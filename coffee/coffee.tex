@@ -42,8 +42,126 @@ Expression rewriting and code specialization have been implemented in a compiler
 To demonstrate the effectiveness of our approach, we provide an extensive and unprecedented performance evaluation across a number of real-world PDEs of increasing complexity, including some based on complex hyperelasticity models. We characterize our problems by varying polynomial order of the employed function spaces and number of so called pre-multiplying functions. To clearly distinguish the improvements achieved by COFFEE, we will compare, for each examined PDE, four sets of code variants: 1) unoptimized code, i.e. a local assembly routine as returned from the domain-specific compiler; 2) code optimized by FEniCS, i.e. the work in~\cite{quadrature1}; 3) code optimized by expression rewriting and code specialization as described in this paper. Notable performance improvements of 3) over 1) and 2) are reported and discussed.
 
 \section{Preliminaries}
+\label{sec:coffee-preliminaries}
+In this section, the basic concepts sustaining the finite element method are summarized. The notation adopted in~\cite{quadrature1} and~\cite{Francis} is followed. At the end of this section, the reader is expected to understand what local assembly represents and how an implementation can be derived starting from a mathematical specification of the finite element problem. 
+
 \subsection{Overview of the Finite Element Method}
-\subsection{From Math to Actual Code}
+We consider the weak formulation of a linear variational problem
+\begin{equation}
+\begin{split}
+Find\ u\ \in U\ such\ that \\
+a(u, v) = L(v), \forall v \in V
+\end{split}
+\end{equation}
+where $a$ and $L$ are called bilinear and linear form, respectively. The set of \textit{trial} functions $U$ and the set of \textit{test} functions $V$ are discrete function spaces. For simplicity, we assume $U = V$ and $\lbrace \phi_i \rbrace$ be the set of basis functions spanning $U$. The unknown solution $u$ can be approximated as a linear combination of the basis functions $\lbrace \phi_i \rbrace$. From the solution of the following linear system it is possible to determine a set of coefficients to express $u$
+\begin{equation}
+A\textbf{u} = b
+\end{equation}
+in which $A$ and $b$ discretize $a$ and $L$ respectively:
+\begin{equation}
+\centering
+\begin{split}
+A_{ij} = a(\phi_i(x), \phi_j(x)) \\
+b_i = L(\phi_i(x))
+\end{split}
+\end{equation}
+The matrix $A$ and the vector $b$ are computed in the so called assembly phase. Then, in a subsequent phase, the linear system is solved, usually by means of an iterative method, and $\textbf{u}$ is eventually evaluated. 
+
+We focus on the assembly phase, which is often characterized as a two-step procedure: \textit{local} and \textit{global} assembly. Optimizing the performance of local assembly is the subject of the research. Local assembly consists of computing the contributions that an element in the discretized domain provide to the approximated solution of the equation. Global assembly, on the other hand, is the process of suitably ``inserting'' such contributions in $A$ and $b$. 
+
+\subsection{Quadrature Representation for Finite Element Local Assembly}
+\label{sec:quadrature-rep}
+Without loss of generality, we illustrate local assembly in a concrete example, the evaluation of the local element matrix for a Laplacian operator. Consider the weighted Laplace equation
+\begin{equation}
+- \nabla \cdot (w \nabla u) = 0
+\end{equation}
+in which $u$ is unknown, while $w$ is prescribed. The bilinear form associated with the weak variational form of the equation is:
+\begin{equation}
+a(v, u) = \int_\Omega w \nabla v \cdot \nabla u\ \mathrm{d}x
+\end{equation}
+The domain $\Omega$ of the equation is partitioned into a set of cells (elements) $T$ such that $\bigcup T = \Omega$ and $\bigcap T = \emptyset$. By defining $\lbrace \phi_i^K \rbrace$ as the set of local basis functions spanning $U$ on the element $K$, we can express the local element matrix as
+\begin{equation}
+\label{eq:stiffness}
+A_{ij}^K = \int_K w \nabla \phi_i^K \cdot \nabla \phi_j^K\ \mathrm{d}x
+\end{equation}
+The local element vector $L$ can be determined in an analogous way starting from the linear form associated with the weak variational form of the equation. 
+
+Quadrature schemes are conveniently used to numerically evaluate $A_{ij}^K$. For convenience, a reference element $K_0$ and an affine mapping $F_K : K_0 \rightarrow K$ to any element $K \in T$ are introduced. This implies a change of variables from reference coordinates $X_0$ to real coordinates $x = F_K (X_0)$ is necessary any time a new element is evaluated. The numerical integration routine based on quadrature representation over an element $K$ can be expressed as follows
+\begin{equation}
+\label{eq:quadrature}
+\scriptsize
+A_{ij}^K = \sum_{q=1}^N \sum_{\alpha_3=1}^n \phi_{\alpha_3}(X^q)w_{\alpha_3} \sum_{\alpha_1=1}^d \sum_{\alpha_2=1}^d \sum_{\beta=1}^d \frac{\partial X_{\alpha_1}}{\partial x_{\beta}} \frac{\partial \phi_i^K(X^q)}{\partial X_{\alpha_1}} \frac{\partial X_{\alpha_2}}{\partial x_{\beta}} \frac{\partial \phi_j^K(X^q)}{\partial X_{\alpha_2}} det F_K' W^q
+\end{equation}
+where $N$ is the number of integration points, $W^q$ the quadrature weight at the integration point $X^q$, $d$ is the dimension of $\Omega$, $n$ the number of degrees of freedom associated to the local basis functions, and $det$ the determinant of the Jacobian matrix used for the aforementioned change of coordinates.  
+
+In the next sections, we will often refer to the local element matrix evaluation, such as Equation~\ref{eq:quadrature} for the weighted Lapalce operator, as the \textit{assembly expression} deriving from the weak variational problem.
+
+\subsection{From Math to Code}
+We have explained that local assembly is the computation of contributions of a specific cell in the discretized domain to the linear system which yields the PDE solution. The process consists of numerically evaluating problem-specific integrals to produce a matrix and a vector (only the derivation of the matrix was shown in Section~\ref{sec:quadrature-rep}), whose sizes depend on the order of the method. This operation is applied to all cells in the discretized domain (mesh).
+
+We consider again the weighted Laplace example of the previous section. A C-code implementation of Equation~\ref{eq:quadrature} is illustrated in Listing~\ref{code:weighted-laplace}. The values at the various quadrature points of basis functions ($\phi$) derivatives are tabulated in the FE0$\_$D10 and FE0$\_$D01 arrays. The summation along quadrature points $q$ is implemented by the \emph{i} loop, whereas the one along $\alpha_3$ is represented by the \emph{r} loop. In this example, we assume $d=2$ (2D mesh), so the summations along $\alpha_1$, $\alpha_2$ and $\beta$ have been straightforwardly expanded in the expression that evaluates the local element matrix $A$. 
+
+\begin{algorithm}
+\scriptsize
+\SetAlgorithmName{LISTING}{}
+
+\KwSty{void} weighted$\_$laplace(\KwSty{double} A[3][3], \KwSty{double} **coordinates, \KwSty{double} **w) \\
+$\lbrace$ \\
+~~  // Compute Jacobian \\
+~~  \KwSty{double} J[4]; \\
+~~  compute$\_$jacobian$\_$triangle$\_$2d(J, coordinates); \\
+~~\\
+~~  // Compute Jacobian inverse and determinant \\
+~~  \KwSty{double} K[4]; \\
+~~  \KwSty{double} detJ; \\
+~~  compute$\_$jacobian$\_$inverse$\_$triangle$\_$2d(K, detJ, J); \\
+~~  \KwSty{const double} det = fabs(detJ); \\
+~~\\
+~~  // Quadrature weights \\
+~~  \KwSty{static const double} W1[1] = {0.5}; \\
+~~\\
+~~  // Basis functions \\
+~~  \KwSty{static const double} FE0$\_$D10[1][3] = $\lbrace\lbrace$ -0.999999999999999, ...$\rbrace\rbrace$ ;\\
+~~  \KwSty{static const double} FE0$\_$D01[1][3] = $\lbrace\lbrace$ -1.0, ...$\rbrace\rbrace$ ;\\
+~~  \KwSty{static const double} FE0[1][3] = $\lbrace\lbrace$ 0.333333333333333, ...$\rbrace\rbrace$ ;\\
+~~\\
+~~  \KwSty{for} (\KwSty{int} i = 0; i < 6; ++i)\\
+~~  $\lbrace$\\
+~~~~  \KwSty{double} F0  = 0.0;\\
+~~~~  \KwSty{for} (\KwSty{int} r  = 0; r < 3; ++r)\\
+~~~~~~  F0 += (w[r][0] * FE0[i][r]);\\
+~~\\
+~~~~  \KwSty{for} (\KwSty{int} j = 0; j < 3; ++j)\\
+~~~~~~    \KwSty{for} (\KwSty{int} k = 0; k < 3; ++k)\\
+~~~~~~~~      A[j][k] += (\underline{(}\textbf{(}((K[1]*FE0$\_$D10[i][k])+(K[3]*FE0$\_$D01[i][k])) * \\
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~((K[1]*FE0$\_$D10[i][j])+(K[3]*FE0$\_$D01[i][j]))\textbf{)} + \\
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~\textbf{(}((K[0]*FE0$\_$D10[i][k])+(K[2]*FE0$\_$D01[i][k])) * \\
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~((K[0]*FE0$\_$D10[i][j])+(K[2]*FE0$\_$D01[i][j]))\textbf{)}\underline{)}*det*W1[i]*F0);\\
+~~  $\rbrace$\\
+$\rbrace$
+\caption{A possible implementation of Equation~\ref{eq:quadrature} assuming a 2D triangular mesh and polynomial order $p=2$ Lagrange basis functions.}
+\label{code:weighted-laplace}
+\end{algorithm}
+
+More complex assembly expressions, due to the employment of particular differential operators in the original PDE, are obviously possible. Intuitively, as the complexity of the PDE grows, the implementation of local assembly becomes increasingly more complicated. This fact is actually the real motivation behind reasearch in automated code generation techniques, such as those used by state-of-the-art frameworks like FEniCS and Firedrake. Automated code generation allows scientists to express the finite element specfication using a domain-specific language resembling mathematical notation, and obtain with no effort a semantically correct implementation of local assembly. The research in the present work is about making such an implementation also extremely effective, in terms of run-time performance, on standard CPU architectures. 
+
+\begin{algorithm}
+\scriptsize
+\SetAlgorithmName{LISTING}{}
+
+// This is a Firedrake construct (\textbf{not} an UFL's) to instantiate a 2D mesh.\\
+mesh = UnitSquareMesh(size, size)\\
+// FunctionSpace also belongs to the Firedrake language \\
+V = FunctionSpace(mesh, "Lagrange", 2)\\
+u = \KwSty{TrialFunction}(V)\\
+v = \KwSty{TestFunction}(V)\\
+weight = \KwSty{Function(V)}.\KwSty{assign}(value)\\
+a = weight\KwSty{*}\KwSty{dot}(\KwSty{grad}(v), \KwSty{grad}(u))\KwSty{*dx}
+\caption{UFL specification of the weighted Laplace equation for polynomial order $p=2$ Lagrange basis functions.}
+\label{code:weighted-laplace}
+\end{algorithm}
+
+The domain-specific language used by Firedrake and FEniCS to express finite element problems is the Unified Form Language (UFL) \cite{ufl}. Listing~\ref{code:weighted-laplace-ufl} shows a possible UFL implementation for the weighted Laplace form. Note the resemblance of \emph{a = weight*...} with Equation~\ref{eq:stiffness}. A form compiler translates UFL code into the C code shown in Listing~\ref{code:weighted-laplace}. We will describe these aspects deeply in Section~\ref{sec:coffee-implementation}; for the moment, this level of detail sufficies to open a discussion on how to optimize local assembly kernels arising from generic partial differential equations. 
 
 \section{On the Space of Possible Code Optimizations}
 \subsection{Outline of COFFEE}
@@ -55,6 +173,7 @@ To demonstrate the effectiveness of our approach, we provide an extensive and un
 \section{Composing Optimizations}
 
 \section{Design and Implementation of COFFEE}
+\label{sec:coffee-implementation}
 \subsection{Input ad Output: the Integration with Firedrake}
 \subsection{Structure}
 \subsection{Conveying Domain-Specific Knowledge}
