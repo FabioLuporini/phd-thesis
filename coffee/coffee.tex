@@ -161,16 +161,18 @@ a = weight\KwSty{*}\KwSty{dot}(\KwSty{grad}(v), \KwSty{grad}(u))\KwSty{*dx}
 \label{code:weighted-laplace}
 \end{algorithm}
 
-The domain-specific language used by Firedrake and FEniCS to express finite element problems is the Unified Form Language (UFL) \cite{ufl}. Listing~\ref{code:weighted-laplace-ufl} shows a possible UFL implementation for the weighted Laplace form. Note the resemblance of \emph{a = weight*...} with Equation~\ref{eq:stiffness}. A form compiler translates UFL code into the C code shown in Listing~\ref{code:weighted-laplace}. We will describe these aspects deeply in Section~\ref{sec:coffee-implementation}; for the moment, this level of detail sufficies to open a discussion on how to optimize local assembly kernels arising from generic partial differential equations. 
+The domain-specific language used by Firedrake and FEniCS to express finite element problems is the Unified Form Language (UFL) \cite{ufl}. Listing~\ref{code:weighted-laplace-ufl} shows a possible UFL implementation for the weighted Laplace form. Note the resemblance of \emph{a = weight*...} with Equation~\ref{eq:stiffness}. A form compiler translates UFL code into the C code shown in Listing~\ref{code:weighted-laplace}. We will describe these aspects carefully in Section~\ref{sec:coffee-implementation}; for the moment, this level of detail sufficies to open a discussion on how to optimize local assembly kernels arising from generic partial differential equations. 
 
 \section{On the Space of Possible Code Optimizations}
 \subsection{Outline of COFFEE}
+
+% Need to mention composability here
 
 \section{Expression Rewriting}
 
 \section{Code Specialization}
 
-\section{Composing Optimizations}
+\section{General-purpose Optimizations}
 
 \section{Design and Implementation of COFFEE}
 \label{sec:coffee-implementation}
@@ -179,7 +181,7 @@ The domain-specific language used by Firedrake and FEniCS to express finite elem
 \subsection{Conveying Domain-Specific Knowledge}
 
 \section{Performance Analysis}
-\subsection{Contribution of Basic Optimizations}
+\subsection{Contribution of Individual Optimizations}
 \subsection{Evaluation in Forms of Increasing Complexity}
 \subsection{Full Application Study}
 
