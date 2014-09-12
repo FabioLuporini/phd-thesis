@@ -310,11 +310,36 @@ In Section~\ref{sec:coffee-implementation}, it is also explained how these class
 
 % Need to mention composability here
 
-\subsection{Expression Rewriting}
+\section{Expression Rewriting}
+\label{sec:coffee-expr-rewrite}
 
-\subsection{Code Specialization}
+Expression rewriting is about exploiting properties of operators such as associativity, distributivity, and commutativity, to minimize arithmetic intensity, expose code vectorization opportunities, and optimize the register pressure in the various levels of the assembly loop nest. There are many possibilities of rewriting an expression, so the transformation space can be quite large. Firstly, in Sections~\ref{sec:coffee-licm}--\ref{sec:coffee-expansion}, several ways of manipulating an assembly expression and their potential impact on the computational cost are described. Then, in Section~\ref{sec:coffee-rewrite-rules}, a simple yet systematic way of rewriting an expression based on a set of formal rewrite rules, which is the key to effectively explore the expression's transformation space, is formalized. 
 
-\subsection{General-purpose Optimizations}
+The second objective of expression rewriting (Section~\ref{sec:coffee-avoidzeros}) consists of re-structuring the iteration space so as to avoid arithmetic operations over zero-valued columns in block-sparse basis functions arrays. Zero-valued columns arise, for example, when taking derivatives on a reference element or when using mixed (vector-valued) elements. This problem was tackled in~\cite{quadrature-olegaard}, but the proposed solution, which makes use of indirection arrays in the generated local assembly code, breaks most of the optimizations applicable by code specialization, including the fundamental SIMD vectorization. The contribution of the present research is a novel domain-aware approach based on symbolic execution that avoids indirection arrays.
+
+\subsection{Generalized Loop-invariant Code Motion}
+\label{sec:coffee-licm}
+
+
+\subsection{Terms Factorization}
+\label{sec:coffee-factorize}
+
+\subsection{Precomputation of Invariant Terms}
+\label{sec:coffee-precompute}
+
+\subsection{Expanding Sub-expressions}
+\label{sec:coffee-expansion}
+
+\subsection{Rewrite Rules of Assembly Expressions}
+\label{sec:coffee-rewrite-rules}
+
+\subsection{Avoiding Iteration over Zero-valued Blocks by Symbolic Execution}
+\label{sec:coffee-avoidzeros}
+
+
+\section{Code Specialization}
+
+\section{General-purpose Optimizations}
 
 \section{Design and Implementation of COFFEE}
 \label{sec:coffee-implementation}
