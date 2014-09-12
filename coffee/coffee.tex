@@ -392,7 +392,7 @@ Expression rewriting also aims at minimizing register pressure in the assembly l
 
 Consider a variant of the Burgers local assembly kernel, shown in Figure~\ref{code:toexpand-code}. This is again a representative, simplified example. We can easily distribute \texttt{det*W[i]} over the three operands on the left-hand side of the multiplication, and then absorb it in the pre-computation of the invariant sub-expression stored in \texttt{T1}, resulting in code as in Figure~\ref{code:expanded-1-code}. Freeing the register destined to the constant \texttt{g} is less straightforward: we cannot absorb it in \texttt{T1} as we did with \texttt{det*W[i]} since \texttt{T1} is also accessed in the \texttt{T1[j]*A[i][k]} sub-expression. The solution is to add another temporary as in Figure~\ref{code:expanded-2-code}. Generalizing, this is a problem of data dependencies: to solve it, we use a dependency graph in which we add a direct edge from identifier \texttt{A} to identifier \texttt{B} to denote that the evaluation of \texttt{B} depends on \texttt{A}. The dependency graph is initially empty, and is updated every time a new temporary is created by either loop-invariant code motion or expansion of terms. The dependency graph is then queried to understand when expansion can be performed without resorting to new temporary values. This aspect is formalized in the next section.
 
-\subsection{Rewrite Rules of Assembly Expressions}
+\subsection{Rewrite Rules for Assembly Expressions}
 \label{sec:coffee-rewrite-rules}
 
 In general, assembly expressions produced by automated code generation can be much more complex than those we have used as examples, with dozens of terms involved (basis function arrays, derivatives, coefficients, ...) and hundreds of (nested) arithmetic operations. Our goal is to establish a portable, unified, platform-independent, and systematic way of reducing the computational strength of an expression exploiting the intuitions described in the previous section. This \textit{expression rewriting} should be simple; definitely, it must be robust to be integrated in an optimizing domain-specific compiler capable of supporting real problems, such as COFFEE. In other words, we look for an algorithm capable of transforming a plain assembly expression by applying 1) generalized loop-invariant code motion, 2) non-trivial factorization and re-association of sub-expressions, and 3) expansion of terms; after that, it should perform 4) scalar-expansion of integration-dependent terms to achieve full vectorization of the assembly code. 
@@ -444,7 +444,7 @@ To what extent should rewrite rules be applied is a question that cannot be answ
 \label{sec:coffee-avoidzeros}
 Skipping arithmetic operations over blocks of zero-valued entries in basis functions arrays is the second goal of expression rewriting. Zero-valued columns arise, for example, when taking derivatives on a reference element and when employing mixed elements. In~\cite{quadrature-olegaard}, a technique to avoid operations on zero-valued columns based on the use of indirection arrays was described (e.g. \texttt{A[B[i]]}, where \texttt{A} is a tabulated basis function and \texttt{B} a map from loop iterations to non-zero columns in \texttt{A}) and implemented in the FEniCS framework. The approach proposed in this section will be evaluated and compared to this pioneering work. Essentially, the strategy avoids indirection arrays in the generated code, which otherwise would break the optimizations applicable by code specialization, including SIMD vectorization. 
 
-\begin{figure}[t]
+\begin{figure}[h]
 \tiny
 \centering     
 \subfigure[Original code. Note the annotation over the definition of the tabulated basis function \texttt{D}, which is used to identify the presence of zero-valued columns]{\label{fig:withzeros-code}\lstinputlisting{coffee/listings/withzeros.code}}
@@ -463,6 +463,144 @@ The goal is achieved by means of symbolic execution. The algorithm expects some 
 
 \section{Code Specialization}
 \label{sec:coffee-code-spec}
+Code specialization's goal is architecture-specific optimization for instruction-level parallelism and register locality. 
+
+\subsection{Padding and Data Alignment}
+\label{sec:coffee-padding}
+The absence of stencils renders the local element matrix computation easily auto-vectorizable by a general-purpose compiler. Nevertheless, auto-vectorization is not efficient if data are not aligned to cache-line boundaries and if the length of the innermost loop is not a multiple of the vector length $\mbox{\texttt{VL}}$, especially when the loops are small as in local assembly. 
+
+Data alignment is enforced in two steps. Firstly, all arrays are allocated to addresses that are multiples of $\mbox{\texttt{VL}}$. Then, two dimensional arrays are padded by rounding the number of columns to the nearest multiple of $\mbox{\texttt{VL}}$. For instance, assume the original size of a basis function array is 3$\times$3 and $\mbox{\texttt{VL}}=4$ (e.g. AVX processor, with 256-bit long vector registers and 64-bit double-precision floats). In this case, a padded version of the array will have size 3$\times$4. The compiler is explicitly told about data alignment using suitable pragmas; for example, in the case of the Intel compiler, the annotation \texttt{$\#$pragma vector aligned} is added before the loop (as shown in later figures) to inform that all of the memory accesses in the loop body will be properly aligned. This allows the compiler to issue aligned load and store instructions, which are notably faster than unaligned ones.
+
+Padding of all two dimensional arrays involved in the evaluation of the element matrix also allows to safely round the loop trip count to the nearest multiple of $\mbox{\texttt{VL}}$. This avoids the introduction of a remainder (scalar) loop from the compiler, which would render vectorization less efficient. These extra iterations only write to the padded region of the element matrix, and therefore have no side effects on the final result.
+
+\subsubsection{Example}
+Consider again the code in Figure~\ref{fig:withzeros-skipped-code}. The arrays in the loop nest \texttt{[j1,k1]} can be padded and the right bound of loop \texttt{k1} can be safely increased to 8: eventually, values computed in the region \texttt{M[0:3][6:8]} will be discarded. Then, by explicitly aligning arrays and using suitable pragmas (e.g. \texttt{$\#$pragma simd} for the Intel compiler), effective SIMD auto-vectorization can be obtained for this loop nest. 
+
+There are some complications in the case of loops \texttt{[j0,k0]}. Here, increasing the loop bound to 4 is still safe, assuming that both \texttt{T1} and \texttt{A} are padded with zero-valued entries, but it has no effect: the starting addresses of the load instructions would be \texttt{T1[3]} and \texttt{A[i][3]}, which are not aligned. One solution is to start iterating from the closest index that would ensure data alignment: in this specific case, $k0=0$. However, this would imply losing (partially in general, totally for this loop nest) the effect of the zero-avoidance transformation. Another possibility is to attain to non-aligned accesses. Which of the two strategy is better cannot be established a-priori, nor is east to formalize a cost model that helps discerning between them; an autotuning system, as described in Section~\ref{sec:coffee-autotune}, can be used to answer this question.
+
+Note that when the extra iterations end up accessing non-zero entries in the local element matrix \texttt{M} there is no way of recovering data alignment.
+
+\subsection{Model-driven Vector-register Tiling}
+\label{sec:coffee-opvect}
+
+One notable problem of assembly kernels concerns register allocation and register locality. The critical situation occurs when loop trip counts and the variables accessed are such that the vector-register pressure is high. Since the kernel's working set fits the L1 cache, it is particularly important to optimize register management. Standard optimizations, such as loop interchange, unroll, and unroll-and-jam, can be employed to deal with this problem. In COFFEE, these optimizations are supported either by means of explicit code transformations (interchange, unroll-and-jam) or indirectly by delegation to the compiler through standard pragmas (unroll). Tiling at the level of vector registers is an additional feature of COFFEE. Based on the observation that the evaluation of the element matrix can be reduced to a summation of outer products along the \texttt{j} and \texttt{k} dimensions, a model-driven vector-register tiling strategy can be implemented. If we consider the codes in the various listings and we focus on the body of the test and trial functions loops (\texttt{j} and \texttt{k}), the computation of the element matrix is abstractly expressible as
+\begin{equation}
+\scriptsize
+\label{outer-product}
+A_{jk} = \sum_{\substack{
+  x \in B' \subseteq B \\
+  y \in B'' \subseteq B}}
+x_j\cdot y_k ~~~~~~ j,k = 0,...,2
+\end{equation}
+where $B$ is the set of all basis functions (or temporary variables, e.g., \texttt{LI$\_$0}) accessed in the kernel, whereas $B'$ and $B''$ are generic problem-dependent subsets. Regardless of the specific input problem, by abstracting from the presence of all variables independent of both \texttt{j} and \texttt{k}, the element matrix computation is always reducible to this form. Figure~\ref{fig:vect-by-vect} illustrates how we can evaluate 16 entries ($j,k=0,...,3$) of the element matrix using just 2 vector registers, which represent a 4$\times$4 tile, assuming $\vert B' \vert = \vert B'' \vert = 1$. Values in a register are shuffled each time a product is performed. Standard compiler auto-vectorization for both GNU and Intel compilers, instead, executes 4 broadcast operations (i.e., ``splat'' of a value over all of the register locations) along the outer dimension to perform the calculation. In addition to incurring a larger number of cache accesses, it needs to keep between $f=1$ and $f=3$ extra registers to perform the same 16 evaluations when unroll-and-jam is used, with $f$ being the unroll-and-jam factor.
+
+%More importantly, we avoid using $\mbox{\texttt{VL}}$-1 registers per each
+%outer-loop-dependent variable (i.e., all $x$ terms in
+%Equation~\ref{outer-product}), with $\mbox{\texttt{VL}}$ being the vector
+%length. This is a considerable gain, which allows us to slice the
+%iteration space into bigger tiles, implemented directly by vector
+%registers.
+
+\begin{figure}[h]
+\centerline{\includegraphics[scale=0.6]{coffee/pictures/vect-by-vect-inline.pdf}}
+\caption{Outer-product vectorization by permuting values in a vector register.}
+\label{fig:vect-by-vect}
+\end{figure}
+
+The storage layout of $A$, however, is incorrect after the application of this outer-product-based vectorization (\emph{op-vect}, in the following). It can be efficiently restored with a sequence of vector shuffles following the pattern highlighted in Figure~\ref{fig:restore-layout}, executed once outside of the \texttt{ijk} loop nest. The pseudo-code for the Burgers equation when using \emph{op-vect} is shown in Listing~\ref{code:helmholtz-opvect}.
+
+\begin{figure}[h]
+\centerline{\includegraphics[scale=0.6]{coffee/pictures/vect-restore-inline.pdf}}
+\caption{Restoring the storage layout after \emph{op-vect}. The figure shows how 4$\times$4 elements in the top-left block of the element matrix $A$ can be moved to their correct positions. Each rotation, represented by a group of three same-colored arrows, is implemented by a single shuffle intrinsic.}
+\label{fig:restore-layout}
+\end{figure}
+
+%are sufficiently large to prevent register reuse along the innermost
+%dimension \texttt{k}. A combination of the two scenarios is also
+%possible. We want to exploit the small size of the iteration space
+%and the structure of the computation to optimize register management.
+
+\begin{algorithm}
+\scriptsize
+\SetAlgorithmName{LISTING}{}
+
+\KwSty{void} burgers(\KwSty{double} A[4][4], \KwSty{double} **coords) $\lbrace$\\
+~~// K, det = Compute Jacobian (coords) \\
+~~// Declaration of basis function matrices \\
+~~\\
+~~\KwSty{for} (\KwSty{int} i = 0; i$<$3; i++) $\lbrace$ \\
+~~~~// Do expression rewriting \\
+~~~~\KwSty{for} (\KwSty{int} j = 0; j$<$4; j+=4) \\
+~~~~~~\KwSty{for} (\KwSty{int} k = 0; k$<$4; k+=4) $\lbrace$\\
+~~~~~~~~// \emph{load} and \emph{set} intrinsics \\
+~~~~~~~~// Compute A[0,0], A[1,1], A[2,2], A[3,3] \\
+~~~~~~~~// One \emph{permute\_pd} intrinsic per \texttt{k}-loop \emph{load}\\
+~~~~~~~~// Compute A[0,1], A[1,0], A[2,3], A[3,2] \\
+~~~~~~~~// One \emph{permute2f128\_pd} intrinsic per \texttt{k}-loop \emph{load}\\
+~~~~~~~~// ...\\
+~~~~~~$\rbrace$\\
+~~~~// Remainder loop (from $j=4$ to $j=6$)\\
+~~$\rbrace$\\
+~~// Restore the storage layout:\\
+~~\KwSty{for} (\KwSty{int} j = 0; j$<$4; j+=4) $\lbrace$\\
+~~~~\KwSty{$\_\_$m256d} r0, r1, r2, r3, r4, r5, r6, r7;\\
+~~~~\KwSty{for} (\KwSty{int} k = 0; k$<$4; k+=4) $\lbrace$\\
+~~~~~~r0 = $\_$mm256$\_$load$\_$pd ($\&$A[j+0][k]);\\
+~~~~~~// Load A[j+1][k], A[j+2][k], A[j+3][k]\\
+~~~~~~r4 = $\_$mm256$\_$unpackhi$\_$pd (r1, r0);\\
+~~~~~~r5 = $\_$mm256$\_$unpacklo$\_$pd (r0, r1);\\
+~~~~~~r6 = $\_$mm256$\_$unpackhi$\_$pd (r2, r3);\\
+~~~~~~r7 = $\_$mm256$\_$unpacklo$\_$pd (r3, r2);\\
+~~~~~~r0 = $\_$mm256$\_$permute2f128$\_$pd (r5, r7, 32);\\
+~~~~~~r1 = $\_$mm256$\_$permute2f128$\_$pd (r4, r6, 32);\\
+~~~~~~r2 = $\_$mm256$\_$permute2f128$\_$pd (r7, r5, 49);\\
+~~~~~~r3 = $\_$mm256$\_$permute2f128$\_$pd (r6, r4, 49);\\
+~~~~~~$\_$mm256$\_$store$\_$pd ($\&$A[j+0][k], r0);\\
+~~~~~~// Store A[j+1][k], A[j+2][k], A[j+3][k]\\
+~~~~$\rbrace$\\
+~~$\rbrace$\\
+$\rbrace$
+\caption{Local assembly code for the Burgers problem after vector-register tiling (outer-product vectorization), expression rewriting, padding and data alignment. In this example, the unroll-and-jam factor is 1.}
+\label{code:helmholtz-opvect}
+\end{algorithm}
+
+
+
+
+\subsection{Expression Splitting}
+\label{sec:coffee-split}
+
+\begin{algorithm}
+\scriptsize
+\SetAlgorithmName{LISTING}{}
+
+\KwSty{void} helmholtz(\KwSty{double} A[3][4], \KwSty{double} **coords) $\lbrace$\\
+~~~~// Same code as in Listing~\ref{code:helmholtz-licm} up to the j loop\\
+~~~~\KwSty{for} (\KwSty{int} j = 0; j$<$3; j++) \\
+~~~~~~\KwSty{$\#$pragma vector aligned}\\
+~~~~~~\KwSty{for} (\KwSty{int} k = 0; k$<$4; k++) \\
+~~~~~~~~A[j][k] += (Y[i][k]*Y[i][j]+LI$\_$0[k]*LI$\_$0[j])*det*W3[i];\\
+~~~~\KwSty{for} (\KwSty{int} j = 0; j$<$3; j++) \\
+~~~~~~\KwSty{$\#$pragma vector aligned}\\
+~~~~~~\KwSty{for} (\KwSty{int} k = 0; k$<$4; k++) \\
+~~~~~~~~A[j][k] += LI$\_$1[k]*LI$\_$1[j]*det*W3[i];\\
+$\rbrace$
+\caption{Local assembly code generated by Firedrake for the Helmholtz problem in which \emph{split} has been applied on top of the optimizations shown in Listing~\ref{code:helmholtz-licm}. In this example, the split factor is 2.}
+\label{code:helmholtz-split}
+\end{algorithm}
+
+In complex kernels, like Burgers in Listing~\ref{code:burgers}, and on certain architectures, achieving effective register allocation can be challenging. If the number of variables independent of the innermost-loop dimension is close to or greater than the number of available CPU registers, poor register reuse is likely. This usually happens when the number of basis function arrays, temporaries introduced by generalized loop-invariant code motion, and problem constants is large. For example, applying loop-invariant code motion to Burgers on a 3D mesh requires 24 temporaries for the \texttt{ijk} loop order. This can make hoisting of the invariant loads out of the \texttt{k} loop inefficient on architectures with a relatively low number of registers. One potential solution to this problem consists of suitably ``splitting'' the computation of the element matrix $A$ into multiple sub-expressions; an example, for the Helmholtz problem, is given in Listing~\ref{code:helmholtz-split}. The transformation can be regarded as a special case of classic loop fission, in which associativity of the sum is exploited to distribute the expression across multiple loops. To the best of our knowledge, expression splitting is not supported by available compilers.
+
+Splitting an expression (henceforth \emph{split}) has, however, several drawbacks. Firstly, it increases the number of accesses to $A$ proportionally to the ``split factor'', which is the number of sub-expressions produced. Also, depending on how the split is executed, it can lead to redundant computation. For example, the number of times the product $det*W3[i]$ is performed is proportional to the number of sub-expressions, as shown in the code snippet. Further, it increases loop overhead, for example
+through additional branch instructions. Finally, it might affect register locality: for instance, the same array could be accessed in different sub-expressions, requiring a proportional number of loads be performed. This is not the case for the Helmholtz example. Nevertheless, as shown in Section~\ref{sec:perf-results}, the performance gain from improved register reuse along inner dimensions can still be greater, especially if the split factor and the splitting itself use heuristics to minimize the aforementioned issues.
+
+
+\subsection{Exposing Linear Algebra Operations}
+\label{sec:coffee-blas}
+
+\subsection{Model-driven Dynamic Autotuning}
+\label{sec:coffee-autotune}
+
 \section{General-purpose Optimizations}
 
 \section{Design and Implementation of COFFEE}
