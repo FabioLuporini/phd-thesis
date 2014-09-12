@@ -288,22 +288,33 @@ $\rbrace$
 \label{code:burgers}
 \end{algorithm}
 
-The actual complexity of a local assembly kernel depends on the finite element problem being solved. In simpler cases, the loop nest is perfect, has short trip counts (in the range 3--15), and the computation reduces to a summation of a few products involving basis functions. An example is provided in Listing~\ref{code:helmholtz}, which shows the assembly kernel for a Helmholtz problem using Lagrange basis functions on 2D elements with polynomial order $p=1$. In other scenarios, for instance when solving the Burgers equation, the number of arrays involved in the computation of the element matrix can be much larger. The assembly code is given in Listing~\ref{code:burgers} and contains 14 unique arrays that are accessed, where the same array can be referenced multiple times within the same expression. This may also require the evaluation of constants in outer loops (called $F$ in the code) to act as scaling factors of arrays. Trip counts grow proportionally to the order of the method and arrays may be block-sparse. In addition to a larger number of operations, more complex cases like the Burgers equation are characterized by high register pressure.
+The actual complexity of a local assembly kernel depends on the finite element problem being solved. In simpler cases, the loop nest is perfect, has short trip counts (in the range 3--15), and the computation reduces to a summation of a few products involving basis functions. An example is provided in Listing~\ref{code:helmholtz}, which shows the assembly kernel for a Helmholtz problem using Lagrange basis functions on 2D elements with polynomial order $p=1$. In other scenarios, for instance when solving the Burgers equation, the number of arrays involved in the computation of the element matrix can be much larger. The assembly code is given in Listing~\ref{code:burgers} and contains 14 unique arrays that are accessed, where the same array can be referenced multiple times within the same expression. This may also require the evaluation of constants in outer loops (called $F$ in the code) to act as scaling factors of arrays. Trip counts grow proportionally to the order of the method and arrays may be block-sparse.
 
-The Helmholtz and Burgers equations exemplify a large class of problems and, as such, will constitute our benchmark problems, along with the Diffusion equation. We carefully motivate this choice in Section~\ref{sec:real-examples}.
+In general, the variations in the structure of mathematical expressions and in loop trip counts (although typically limited to the order of tens of iterations) that different equations show, render the optimization process challenging, requiring distinct sets of transformations to bring performance closest to the machine peak. For example, the Burgers problem, given the large number of arrays accessed, suffers from high register pressure, whereas the Helmholtz equation does not. Moreover, arrays in Burgers are block-sparse due to the use of vector-valued basis functions (we will elaborate on this in the next sections). These few aspects (we could actually find more) already intuitively suggests that the two problems require a different treatment, based on an in-depth analysis of both data and iteration spaces. Furthermore, domain knowledge enables transformations that a general-purpose compiler could not apply, making the optimization space even larger. In this context, our goal is to understand the relationship between distinct code transformations, their impact on cross-loop arithmetic intensity, and to what extent their composability is effective in a wide class of real-world equations and architectures.
 
-Despite the infinite variety of assembly kernels that frameworks like FEniCS and Firedrake can generate, it is still possible to identify common domain-specific traits that can be exploited for effective code transformations and SIMD vectorization. These include: 1) memory accesses along the three loop dimensions are always unit stride; 2) the \texttt{j} and \texttt{k} loops are interchangeable, whereas interchanges involving the $i$ loop require pre-computation of values (e.g. the $F$ values in Burgers) and introduction of temporary arrays, as explained in Section~\ref{sec:code-transf}; 3) depending on the problem being solved, the \texttt{j} and \texttt{k} loops could iterate along the same iteration space; 4) most of the sub-expressions on the right hand side of the element matrix computation depend on just two loops (either \texttt{i}-\texttt{j} or \texttt{i}-\texttt{k}). In the following sections we show how to exploit these observations to define a set of systematic, composable optimizations.
+We also note that despite the infinite variety of assembly kernels that frameworks like FEniCS and Firedrake can generate, it is still possible to identify common domain-specific traits that are potentially exploitable for our optimization strategy. These include: 1) memory accesses along the three loop dimensions are always unit stride; 2) the \texttt{j} and \texttt{k} loops are interchangeable, whereas interchanges involving the $i$ loop require pre-computation of values (e.g. the $F$ values in Burgers) and introduction of temporary arrays (explained next); 3) depending on the problem being solved, the \texttt{j} and \texttt{k} loops could iterate along the same iteration space; 4) most of the sub-expressions on the right hand side of the element matrix computation depend on just two loops (either \texttt{i}-\texttt{j} or \texttt{i}-\texttt{k}). In the following sections we show how to exploit these observations to define a set of systematic, composable optimizations.
 
-\section{On the Space of Possible Code Optimizations}
-\subsection{Outline of COFFEE}
+%TODO: more observations are needed here: e.g. linear algebra operations...
+
+\section{Optimizing Finite Element Local Assembly}
+
+To generate high performance implementation of local assembly kernels, assembly expressions must be optimized with regards to three interrelated aspects: 
+\begin{itemize}
+\item arithmetic intensity
+\item instruction-level parallelism
+\item data locality
+\end{itemize}
+Three conceptually distinct kind of transformations can be individuated, which we refer to as \textit{expression rewriting}, \textit{code specialization}, and \textit{general-purpose optimizations}. Expression rewriting mainly targets arithmetic intensity by transforming the assembly expression (and its enclosing loop nest) so as to minimize the number of floating point operations required to evaluate the local element matrix. Code specialization is tailored to optimizing for instruction-level parallelism, particularly SIMD vectorization, and data (register) locality. Both classes of transformations are inspired by the inherent structure of local assembly code and make use of domain knowledge: as elaborated in the next sections, these two aspects are the core motivations for which standard general-purpose compilers fail at maximizing the performance of local assembly kernels. The third class of transformations is about general-purpose optimizations; that is, generic, well-known techniques for improving code performance, such as loop unrolling or loop interchange, that for some reasons are not applied by the compiler generating machine code, but potentially useful in certain equations.
+
+In Section~\ref{sec:coffee-implementation}, it is also explained how these classes of transformations must be applied following a specific order. Also, some effort was invested to ensure that optimizations at stage $i$ (e.g. expression rewriting) would not break any further optimization opportunity at stage $i+1$ (code specialization). In the following, we present the various classes of transformations following the order in which they are expected to be applied to a local assembly kernel.
 
 % Need to mention composability here
 
-\section{Expression Rewriting}
+\subsection{Expression Rewriting}
 
-\section{Code Specialization}
+\subsection{Code Specialization}
 
-\section{General-purpose Optimizations}
+\subsection{General-purpose Optimizations}
 
 \section{Design and Implementation of COFFEE}
 \label{sec:coffee-implementation}
