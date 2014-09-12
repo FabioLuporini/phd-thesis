@@ -320,25 +320,132 @@ The second objective of expression rewriting (Section~\ref{sec:coffee-avoidzeros
 \subsection{Generalized Loop-invariant Code Motion}
 \label{sec:coffee-licm}
 
+\begin{figure}
+\centering
+\label{code:original-code}
+\footnotesize
+\lstinputlisting{coffee/listings/simple.code}
+\caption{Original (simplified) code}
+\end{figure}
+
+Consider the local element matrix computation in Figure~\ref{code:original-code}, which is an excerpt from the Burgers problem shown in Listing~\ref{code:burgers}. The assembly expression, produced by the FEniCS and Firedrake's form compiler, has been deliberately simplified, and code details have been omitted for brevity and readability. In practice, as already emphasized, assembly expressions can be much more complex depending on the differential operators employed in the variational form; however, this example is representative enough for highlighting patterns that are common in a large class of equations. 
+
+A first glimpse of the code suggests that the \texttt{a*f0*A[i][j]+b*f1*B[i][j]} sub-expression is invariant with respect to the innermost (trial functions) loop \texttt{k}, so it can be hoisted at the level of the outer loop \texttt{j} to avoid redundant computation. This is indeed a standard compiler transformation, supported by any available compilers, so, in principle, there should be no need to transform the source code explicitly. With a closer look we notice that the sub-expression \texttt{d*D[i][k]+e*E[i][k]} is also invariant, although, this time, with respect to the outer (test functions) loop \texttt{j}. Available compilers (e.g. \emph{GNU's} and \emph{Intel's}) limit the search for code motion opportunities to the innermost loop of a given nest. Moreover, the hoisted code is scalar and therefore not subjected to SIMD auto-vectorization. In other words, these general-purpose compilers lack performance models to determine (i) the optimal place where to hoist an expression and (ii) the potential gain and overhead (due to the need for extra temporary memory) of vectorization. These are notable limitations for local assembly kernels. 
+
+\begin{figure}
+\centering
+\label{code:invariant-code}
+\footnotesize
+\lstinputlisting{coffee/listings/invariant.code}
+\caption{Invariant code}
+\end{figure}
+
+We work around these limitations with source-level loop-invariant code motion. In particular, we pre-compute all values that an invariant sub-expression assumes along its fastest varying dimension. This is implemented by introducing a temporary array per invariant sub-expression and by adding a new loop to the nest. At the price of extra memory for storing temporaries, the gain is that lifted terms can be auto-vectorized as part of an inner loop. Given the short trip counts of our loops, it is important to achieve auto-vectorization of hoisted terms in order to minimize the percentage of scalar instructions, which could otherwise be significant. It is also worth noting that, in some problems, for instance Helmholtz in Listing~\ref{code:helmholtz}, invariant sub-expressions along \texttt{j} are identical to those along \texttt{k}, and both loops iterate over the same iteration space, as anticipated in Section~\ref{sec:background}. In these cases, we safely avoid redundant pre-computation. The resulting code for the running Burgers example is shown in Figure~\ref{code:invariant-code}.
+
+In the following, we refer to this series of transformations as \textit{generalized loop-invariant code motion}. We will show that this optimization is crucial when optimizing non-trivial assembly expressions, allowing to achieve performance improvements over the original code larger than 3$\times$.
+
 
 \subsection{Terms Factorization}
 \label{sec:coffee-factorize}
 
+\begin{figure}
+\centering
+\label{code:factorized-code}
+\footnotesize
+\lstinputlisting{coffee/listings/factorized.code}
+\caption{Factorized code}
+\end{figure}
+
+After generalized loop-invariant code motion has been applied, some assembly expressions can still  ``hide'' opportunities for code hoisting. By examining again the code in Figure~\ref{code:invariant-code}, we notice that the basis function array \texttt{A} iterating along the \texttt{[i,j]} loops appears twice in the expression. By expanding the products in which \texttt{A} is accessed and by applying sum commutativity, terms can be factorized. This has two effects: firstly, it reduces the number of arithmetic operations performed; secondly, and most importantly, it exposes a new sub-expression \texttt{A[i][k]/c+T2[k]*f} invariant with respect to loop \texttt{j}. Consequently, hoisting can be performed, resulting in the code in Figure~\ref{code:factorized-code}. In general, exposing factorization opportunities requires traversing the whole expression tree, and then expanding and moving terms. It also needs heuristics to select a factorization strategy: there may be different opportunities of reorganizing sub-expressions, and, in our case, the best is the one that maximizes the invariant code eventually disclosed. We will discuss this aspect formally in Section~\ref{sec:coffee-rewrite-rules}.
+
 \subsection{Precomputation of Invariant Terms}
 \label{sec:coffee-precompute}
+
+\begin{figure}
+\centering
+\label{code:scalarexp-code}
+\footnotesize
+\lstinputlisting{coffee/listings/vectexpanded.code}
+\caption{Scalar-expanded code}
+\end{figure}
+
+We note that integration-dependent expressions are inherently executed as scalar code. For example, the \texttt{f0*a} and \texttt{f1*b} products in Figure~\ref{fig:factorized-code} depend on the loop along quadrature points; these operations are performed in a non-vectorized way at every \texttt{i} iteration. This is not a big issue in our running example, in which the scalar computation represents a small fraction of the total, but it becomes a concrete problem in complicated forms, like those at the heart of hyperelasticity (which will be part of our performance evaluation). In such forms, the amount of computation independent of both test and trial functions loops is so large that it has a significant impact on the run-time, despite being executed only $O(I)$ times (with $I$ number of quadrature points). We have therefore implemented an algorithm to move and scalar-expand integration-dependent expressions, which leads to codes as in Figure~\ref{code:scalarexp-code}.
 
 \subsection{Expanding Sub-expressions}
 \label{sec:coffee-expansion}
 
+Expression rewriting also aims at minimizing register pressure in the assembly loop nest. Once the code has been optimized for arithmetic intensity, it is important to think about how the transformations impacted register allocation. Assume the local assembly kernel is executed on a state-of-the-art CPU architecture having 16 logical registers, e.g. an Intel Haswell. Each value appearing in the expression is loaded and kept in a register as long as possible. In Figure~\ref{code:scalarexp-code}, for instance, the scalar value \texttt{g} is loaded once, whereas the term \texttt{det*W[i]} is precomputed and loaded in a register at every \texttt{i} iteration. This implies that at every iteration of the \texttt{[j,k]} loop nest, 12$\%$ of the available registers are spent just to store values independent of test and trial functions loops. In more complicated expressions, the percentage of registers destined to store such constant terms can be even higher. Registers are, however, a precious resource, especially when evaluating compute-intensive expressions. The smaller is the number of available free registers, the worse is the instruction-level parallelism achieved: for example, a shortage of registers can increase the pressure on the L1 cache (i.e. it can worsen data locality), or it may prevent the effective application of standard transformations, e.g. loop unrolling. We aim at relieving this problem by suitably expanding terms and introducing, where necessary, additional temporary values. We illustrate this in the following example.
+
+%An analogous analysis applies to processors with larger numbers of registers, since using loop unroll or loop unroll-and-jam to expose more instruction-level parallelism would increase the requirements on registers.
+
+\begin{figure}
+\footnotesize
+\subfigure[Original (simplified) code]{\label{code:toexpand-code}\lstinputlisting{coffee/listings/toexpand.code}}
+~\\
+~\\
+\subfigure[The code after expansion of \texttt{det*W[i]}]{\label{code:expanded-1-code}\lstinputlisting{coffee/listings/expanded-1.code}}
+~\\
+~\\
+\subfigure[The code after expansion of \texttt{g}. Note the need to introduce a new temporary array.]{\label{code:expanded-2-code}\lstinputlisting{coffee/listings/expanded-2.code}}
+\caption{Expansion of terms to improve register pressure in a local assembly kernel}\label{code:expanded-code}
+\end{figure}
+
+Consider a variant of the Burgers local assembly kernel, shown in Figure~\ref{code:toexpand-code}. This is again a representative, simplified example. We can easily distribute \texttt{det*W[i]} over the three operands on the left-hand side of the multiplication, and then absorb it in the pre-computation of the invariant sub-expression stored in \texttt{T1}, resulting in code as in Figure~\ref{code:expanded-1-code}. Freeing the register destined to the constant \texttt{g} is less straightforward: we cannot absorb it in \texttt{T1} as we did with \texttt{det*W[i]} since \texttt{T1} is also accessed in the \texttt{T1[j]*A[i][k]} sub-expression. The solution is to add another temporary as in Figure~\ref{code:expanded-2-code}. Generalizing, this is a problem of data dependencies: to solve it, we use a dependency graph in which we add a direct edge from identifier \texttt{A} to identifier \texttt{B} to denote that the evaluation of \texttt{B} depends on \texttt{A}. The dependency graph is initially empty, and is updated every time a new temporary is created by either loop-invariant code motion or expansion of terms. The dependency graph is then queried to understand when expansion can be performed without resorting to new temporary values. This aspect is formalized in the next section.
+
 \subsection{Rewrite Rules of Assembly Expressions}
 \label{sec:coffee-rewrite-rules}
+
+In general, assembly expressions produced by automated code generation can be much more complex than those we have used as examples, with dozens of terms involved (basis function arrays, derivatives, coefficients, ...) and hundreds of (nested) arithmetic operations. Our goal is to establish a portable, unified, platform-independent, and systematic way of reducing the computational strength of an expression exploiting the intuitions described in the previous section. This \textit{expression rewriting} should be simple; definitely, it must be robust to be integrated in an optimizing domain-specific compiler capable of supporting real problems, such as COFFEE. In other words, we look for an algorithm capable of transforming a plain assembly expression by applying 1) generalized loop-invariant code motion, 2) non-trivial factorization and re-association of sub-expressions, and 3) expansion of terms; after that, it should perform 4) scalar-expansion of integration-dependent terms to achieve full vectorization of the assembly code. 
+
+We centre such an algorithm around a set of rewrite rules. These rules drive the transformation of an expression, prescribe where invariant sub-expressions will be moved (i.e. at what level in the loop nest), and track the propagation of data dependencies. When applying a rule, the state of the loop nest must be updated to reflect, for example, the use of a new temporary and new data dependencies. We define the state of a loop nest as $L = (\sigma, G)$, where $G = (V, E)$ represents the dependency graph, while $\sigma : Inv \rightarrow S$ maps invariant sub-expressions to identifiers of temporary arrays. The notation $\sigma_i$ refers to invariants hoisted at the level of loop $i$. We also introduce the \textit{conditional hoister} operator $[]$ on $\sigma$ such that
+\begin{gather*}
+\sigma[\sfrac{v}{x}] = 
+\begin{cases}
+\sigma(x) \text{~~~~~~~~if $x \in Inv$; $v$ is ignored}\\
+v \text{~~~~~~~~~~~~~if $x$ $\notin$ $Inv$; $\sigma$(x) = v}\\
+\end{cases}
+\end{gather*}
+That is, if the invariant expression \texttt{x} has already been hoisted, $[]$ returns the temporary identifier hosting its value; otherwise, \texttt{x} is hoisted and a new temporary $v$ is created. There is a special case when $v = \perp$, used for \textit{conditional deletion} of entries in $\sigma$. Specifically
+\begin{gather*}
+\sigma[\sfrac{\perp}{x}] = 
+\begin{cases}
+\sigma(x) \text{~~~~~~~~if $x \in Inv$; $\sigma = \sigma \setminus (x, \sigma(x))$}\\
+v \text{~~~~~~~~~~~~~~if $x$ $\notin$ $Inv$; $v \notin S$}\\
+\end{cases}
+\end{gather*}
+In other words, the invariant sub-expression \texttt{x} is removed and the temporary identifier that was hosting its value is returned if \texttt{x} had been previously hoisted; otherwise, a fresh identifier $v$ is returned. This is useful to express updates of hoisted invariant sub-expressions when expanding terms.
+
+In the following, a generic (sub-)expression is represented with Roman letters \texttt{a, b, ...}; constant terms are considered a special case, so Greek letters \texttt{$\alpha$, $\beta$, ...} are used instead. The iteration vector $i = [i_0, i_1, ...]$ is the ordered sequence of the indices of the loops enclosing an (sub-)expression. We will refer to $i_0$ as the outermost enclosing loop. The notation $a_i$, therefore, indicates that the expression $a$ assumes distinct values while iterating along the loops in $i$; its outermost loop is silently assumed to be $i_0$. 
+
+\begin{figure}[t]
+\scriptsize
+\centering
+\begin{spacing}{1.35}
+\begin{align*}
+~~~~~~&Rule &~~&~~~~~~~~~~~~~~~~~~~~~~~~Precondition \\
+[a_i \cdot b_j]_{(\sigma, G)} &\rightarrow [a_i \cdot b_j]_{(\sigma, G)} ~~&~~&\\
+[(a_i + b_j)\cdot \alpha]_{(\sigma, G)} &\rightarrow [(a_i \cdot \alpha + b_j \cdot \alpha)]_{(\sigma, G)} ~~&~~ &\\
+[a_i \cdot b_j + a_i \cdot c_j]_{(\sigma, G)} &\rightarrow [(a_i \cdot (b_j + c_j)]_{(\sigma, G)} ~~&~~ &\\
+[a_i + b_i]_{(\sigma, G)} &\rightarrow [t_i]_{(\sigma', G')} ~~&~~ &t_i = \sigma_{i_0}[\sfrac{t_i'}{a_i + b_i}], G' = (V \cup {t_i}, E \cup \lbrace(t_i, a_i), (t_i, b_i)\rbrace)\\
+[(a_i \cdot b_j) \cdot \alpha]_{(\sigma, G)} &\rightarrow [t_i \cdot b_j]_{(\sigma', G')} ~~&~~ &\sharp(b_j) > \sharp(a_i), t_i = \sigma_{i_0}[\sfrac{\sigma[\sfrac{\perp}{a_i}]}{a_i \cdot \alpha}], a_i \notin in(G), \\
+~&~~&~~&G' = (V \cup {t_i}, E \cup \lbrace(t_i, a_i), (t_i, \alpha)\rbrace)\\
+[(a_i \cdot b_j) \cdot \alpha]_{(\sigma, G)} &\rightarrow [t_i \cdot b_j]_{(\sigma', G')} ~~&~~ &\sharp(b_j) > \sharp(a_i), t_i = \sigma_{i_0}[\sfrac{t_i'}{a_i \cdot \alpha}], a_i \in in(G), \\
+~&~~&~~&G' = (V \cup {t_i}, E \cup \lbrace(t_i, a_i), (t_i, \alpha)\rbrace)\\
+\end{align*}
+\end{spacing}
+\caption{Rewrite rules driving the rewriting process of an assembly expression.}\label{fig:rewrite-rules}
+\end{figure}
+
+Rewrite rules for expression rewriting are provided in Figure~\ref{fig:rewrite-rules}; obvious rules are omitted for brevity. The Expression Rewriter applies the rules while performing a depth-first traversal of the assembly expression tree. Given an arithmetic operation between two sub-expressions (i.e. a node in the expression tree), we first need to find an applicable rule. There cannot be ambiguities: only one rule can be matched. If the preconditions of the rule are satisfied, the corresponding transformation is performed; otherwise, no rewriting is performed, and the traversal proceeds. As examples, it is possible to instantiate the rules in the codes shown in Figures~\ref{code:original-code} and~\ref{code:toexpand-code}; eventually, the optimized codes in Figures~\ref{code:factorized-code} and~\ref{code:expanded-2-code} are obtained, respectively. 
+
+To what extent should rewrite rules be applied is a question that cannot be answered in general. In some problems, a full rewrite of the expression may be the best option; in other cases, on the other hand, an aggressive expansion of terms, for example, may lead to high register pressure in the loops computing invariant terms, worsening the performance. In Section~\ref{sec:coffee-code-spec} how to leverage code specialization to select a suitable rewriting strategy for the problem at hand is explained.
 
 \subsection{Avoiding Iteration over Zero-valued Blocks by Symbolic Execution}
 \label{sec:coffee-avoidzeros}
 
 
 \section{Code Specialization}
-
+\label{sec:coffee-code-spec}
 \section{General-purpose Optimizations}
 
 \section{Design and Implementation of COFFEE}
