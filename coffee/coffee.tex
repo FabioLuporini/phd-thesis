@@ -590,8 +590,18 @@ The compiler applies an ordered sequence of optimization steps to the ASTs recei
 
 
 \subsection{Modifying the FEniCS Form Compiler}
-TODO
-%\subsubsection{Conveying Domain Knowledge}
+COFFEE expects as input either a string of C code or an AST. In the former case, a parser could be used to obtain an AST representation, which is required by the algorithms implementing the various code transformations. Therefore, FFC's output, which is a C-code implementation of a local assembly kernel, could be used straightforwardly as input to COFFEE. However, we note that this would also be conceptually pointless: FFC would generate C code from its intermediate representation that eventually COFFEE would have to re-parse to obtain an AST. A much cleaner solution, adopted and explained next, consists of modifying FFC to directly generate an AST. 
+
+\subsubsection{Generation of Abstract Syntax Trees}
+The construction of the FFC's intermediate representation from UFL code is refined as follows:
+\begin{itemize}
+\item The mathematical expression that evaluates the element matrix is represented by a tree data structure. A limitation of the original FFC was that nodes in such expression tree, which correspond to symbols or arithmetic operations, are not bound to the enclosing loops. For instance, consider the symbol \texttt{A[i][j]}: the FFC's expression tree has a node for this symbol, but visiting it there is no clean way of separating the variable name \texttt{A} from the loop indices \texttt{i} and \texttt{j}. Therefore, we have enriched symbol nodes with additional fields to capture these information. 
+\item Basis functions in the FFC's intermediate representation are characterized by a new field telling whether they originated from a vector-valued or a scalar-valued element. In the former case, the array rappresenting the tabulation of a basis function at the various quadrature points is block-sparse. This information is recorded and, as explained next, attached to the kernel's AST to enable COFFEE applying symbolic execution to avoid iteration over zero-valued blocks, as elaborated in Section~\ref{sec:coffee-avoidzeros}.
+\end{itemize}
+To make FFC output ASTs, its intermediate representation is intercepted prior to the code generation stage and forwarded to a new module, which is referred to as \texttt{ast-generation}. The structure of the modified version of FFC is illustrated in Figure~\ref{fig:coffee-ffc}. The \texttt{ast-generation} stage ``mirrors'' the actions of code generation, but it differs by rather building an AST. An example is provided in Figure~\ref{fig:coffee-ast-vs-c}. To achieve this, COFFEE exposes its hierarchy of AST nodes, which are suitably instantiated and composed in \texttt{ast-generation}. 
+
+The enriched intermediate representation allows to create proper AST's Symbol nodes. A Symbol, as shown in Figure~\ref{fig:coffee-ast-vs-c}, has a name (the variable name), an array of indices, and an array of offsets. These information are fundamental for the implementation of expression rewriting and code specialization. Further, special AST's Declaration objects can be used to track the sparsity pattern in basis function arrays. 
+
 
 \subsection{Implementation of the Compiler}
 TODO
@@ -624,6 +634,8 @@ The autotuner is also domain-aware: the following heuristics, which capture prop
 All of the previous points contribute to minimize the overhead of the autotuning process. We will discuss the actual cost of autotuning in Section~\ref{sec:coffee-pereval-autotune}.
 
 \section{Performance Analysis}
+\label{sec:coffee-perfeval}
+
 \subsection{Contribution of Individual Optimizations}
 \label{sec:coffee-perfeval-single}
 \subsection{Evaluation in Forms of Increasing Complexity}
