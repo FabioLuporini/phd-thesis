@@ -480,6 +480,22 @@ There are some complications in the case of loops \texttt{[j0,k0]}. Here, increa
 
 Note that when the extra iterations end up accessing non-zero entries in the local element matrix \texttt{M} there is no way of recovering data alignment.
 
+\subsection{Expression Splitting}
+\label{sec:coffee-split}
+
+In complex kernels, like Burgers in Listing~\ref{code:burgers}, and on certain architectures, achieving effective register allocation can be challenging. If the number of variables independent of the innermost-loop dimension is close to or greater than the number of available CPU registers, poor register reuse is likely. This usually happens when the number of basis function arrays, temporaries introduced by generalized loop-invariant code motion, and problem constants is large. For example, applying loop-invariant code motion to Burgers on a 3D mesh requires 24 temporaries for the \texttt{ijk} loop order. This can make hoisting of the invariant loads out of the \texttt{k} loop inefficient on architectures with a relatively low number of registers. One potential solution to this problem consists of suitably ``splitting'' the computation of the element matrix $A$ into multiple sub-expressions; an example, for the Burgers problem, is given in Listing~\ref{code:burgers-split}. The transformation can be regarded as a special case of classic loop fission, in which associativity of the sum is exploited to distribute the expression across multiple loops. To the best of our knowledge, expression splitting is not supported by available compilers.
+
+\begin{figure}
+\centering
+\label{code:burgers-split}
+\scriptsize
+\lstinputlisting{coffee/listings/expr-split.code}
+\caption{Local assembly code for the Burgers problem in Figure~\ref{code:expanded-2-code} after the application of \emph{split}. In this example, the split factor is 2.}
+\end{figure}
+
+Splitting an expression (henceforth \emph{split}) has, however, several drawbacks. Firstly, it increases the number of accesses to $A$ proportionally to the ``split factor'', which is the number of sub-expressions produced. Also, depending on how the split is executed, it can lead to redundant computation. For example, the number of times the product $det*W3[i]$ is performed is proportional to the number of sub-expressions, as shown in the code snippet. Further, it increases loop overhead, for example
+through additional branch instructions. Finally, it might affect register locality: for instance, the same array could be accessed in different sub-expressions, requiring a proportional number of loads be performed. This is not the case for the Helmholtz example. Nevertheless, as shown in Section~\ref{sec:coffee-perfeval-single}, the performance gain from improved register reuse along inner dimensions can still be greater, especially if the split factor and the splitting itself use heuristics to minimize the aforementioned issues.
+
 \subsection{Model-driven Vector-register Tiling}
 \label{sec:coffee-opvect}
 
@@ -525,26 +541,18 @@ The storage layout of $A$, however, is incorrect after the application of this o
 
 
 
-
-\subsection{Expression Splitting}
-\label{sec:coffee-split}
-
-In complex kernels, like Burgers in Listing~\ref{code:burgers}, and on certain architectures, achieving effective register allocation can be challenging. If the number of variables independent of the innermost-loop dimension is close to or greater than the number of available CPU registers, poor register reuse is likely. This usually happens when the number of basis function arrays, temporaries introduced by generalized loop-invariant code motion, and problem constants is large. For example, applying loop-invariant code motion to Burgers on a 3D mesh requires 24 temporaries for the \texttt{ijk} loop order. This can make hoisting of the invariant loads out of the \texttt{k} loop inefficient on architectures with a relatively low number of registers. One potential solution to this problem consists of suitably ``splitting'' the computation of the element matrix $A$ into multiple sub-expressions; an example, for the Burgers problem, is given in Listing~\ref{code:burgers-split}. The transformation can be regarded as a special case of classic loop fission, in which associativity of the sum is exploited to distribute the expression across multiple loops. To the best of our knowledge, expression splitting is not supported by available compilers.
-
-\begin{figure}
-\centering
-\label{code:burgers-split}
-\scriptsize
-\lstinputlisting{coffee/listings/expr-split.code}
-\caption{Local assembly code for the Burgers problem in Figure~\ref{code:expanded-2-code} after the application of \emph{split}. In this example, the split factor is 2.}
-\end{figure}
-
-Splitting an expression (henceforth \emph{split}) has, however, several drawbacks. Firstly, it increases the number of accesses to $A$ proportionally to the ``split factor'', which is the number of sub-expressions produced. Also, depending on how the split is executed, it can lead to redundant computation. For example, the number of times the product $det*W3[i]$ is performed is proportional to the number of sub-expressions, as shown in the code snippet. Further, it increases loop overhead, for example
-through additional branch instructions. Finally, it might affect register locality: for instance, the same array could be accessed in different sub-expressions, requiring a proportional number of loads be performed. This is not the case for the Helmholtz example. Nevertheless, as shown in Section~\ref{sec:coffee-perfeval-single}, the performance gain from improved register reuse along inner dimensions can still be greater, especially if the split factor and the splitting itself use heuristics to minimize the aforementioned issues.
-
-
-\subsection{Exposing Linear Algebra Operations}
+\subsection{Exposing Matrix-Matrix Multiplications for BLAS Operations}
 \label{sec:coffee-blas}
+
+In this section, a way of systematically transforming the local element matrix computation into a sequence of matrix-matrix multiplication operations is discussed. 
+
+If such operations could be exposed, highly-optimized dense linear algebra libraries, for instance MKL or ATLAS BLAS, could be used, which would potentially result in notable performance improvements. It is true that the basis functions' size is usually too small to obtain any gain from BLAS routines, which are tuned for large arrays~\citep{nek5000}; however, this can significantly increase with the order of the method and due to the presence of coefficient functions in the equation. Since our research is an exploration of optimization techniques for generic equations (i.e. nothing is assumed about the order of the method and the mathematical structure of the form), an algorithm capable of translating assembly expressions into a sequence of BLAS calls has been studied. The main steps of the algorithm are informally provided next. 
+
+By fully applying the rewrite rules in Figure~\ref{fig:rewrite-rules}, an assembly expression is reduced to a summation, over each quadrature point, of outer products along the test and trial functions. Each outer product is then isolated, i.e. the assembly expression is split into chunks, each chunk representing an outer product over test and trial functions. Statements in the bodies of the surrounding loops (e.g. coefficients evaluation at a quadrature point, temporaries introduced by expression rewriting) are vector-expanded and hoisted completely outside of the loop nest, similarly to what we have described in Section~\ref{sec:expr-rewriter-obj}. This renders the loop nest perfect; that is, there is no intervening code among the various loops. The element matrix evaluation has now become a sequence of dense matrix-matrix multiplies (transposition aside)
+\begin{equation*}
+A_{jk} = \sum_{i} x_{0_{ij}} \cdot y_{0_{ik}} + \sum_{i} x_{1_{ij}} \cdot y_{1_{ik}} + ...
+\end{equation*}
+where $x0, x1, y0, y1, ...$ are tabulated basis functions or vector-expanded temporaries introduced at expression rewriting time. Eventually, the storage layout of the involved operands is changed so as to be conforming to the BLAS interface (e.g. two dimensional arrays are flatten as one dimensional arrays). The translation into a sequence of DGEMM calls is the last, straightforward step. 
 
 \subsection{Model-driven Dynamic Autotuning}
 \label{sec:coffee-autotune}
