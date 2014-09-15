@@ -568,11 +568,33 @@ By comparison with implementations characterized by manually-unrolled loops, we 
 
 %TODO: maybe we can clarify that unroll-and-jam for opvect corresponds to changing the tile size...
 
-\section{Design and Implementation of COFFEE}
+\section{COFFEE: an Optimizing Compiler for Finite Element Local Assembly}
 \label{sec:coffee-implementation}
-\subsection{Input ad Output: the Integration with Firedrake}
-\subsection{Structure}
-\subsection{Conveying Domain-Specific Knowledge}
+\subsection{Outline and Integration with Firedrake}
+
+\begin{figure}
+\begin{center}
+\includegraphics[scale=0.70]{coffee/pictures/coffee-pipeline.pdf}
+\caption{High-level view of Firedrake. COFFEE is at the core, receiving ASTs from a modified version of the FEniCS Form Compiler and producing optimized C code kernels.}
+\label{fig:coffee-pipeline}
+\end{center}
+\end{figure}
+
+Our research resulted in the implementation of COFFEE\footnote{COFFEE stands for COmpiler For FinitE Element local assembly.}, a mature, platform-independent compiler capable of optimizing any local assembly code generated through Firedrake or FEniCS. COFFEE has been fully integrated with Firedrake, so it can optimize any equation expressible with this framework.
+
+Firedrake users employ the Unified Form Language to express problems in a notation resembling mathematical equations. At run-time, the high-level specification is translated by a modified version of its form compiler, the FEniCS Form Compiler (FFC)~\cite{FFC-Compiler}, into an abstract syntax tree (AST) representation of one or more finite element assembly kernels. ASTs are then passed to COFFEE to apply the transformations described in the previous sections. The output of COFFEE, C code, is eventually provided to PyOP2~\citep{pyop2isc}, where just-in-time compilation and execution over the discretized domain take place. The flow and the compiler structure are outlined in Figure~\ref{fig:coffee-pipeline}. 
+
+The compiler applies an ordered sequence of optimization steps to the ASTs received from FFC. Expression rewriting is performed first, due to the introduction of temporary arrays and the need for creating multiple loop nest starting from the original one (this may happen when computation over zero-valued blocks is avoided). Then, code specialization takes place. Finally, loop interchange and loop unroll are applied. COFFEE has an auto-tuning system, described in Section~\ref{sec:coffee-autotune}, to individuate the most suitable optimization strategy (i.e. to select which transformations to apply) for a certain equation. The implementation of all code transformations is centered on analysis and manipulation of the kernel AST. Any possible corner cases are handled: for example, if outer-product vectorization is to be applied but the size of the iteration space is not a multiple of the vector length, then a remainder loop, amenable to auto-vectorization, is inserted (as shown in Figure~\ref{code:burgers-opvect}).
+
+%When \emph{op-vect} is selected, the compiler outputs AVX or AVX-512 intrinsics code.
+
+
+\subsection{Modifying the FEniCS Form Compiler}
+TODO
+%\subsubsection{Conveying Domain Knowledge}
+
+\subsection{Implementation of the Compiler}
+TODO
 
 \subsection{Model-driven Dynamic Autotuning}
 \label{sec:coffee-autotune}
