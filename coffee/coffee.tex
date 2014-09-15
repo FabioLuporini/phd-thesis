@@ -540,7 +540,6 @@ The storage layout of $A$, however, is incorrect after the application of this o
 \end{figure}
 
 
-
 \subsection{Exposing Matrix-Matrix Multiplications for BLAS Operations}
 \label{sec:coffee-blas}
 
@@ -554,9 +553,6 @@ A_{jk} = \sum_{i} x_{0_{ij}} \cdot y_{0_{ik}} + \sum_{i} x_{1_{ij}} \cdot y_{1_{
 \end{equation*}
 where $x0, x1, y0, y1, ...$ are tabulated basis functions or vector-expanded temporaries introduced at expression rewriting time. Eventually, the storage layout of the involved operands is changed so as to be conforming to the BLAS interface (e.g. two dimensional arrays are flatten as one dimensional arrays). The translation into a sequence of DGEMM calls is the last, straightforward step. 
 
-\subsection{Model-driven Dynamic Autotuning}
-\label{sec:coffee-autotune}
-
 \section{General-purpose Optimizations}
 
 \section{Design and Implementation of COFFEE}
@@ -565,14 +561,44 @@ where $x0, x1, y0, y1, ...$ are tabulated basis functions or vector-expanded tem
 \subsection{Structure}
 \subsection{Conveying Domain-Specific Knowledge}
 
+\subsection{Model-driven Dynamic Autotuning}
+\label{sec:coffee-autotune}
+
+Determining the sequence of transformations that maximizes the performance of a problem requires investigating a broad range of factors, including mathematical structure of the input form, polynomial order of employed function spaces, presence of pre-multiplying functions, and, of course, the characteristics of the underlying architecture. The set of possible optimizations is very large, so the selection problem is challenging. The sole Expression Rewriter, for instance, can generate a wide variety of implementations by just applying rewrite rules up to different extents.  
+
+We tackle the optimizations selection problem by compiler autotuning. Not only does it allow to determine the best combination of transformations, also it enables exploring parametric low-level optimizations, such as loop unroll, unroll-and-jam, and interchange, by trying different unroll factors and loop permutations. By leveraging the cost model defined in our previous study, domain knowledge, and a set of heuristics, we manage to keep the autotuner overhead at a minimum, whilst achieving significant speed ups over the purely cost-model-based implementations in all of the forms we have evaluated. In particular, our autotuner usually requires order of seconds to determine the fastest kernel implementation, a negligible overhead when it comes to iterate over real-life unstructured meshes.
+
+COFFEE analyzes the input problem and decides what variants it is worth testing through autotuning, as described later. Each variant is obtained by requesting specific transformations to the Expression Rewriter and the Code Specializer. The possible variants are then provided to the autotuner, in the form of abstract syntax trees. The autotuner is a template-based code generator. By inspecting an abstract syntax tree, it determines how to generate ``wrapping'' code that 1) initializes kernel's input variables with fictitious values and 2) calls the kernel. These two points are executed repeatedly in a \emph{while} loop for a pre-established amount of time (order of milliseconds). At the exit of the \emph{while} loop, the times the kernel was invoked is recorded. Eventually, the variant executed the largest number of iterations is designated as the fastest implementation. Suitable compiler directives are used to prevent inlining of all function calls: this avoids the situation in which some variants are inlined and some are not, which would fake the autotuner's output. 
+
+The autotuning process is dynamic: depending on the complexity of the input problem, more or less variants are tried. General heuristics, which can be considered a revisited version of those presented in~\cite{nek5000}, are applied
+\begin{itemize}
+\item Loop permutations that are likely to worsen the performance are excluded from the search space. According to the cost model, and for the same reasons explained in~\cite{Luporini}, we enable only variants in which the loop over quadrature points is either the outermost or the innermost. This is due to the fact that versions of the code in which such loop lies between the test and trial functions loops are typically lower performing.
+\item The unroll factors must divide the loop bounds evenly to avoid the introduction of reminder (scalar) loops.
+\item The innermost loop is never explicitly unrolled. This is because we expect auto-vectorization along this loop, so memory accesses should be kept unit-stride. 
+\end{itemize}
+The autotuner is also domain-aware: the following heuristics, which capture properties of the computational domain, are exploited
+\begin{itemize}
+\item The lengths of test and trial functions loops are identical in some cases, for example when they originate from the same function space. In such cases, since for the employed storage layout the memory access pattern is symmetrical along these two loops, we prune their interchange from the search space. 
+\item The larger is the polynomial order of the method, the larger is the assembly loop nest. In these cases, we impose a bound on the loop nest's overall unroll factor (which we found empirically) to avoid uselessly testing too many unroll factors. 
+\item On the other hand, if the polynomial order is low, i.e. when the loop nest is small, we prune variants that we know will be low-performing, e.g. those resorting to BLAS.
+\item We specifically select two levels of expression rewriting. In the ``base'' level, only generalized loop-invariant code motion, as described in~\cite{Luporini}, is applied. This means that only a subset of the rewrite rules exposed in~\ref{fig:rewrite-rules} will be considered. In the ``aggressive'' level, all of the rewrite rules are applied. Many other trade-offs, which we do not explore, would be feasibile, however. 
+\item For the expression splitting optimization described in~\cite{Luporini} and summarized in Section~\ref{sec:summary-opts}, we test only three split factors, namely 1, 2, 4. Also, if the input problem uses mixed function spaces, the iteration space is already split at expression rewriting time to avoid computation over zero-valued columns; in these cases, we do not further apply expression splitting.
+\item Based on the cost model, the padding and data alignment optimization is always applied. 
+\end{itemize}
+
+All of the previous points contribute to minimize the overhead of the autotuning process. We will discuss the actual cost of autotuning in Section~\ref{sec:coffee-pereval-autotune}.
+
 \section{Performance Analysis}
 \subsection{Contribution of Individual Optimizations}
 \label{sec:coffee-perfeval-single}
 \subsection{Evaluation in Forms of Increasing Complexity}
+\subsection{Details on the Autotuning Process}
+\label{sec:coffee-pereval-autotune}
+
 \subsection{Full Application Study}
 
 
-\section{Related Word}
+\section{Related Work}
 \label{sec:coffee-related-work}
 
 \section{Generality of the Approach and Applicability to Other Domains}
