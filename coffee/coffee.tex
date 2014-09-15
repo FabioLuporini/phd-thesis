@@ -483,6 +483,14 @@ Note that when the extra iterations end up accessing non-zero entries in the loc
 \subsection{Model-driven Vector-register Tiling}
 \label{sec:coffee-opvect}
 
+\begin{figure}[h]
+\centering
+\label{code:burgers-opvect}
+\scriptsize
+\lstinputlisting{coffee/listings/opvect.code}
+\caption{Local assembly code for the Burgers problem in Figure~\ref{fig:withzeros-code} after the application of vector-register tiling (outer-product vectorization). In this example, the unroll-and-jam factor is 1.}
+\end{figure}
+
 One notable problem of assembly kernels concerns register allocation and register locality. The critical situation occurs when loop trip counts and the variables accessed are such that the vector-register pressure is high. Since the kernel's working set fits the L1 cache, it is particularly important to optimize register management. Standard optimizations, such as loop interchange, unroll, and unroll-and-jam, can be employed to deal with this problem. In COFFEE, these optimizations are supported either by means of explicit code transformations (interchange, unroll-and-jam) or indirectly by delegation to the compiler through standard pragmas (unroll). Tiling at the level of vector registers is an additional feature of COFFEE. Based on the observation that the evaluation of the element matrix can be reduced to a summation of outer products along the \texttt{j} and \texttt{k} dimensions, a model-driven vector-register tiling strategy can be implemented. If we consider the codes in the various listings and we focus on the body of the test and trial functions loops (\texttt{j} and \texttt{k}), the computation of the element matrix is abstractly expressible as
 \begin{equation}
 \scriptsize
@@ -501,68 +509,19 @@ where $B$ is the set of all basis functions (or temporary variables, e.g., \text
 %iteration space into bigger tiles, implemented directly by vector
 %registers.
 
-\begin{figure}[h]
+\begin{figure}[t]
 \centerline{\includegraphics[scale=0.6]{coffee/pictures/vect-by-vect-inline.pdf}}
 \caption{Outer-product vectorization by permuting values in a vector register.}
 \label{fig:vect-by-vect}
 \end{figure}
 
-The storage layout of $A$, however, is incorrect after the application of this outer-product-based vectorization (\emph{op-vect}, in the following). It can be efficiently restored with a sequence of vector shuffles following the pattern highlighted in Figure~\ref{fig:restore-layout}, executed once outside of the \texttt{ijk} loop nest. The pseudo-code for the Burgers equation when using \emph{op-vect} is shown in Listing~\ref{code:helmholtz-opvect}.
+The storage layout of $A$, however, is incorrect after the application of this outer-product-based vectorization (\emph{op-vect}, in the following). It can be efficiently restored with a sequence of vector shuffles following the pattern highlighted in Figure~\ref{fig:restore-layout}, executed once outside of the \texttt{ijk} loop nest. The pseudo-code for the Burgers local assembly kernel when using \emph{op-vect} is shown in Listing~\ref{code:burgers-opvect}.
 
-\begin{figure}[h]
+\begin{figure}[t]
 \centerline{\includegraphics[scale=0.6]{coffee/pictures/vect-restore-inline.pdf}}
 \caption{Restoring the storage layout after \emph{op-vect}. The figure shows how 4$\times$4 elements in the top-left block of the element matrix $A$ can be moved to their correct positions. Each rotation, represented by a group of three same-colored arrows, is implemented by a single shuffle intrinsic.}
 \label{fig:restore-layout}
 \end{figure}
-
-%are sufficiently large to prevent register reuse along the innermost
-%dimension \texttt{k}. A combination of the two scenarios is also
-%possible. We want to exploit the small size of the iteration space
-%and the structure of the computation to optimize register management.
-
-\begin{algorithm}
-\scriptsize
-\SetAlgorithmName{LISTING}{}
-
-\KwSty{void} burgers(\KwSty{double} A[4][4], \KwSty{double} **coords) $\lbrace$\\
-~~// K, det = Compute Jacobian (coords) \\
-~~// Declaration of basis function matrices \\
-~~\\
-~~\KwSty{for} (\KwSty{int} i = 0; i$<$3; i++) $\lbrace$ \\
-~~~~// Do expression rewriting \\
-~~~~\KwSty{for} (\KwSty{int} j = 0; j$<$4; j+=4) \\
-~~~~~~\KwSty{for} (\KwSty{int} k = 0; k$<$4; k+=4) $\lbrace$\\
-~~~~~~~~// \emph{load} and \emph{set} intrinsics \\
-~~~~~~~~// Compute A[0,0], A[1,1], A[2,2], A[3,3] \\
-~~~~~~~~// One \emph{permute\_pd} intrinsic per \texttt{k}-loop \emph{load}\\
-~~~~~~~~// Compute A[0,1], A[1,0], A[2,3], A[3,2] \\
-~~~~~~~~// One \emph{permute2f128\_pd} intrinsic per \texttt{k}-loop \emph{load}\\
-~~~~~~~~// ...\\
-~~~~~~$\rbrace$\\
-~~~~// Remainder loop (from $j=4$ to $j=6$)\\
-~~$\rbrace$\\
-~~// Restore the storage layout:\\
-~~\KwSty{for} (\KwSty{int} j = 0; j$<$4; j+=4) $\lbrace$\\
-~~~~\KwSty{$\_\_$m256d} r0, r1, r2, r3, r4, r5, r6, r7;\\
-~~~~\KwSty{for} (\KwSty{int} k = 0; k$<$4; k+=4) $\lbrace$\\
-~~~~~~r0 = $\_$mm256$\_$load$\_$pd ($\&$A[j+0][k]);\\
-~~~~~~// Load A[j+1][k], A[j+2][k], A[j+3][k]\\
-~~~~~~r4 = $\_$mm256$\_$unpackhi$\_$pd (r1, r0);\\
-~~~~~~r5 = $\_$mm256$\_$unpacklo$\_$pd (r0, r1);\\
-~~~~~~r6 = $\_$mm256$\_$unpackhi$\_$pd (r2, r3);\\
-~~~~~~r7 = $\_$mm256$\_$unpacklo$\_$pd (r3, r2);\\
-~~~~~~r0 = $\_$mm256$\_$permute2f128$\_$pd (r5, r7, 32);\\
-~~~~~~r1 = $\_$mm256$\_$permute2f128$\_$pd (r4, r6, 32);\\
-~~~~~~r2 = $\_$mm256$\_$permute2f128$\_$pd (r7, r5, 49);\\
-~~~~~~r3 = $\_$mm256$\_$permute2f128$\_$pd (r6, r4, 49);\\
-~~~~~~$\_$mm256$\_$store$\_$pd ($\&$A[j+0][k], r0);\\
-~~~~~~// Store A[j+1][k], A[j+2][k], A[j+3][k]\\
-~~~~$\rbrace$\\
-~~$\rbrace$\\
-$\rbrace$
-\caption{Local assembly code for the Burgers problem after vector-register tiling (outer-product vectorization), expression rewriting, padding and data alignment. In this example, the unroll-and-jam factor is 1.}
-\label{code:helmholtz-opvect}
-\end{algorithm}
 
 
 

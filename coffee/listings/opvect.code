@@ -1,0 +1,51 @@
+void burgers(double M[6][6], double **coordinates) {
+  // Calculate determinant of jacobian (det) using the coordinates field
+  // Define tabulation of basis functions (and their derivatives) arrays
+  ...
+
+  for (int i=0; i<6; ++i) {
+    ...
+    double T1[6], T2[6];
+    for (int r=0; r<6; ++r) {
+      T1[r] = a*A[i][r]+b*B[i][r];
+      T2[r] = d*D[i][k]+e*E[i][k];
+    }
+    
+    for (int j=0; j<4; ++j) {
+      for (int k=0; k<8; ++k) {
+        // "load" and "set" intrinsics
+        // Compute M[0,0], M[1,1], M[2,2], M[3,3]
+        // One "permute_pd" intrinsic per k-loop "load"
+        // Compute M[0,1], M[1,0], M[2,3], M[3,2]
+        // One "permute2f128_pd" intrinsic per k-loop load
+        ...
+      }
+    }
+
+    // Reminder loop
+    for (int j=4; j<6; ++j) {
+      for (int k=0; k<6; ++k) {
+        M[j][k] += (T1[j], T2[k], A[i][j], ...)
+      }
+    }
+
+    // Restore the storage layout:\\
+    for (int j = 0; j<4; j+=4) {
+      _m256d r0, r1, r2, r3, r4, r5, r6, r7;
+      for (int k = 0; k<8; k+=4) {
+        r0 = _mm256_load_pd (&A[j+0][k]);
+        // Load A[j+1][k], A[j+2][k], A[j+3][k]
+        r4 = _mm256_unpackhi_pd (r1, r0);
+        r5 = _mm256_unpacklo_pd (r0, r1);
+        r6 = _mm256_unpackhi_pd (r2, r3);
+        r7 = _mm256_unpacklo_pd (r3, r2);
+        r0 = _mm256_permute2f128_pd (r5, r7, 32);
+        r1 = _mm256_permute2f128_pd (r4, r6, 32);
+        r2 = _mm256_permute2f128_pd (r7, r5, 49);
+        r3 = _mm256_permute2f128_pd (r6, r4, 49);
+        mm256_store_pd (&A[j+0][k], r0);
+        // Store M[j+1][k], M[j+2][k], M[j+3][k]
+      }
+    }
+  }
+}
