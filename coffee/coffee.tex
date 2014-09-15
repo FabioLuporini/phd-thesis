@@ -602,7 +602,6 @@ To make FFC output ASTs, its intermediate representation is intercepted prior to
 
 The enriched intermediate representation allows to create proper AST's Symbol nodes. A Symbol, as shown in Figure~\ref{fig:coffee-ast-vs-c}, has a name (the variable name), an array of indices, and an array of offsets. These information are fundamental for the implementation of expression rewriting and code specialization. Further, special AST's Declaration objects can be used to track the sparsity pattern in basis function arrays. 
 
-
 \subsection{Implementation of the Compiler}
 TODO
 
@@ -636,9 +635,15 @@ All of the previous points contribute to minimize the overhead of the autotuning
 \section{Performance Analysis}
 \label{sec:coffee-perfeval}
 
+\subsection{Experimental Setup}
+\label{sec:coffee-perfeval-setup}
+
 \subsection{Contribution of Individual Optimizations}
 \label{sec:coffee-perfeval-single}
+
 \subsection{Evaluation in Forms of Increasing Complexity}
+\label{sec:coffee-perfeval-allforms}
+
 \subsection{Details on the Autotuning Process}
 \label{sec:coffee-pereval-autotune}
 
