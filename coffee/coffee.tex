@@ -444,11 +444,13 @@ To what extent should rewrite rules be applied is a question that cannot be answ
 \label{sec:coffee-avoidzeros}
 Skipping arithmetic operations over blocks of zero-valued entries in basis functions arrays is the second goal of expression rewriting. Zero-valued columns arise, for example, when taking derivatives on a reference element and when employing mixed elements. In~\cite{quadrature-olegaard}, a technique to avoid operations on zero-valued columns based on the use of indirection arrays was described (e.g. \texttt{A[B[i]]}, where \texttt{A} is a tabulated basis function and \texttt{B} a map from loop iterations to non-zero columns in \texttt{A}) and implemented in the FEniCS framework. The approach proposed in this section will be evaluated and compared to this pioneering work. Essentially, the strategy avoids indirection arrays in the generated code, which otherwise would break the optimizations applicable by code specialization, including SIMD vectorization. 
 
-\begin{figure}
+\begin{figure}[t]
 \tiny
-\centering     
+\centerline{  
 \subfigure[Original code. Note the annotation over the definition of the tabulated basis function \texttt{D}, which is used to identify the presence of zero-valued columns]{\label{fig:withzeros-code}\lstinputlisting{coffee/listings/withzeros.code}}
+~~~~~~~~~
 \subfigure[The code after symbolic execution took place]{\label{fig:withzeros-skipped-code}\lstinputlisting{coffee/listings/skipzeros.code}}
+}
 \caption{Simplified excerpt of local assembly code from a Burgers form using vector-valued basis functions, before and after symbolic execution is performed to rewrite the iteration space}\label{fig:skip-code}
 \end{figure}
 
