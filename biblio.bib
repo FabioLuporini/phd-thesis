@@ -51,6 +51,25 @@
   url = {http://dx.doi.org/10.1016/j.camwa.2014.01.021}
 }
 
+@INCOLLECTION{carlolcpca,
+  author = {Bertolli, C. and Betts, A. and Loriant, N. and Mudalige, G.R. and
+	Radford, D. and Ham, D.A. and Giles, M.B. and Kelly, P.H.J.},
+  title = {Compiler Optimizations for Industrial Unstructured Mesh CFD Applications
+	on GPUs},
+  booktitle = {Languages and Compilers for Parallel Computing},
+  publisher = {Springer Berlin Heidelberg},
+  year = {2013},
+  editor = {Kasahara, Hironori and Kimura, Keiji},
+  volume = {7760},
+  series = {Lecture Notes in Computer Science},
+  pages = {112-126},
+  doi = {10.1007/978-3-642-37658-0_8},
+  isbn = {978-3-642-37657-3},
+  keywords = {Computational Fluid Dynamics; Unstructured Meshes; Graphical Processing
+	Units; Compilers},
+  language = {English}
+}
+
 @INPROCEEDINGS{pluto,
   author = {Bondhugula, Uday and Hartono, Albert and Ramanujam, J. and Sadayappan,
 	P.},
@@ -102,6 +121,51 @@
   title = {{The Firedrake Project}},
   howpublished = {\url{http://www.firedrakeproject.org}},
   year = {2014}
+}
+
+@INPROCEEDINGS{FFTW,
+  author = {Matteo Frigo and Steven G. Johnson},
+  title = {The design and implementation of FFTW3},
+  booktitle = {Proceedings of the IEEE},
+  year = {2005},
+  pages = {216--231}
+}
+
+@ARTICLE{TCE,
+  author = {Hartono, A. and Lu, Q. and Henretty, T. and Krishnamoorthy, S. and
+	Zhang, H. and Baumgartner, G. and Bernholdt, D. E. and Nooijen, M.
+	and Pitzer, R. and Ramanujam, J. and Sadayappan, P.},
+  title = {Performance Optimization of Tensor Contraction Expressions for Many-Body
+	Methods in Quantum Chemistry†},
+  journal = {The Journal of Physical Chemistry A},
+  year = {2009},
+  volume = {113},
+  pages = {12715-12723},
+  number = {45},
+  note = {PMID: 19888780},
+  doi = {10.1021/jp9051215},
+  eprint = {http://pubs.acs.org/doi/pdf/10.1021/jp9051215},
+  url = {http://pubs.acs.org/doi/abs/10.1021/jp9051215}
+}
+
+@INPROCEEDINGS{stencil-compiler,
+  author = {Henretty, Tom and Veras, Richard and Franchetti, Franz and Pouchet,
+	Louis-No\"{e}l and Ramanujam, J. and Sadayappan, P.},
+  title = {A Stencil Compiler for Short-vector SIMD Architectures},
+  booktitle = {Proceedings of the 27th International ACM Conference on International
+	Conference on Supercomputing},
+  year = {2013},
+  series = {ICS '13},
+  pages = {13--24},
+  address = {New York, NY, USA},
+  publisher = {ACM},
+  acmid = {2467268},
+  doi = {10.1145/2464996.2467268},
+  isbn = {978-1-4503-2130-3},
+  keywords = {dsl, multicore, simd, split tiling, stencils},
+  location = {Eugene, Oregon, USA},
+  numpages = {12},
+  url = {http://doi.acm.org/10.1145/2464996.2467268}
 }
 
 @MANUAL{IACA,
@@ -195,7 +259,29 @@
   url = {http://doi.acm.org/10.1145/2427023.2427027}
 }
 
-@BOOK{fenics,
+@ARTICLE{assembly-opencl,
+  author = {Kruel, Filip and Bana, Krzysztof},
+  title = {Vectorized OpenCL Implementation of Numerical Integration for Higher
+	Order Finite Elements},
+  journal = {Comput. Math. Appl.},
+  year = {2013},
+  volume = {66},
+  pages = {2030--2044},
+  number = {10},
+  month = dec,
+  acmid = {2542945},
+  address = {Tarrytown, NY, USA},
+  doi = {10.1016/j.camwa.2013.08.026},
+  issn = {0898-1221},
+  issue_date = {December, 2013},
+  keywords = {Finite elements, Higher order approximation, Numerical integration,
+	OpenCL, PowerXCell processor, Vectorization},
+  numpages = {15},
+  publisher = {Pergamon Press, Inc.},
+  url = {http://dx.doi.org/10.1016/j.camwa.2013.08.026}
+}
+
+@BOOK{Fenics,
   title = {Automated Solution of Differential Equations by the Finite Element
 	Method},
   publisher = {Springer},
@@ -203,6 +289,22 @@
   author = {Anders Logg and Kent-Andre Mardal and Garth N. Wells and others},
   doi = {10.1007/978-3-642-23099-8},
   isbn = {978-3-642-23098-1}
+}
+
+@ARTICLE{Markall20101815,
+  author = {Graham R. Markall and David A. Ham and Paul H.J. Kelly},
+  title = {Towards generating optimised finite element solvers for {GPUs} from
+	high-level specifications},
+  journal = {Procedia Computer Science },
+  year = {2010},
+  volume = {1},
+  pages = {1815 - 1823},
+  number = {1},
+  note = {{ICCS} 2010 },
+  doi = {http://dx.doi.org/10.1016/j.procs.2010.04.203},
+  issn = {1877-0509},
+  keywords = {Finite element method},
+  url = {http://www.sciencedirect.com/science/article/pii/S1877050910002048}
 }
 
 @INPROCEEDINGS{pyop2isc,
@@ -238,6 +340,27 @@
   numpages = {23},
   publisher = {ACM},
   url = {http://doi.acm.org/10.1145/1644001.1644009}
+}
+
+@MISC{nek5000-web-page,
+  author = {Paul F. Fischer, James W. Lottes and Stefan G. Kerkemeier},
+  title = {{nek5000} {W}eb page},
+  year = {2008},
+  note = {http://nek5000.mcs.anl.gov}
+}
+
+@ARTICLE{Pueschel:05,
+  author = {Markus P{\"u}schel and Jos{\'e} M. F. Moura and Jeremy Johnson and
+	David Padua and Manuela Veloso and Bryan Singer and Jianxin Xiong
+	and Franz Franchetti and Aca Gacic and Yevgen Voronenko and Kang
+	Chen and Robert W. Johnson and Nicholas Rizzolo},
+  title = {{SPIRAL}: Code Generation for {DSP} Transforms},
+  journal = {Proceedings of the IEEE, special issue on ``Program Generation, Optimization,
+	and Adaptation''},
+  year = {2005},
+  volume = {93},
+  pages = {232-- 275},
+  number = {2}
 }
 
 @INPROCEEDINGS{Rossinelli2013,
@@ -293,6 +416,53 @@
   url = {http://doi.acm.org/10.1145/1810085.1810120}
 }
 
+@INPROCEEDINGS{Spampinato:14,
+  author = {Daniele G. Spampinato and Markus P{\"u}schel},
+  title = {A Basic Linear Algebra Compiler},
+  booktitle = {International Symposium on Code Generation and Optimization (CGO)},
+  year = {2014}
+}
+
+@INPROCEEDINGS{modeldriven,
+  author = {Stock, K. and Henretty, T. and Murugandi, I. and Sadayappan, P. and
+	Harrison, R.},
+  title = {Model-Driven SIMD Code Generation for a Multi-resolution Tensor Kernel},
+  booktitle = {Proceedings of the 2011 IEEE International Parallel \& Distributed
+	Processing Symposium},
+  year = {2011},
+  series = {IPDPS '11},
+  pages = {1058--1067},
+  address = {Washington, DC, USA},
+  publisher = {IEEE Computer Society},
+  acmid = {2059552},
+  doi = {10.1109/IPDPS.2011.101},
+  isbn = {978-0-7695-4385-7},
+  numpages = {10},
+  url = {http://dx.doi.org/10.1109/IPDPS.2011.101}
+}
+
+@INPROCEEDINGS{pochoir,
+  author = {Tang, Yuan and Chowdhury, Rezaul Alam and Kuszmaul, Bradley C. and
+	Luk, Chi-Keung and Leiserson, Charles E.},
+  title = {The Pochoir Stencil Compiler},
+  booktitle = {Proceedings of the Twenty-third Annual ACM Symposium on Parallelism
+	in Algorithms and Architectures},
+  year = {2011},
+  series = {SPAA '11},
+  pages = {117--128},
+  address = {New York, NY, USA},
+  publisher = {ACM},
+  acmid = {1989508},
+  doi = {10.1145/1989493.1989508},
+  isbn = {978-1-4503-0743-7},
+  keywords = {C++, cache-oblivious algorithm, cilk, compiler, embedded domain-specific
+	language, multicore, parallel computation, stencil computation, trapezoidal
+	decomposition},
+  location = {San Jose, California, USA},
+  numpages = {12},
+  url = {http://doi.acm.org/10.1145/1989493.1989508}
+}
+
 @ARTICLE{spencer,
   author = {Vos, Peter E. J. and Sherwin, Spencer J. and Kirby, Robert M.},
   title = {From H to P Efficiently: Implementing Finite and Spectral/Hp Element
@@ -312,6 +482,44 @@
   numpages = {21},
   publisher = {Academic Press Professional, Inc.},
   url = {http://dx.doi.org/10.1016/j.jcp.2010.03.031}
+}
+
+@INPROCEEDINGS{ATLAS,
+  author = {Whaley, R. Clint and Dongarra, Jack J.},
+  title = {Automatically Tuned Linear Algebra Software},
+  booktitle = {Proceedings of the 1998 ACM/IEEE Conference on Supercomputing},
+  year = {1998},
+  series = {Supercomputing '98},
+  pages = {1--27},
+  address = {Washington, DC, USA},
+  publisher = {IEEE Computer Society},
+  acmid = {509096},
+  isbn = {0-89791-984-X},
+  keywords = {BLAS, code generation, high performance, linear algebra, optimization,
+	tuning},
+  location = {San Jose, CA},
+  numpages = {27},
+  url = {http://dl.acm.org/citation.cfm?id=509058.509096}
+}
+
+@BOOK{dragonbook,
+  title = {Compilers: principles, techniques, and tools},
+  publisher = {Pearson/Addison Wesley},
+  year = {2007},
+  editor = {Alfred V. Aho and Monica S. Lam and Ravi Sethi and Jeffrey D. Ullman},
+  pages = {xxiv + 1009},
+  address = {Boston, MA, USA},
+  edition = {Second},
+  acknowledgement = {#ack-nhfb#},
+  bibdate = {Tue Jan 30 16:21:16 MST 2007},
+  bibsource = {http://www.math.utah.edu/pub/tex/bib/master.bib; z3950.loc.gov:7090/Voyager},
+  isbn = {0-321-48681-1},
+  isbn-13 = {978-0-321-48681-3},
+  lccn = {QA76.76.C65 A37 2007},
+  libnote = {Not yet in my library.},
+  remark = {Revised edition of \cite{Aho:CPT86}},
+  subject = {Compilers (Computer programs)},
+  url = {http://www.loc.gov/catdir/toc/ecip0618/2006024333.html}
 }
 
 @comment{jabref-meta: selector_publisher:}
