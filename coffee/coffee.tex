@@ -102,7 +102,7 @@ We have explained that local assembly is the computation of contributions of a s
 
 We consider again the weighted Laplace example of the previous section. A C-code implementation of Equation~\ref{eq:quadrature} is illustrated in Listing~\ref{code:weighted-laplace}. The values at the various quadrature points of basis functions ($\phi$) derivatives are tabulated in the FE0$\_$D10 and FE0$\_$D01 arrays. The summation along quadrature points $q$ is implemented by the \emph{i} loop, whereas the one along $\alpha_3$ is represented by the \emph{r} loop. In this example, we assume $d=2$ (2D mesh), so the summations along $\alpha_1$, $\alpha_2$ and $\beta$ have been straightforwardly expanded in the expression that evaluates the local element matrix $A$. 
 
-\begin{algorithm}
+\begin{algorithm}[t]
 \scriptsize
 \SetAlgorithmName{LISTING}{}
 
@@ -146,7 +146,7 @@ $\rbrace$
 
 More complex assembly expressions, due to the employment of particular differential operators in the original PDE, are obviously possible. Intuitively, as the complexity of the PDE grows, the implementation of local assembly becomes increasingly more complicated. This fact is actually the real motivation behind reasearch in automated code generation techniques, such as those used by state-of-the-art frameworks like FEniCS and Firedrake. Automated code generation allows scientists to express the finite element specfication using a domain-specific language resembling mathematical notation, and obtain with no effort a semantically correct implementation of local assembly. The research in the present work is about making such an implementation also extremely effective, in terms of run-time performance, on standard CPU architectures. 
 
-\begin{algorithm}
+\begin{algorithm}[t]
 \scriptsize
 \SetAlgorithmName{LISTING}{}
 
@@ -636,8 +636,6 @@ COFFEE implements ``smart'' code hoisting: everytime a sub-expression or a term 
 To implement these optimizations, it is necessary to track the evolution of data dependencies as the assembly expression is rewritten. For this purpose, COFFEE uses a dependency graph, which is a standard approach used by general-purpose compilers relying on abstract syntax trees (in addition to other data structures) as intermediate representation. The dependency graph has as many nodes as the number of variables in the loop nest characterizing the assembly expression. A direct edge from a node \texttt{A} to a node \texttt{B} indicates that the value of symbol \texttt{B} depends on that of \texttt{A}. 
 
 The implementation of the depedency graph data structure and of the various algorithms using it is made simple by the fact that COFFEE ensures \textit{static single assignment} form. This property, typically adopted by intermediate representations in compilers, requires that variables are assigned exactly once, and that each variable is defined in advance. 
-
-\subsubsection{Specialization}
 
 
 \subsection{Model-driven Dynamic Autotuning}
