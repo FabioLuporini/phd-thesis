@@ -1,5 +1,9 @@
 \chapter{Introduction}
-\section{Overview}
+
+\section{Thesis Statement}
+Computational efficiency in real-world unstructured-mesh-based applications requires specialized sequential code and execution models optimized for non-affine loops. We advocate and demonstrate that an approach centered on domain-specific languages, automated code generation and generalized (i.e. computation-independent) techniques for data locality and parallelism allows achieving this goal and scientists abstracting from the performance optimization problem, which is the key to software productivity.
+
+\section{Overview and Motivation}
 In many fields, such as computational fluid dynamics, computational
 electromagnetics and structural mechanics, phenomena are modelled by
 partial differential equations (PDEs). Unstructured meshes, which
@@ -31,13 +35,9 @@ code transformations to improve the performance of real-world scientific
 applications using numerical methods over unstructured meshes. 
 
 \section{Contributions}
-Besides developing novel compilers theory, contributions of this thesis come in the form of
-tools that have been, and currently are, used to accelerate scientific computations, namely:
+Besides developing novel compilers theory, contributions of this thesis come in the form of tools that have been, and currently are, used to accelerate scientific computations, namely:
 \begin{itemize}
-\item \textbf{A run-time library, which can be regarded as a prototype compiler,
-capable of optimizing sequences of non-affine loops by fusion and automatic
-parallelization. The library has been used to speed up a real application
-for tsunami simulations as well as other representative benchmarks.}
+\item \textbf{A run-time library, which can be regarded as a prototype compiler, capable of optimizing sequences of non-affine loops by fusion and automatic parallelization. The library has been used to speed up a real application for tsunami simulations as well as other representative benchmarks.}
 
 One limiting factor to the performance of unstructured mesh applications is imposed by
 the need for indirect memory accesses (e.g. \texttt{A[B[i]]}) to read and
@@ -56,10 +56,7 @@ and 2) doing it efficiently, since the fusability analysis must be performed at
 run-time, once the maps are available (i.e. once the mesh topology has been read 
 from disk).
 
-\item \textbf{A fully-operating compiler, named COFFEE\footnote{COFFEE stands
-for COmpiler For FinitE Element local assembly.}, which optimizes numerical
-kernels solving partial differential equations using the finite element method.
-The compiler is integrated with the Firedrake system (\cite{firedrake-code}).}
+\item \textbf{A fully-operating compiler, named COFFEE\footnote{COFFEE stands for COmpiler For FinitE Element local assembly.}, capable of optimizing numerical kernels solving partial differential equations using the finite element method. The compiler is integrated with the Firedrake system (\cite{firedrake-code}).}
 
 The second contribution, in the context of the finite element method, is about 
 optimizing the computation of so called local element matrices, which can 
@@ -70,21 +67,10 @@ among which \cite{francis}, \cite{quadrature-olegaard}, \cite{petsc-integration-
 set of composable, model-aware code transformations explicitly targeting, for the first time,
 instruction-level parallelism - with emphasis on SIMD vectorization - and register locality. 
 These transformations are automated in COFFEE.
-
 \end{itemize}
 
-
-
-
-
-\section{Thesis Statement}
-
-\section{Motivation}
-
-\section{Contributions}
-
-\section{Statement of Originality}
+\section{Thesis Outline}
 
 \section{Dissemination}
 
-\section{Thesis Outline}
+\section{Third Year Plan}
