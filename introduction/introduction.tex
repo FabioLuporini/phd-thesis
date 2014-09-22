@@ -34,7 +34,8 @@ this thesis studies, formalizes, and implements a number of
 code transformations to improve the performance of real-world scientific 
 applications using numerical methods over unstructured meshes. 
 
-\section{Contributions}
+\section{Contributions (1st and 2nd year)}
+\label{sec:contributions}
 Besides developing novel compilers theory, contributions of this thesis come in the form of tools that have been, and currently are, used to accelerate scientific computations, namely:
 \begin{itemize}
 \item \textbf{A run-time library, which can be regarded as a prototype compiler, capable of optimizing sequences of non-affine loops by fusion and automatic parallelization. The library has been used to speed up a real application for tsunami simulations as well as other representative benchmarks.}
@@ -58,15 +59,7 @@ from disk).
 
 \item \textbf{A fully-operating compiler, named COFFEE\footnote{COFFEE stands for COmpiler For FinitE Element local assembly.}, capable of optimizing numerical kernels solving partial differential equations using the finite element method. The compiler is integrated with the Firedrake system (\cite{firedrake-code}).}
 
-The second contribution, in the context of the finite element method, is about 
-optimizing the computation of so called local element matrices, which can 
-be responsible for a significant fraction of the overall computation run-time.
-This is a well-known problem, and several studies can be found in the literature,
-among which \citep{francis}, \citep{quadrature-olegaard}, \citep{petsc-integration-gpu}, 
-\citep{tensor-kirby}. With respect to these studies, we propose a novel 
-set of composable, model-aware code transformations explicitly targeting, for the first time,
-instruction-level parallelism - with emphasis on SIMD vectorization - and register locality. 
-These transformations are automated in COFFEE.
+The second contribution, in the context of the finite element method, is about optimizing the computation of so called local element matrices, which can be responsible for a significant fraction of the overall computation run-time. This is a well-known problem, and several studies can be found in the literature, among which \citep{francis}, \citep{quadrature-olegaard}, \citep{petsc-integration-gpu}, \citep{tensor-kirby}. With respect to these studies, we propose a novel set of composable, model-aware code transformations explicitly targeting, for the first time, instruction-level parallelism - with emphasis on SIMD vectorization - and register locality. These transformations are automated in COFFEE.
 \end{itemize}
 
 \section{Dissemination}
@@ -92,21 +85,24 @@ The research exposed in this thesis has been disseminated in the scientific comm
 been disseminated in the scientific community through publications.
 
 
-\section{3rd Year Plan and Review of 1st and 2nd Year}
+\section{3rd Year Plan}
 \label{sec:thirdyear}
-A list of the contributions of the first two years as PhD Student and Teaching Assistant is provided next
-\begin{itemize}
-\item 
-\end{itemize}
 
-In the following, the research plan for the 3rd year is presented.
+\paragraph{Research plan}
+I believe the material presented in this report demonstrates that the research conducted so far already represents the bulk of the thesis. The main goal of the third year will be a systematic study of loop fusion for sequences of possibly non-affine loops. This will probably result in the re-implementation of part of the PyOP2 run-time support. Questions and research problems I will address are:
 \begin{itemize}
-\item 
+\item When is it feasible to fuse loops?
+\item When is it useful to fuse loops, performance-wise?
+\item How to automate loop fusion?
 \end{itemize}
+This will require a formalization and an implementation efforts that will probably cover the entire third year of studies.
 
-The teaching plan for the 3rd year is as follows.
+\paragraph{Teaching plan}
+The teaching plan for the 3rd year is:
 \begin{itemize}
-\item 
+\item Delivering 3 or 4 hours of new teaching materials (i.e. lectures that I personally prepared) in Paul Kelly's Advanced Computer Architecture course.
+\item Finishing the PGCert course that I started in my 2nd year. This requires attending and writing reports for two seminars in the coming Autumn term.
+\item I will help with various 2nd year labs, as I did over the last two years.
 \end{itemize}
 
 

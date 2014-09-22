@@ -42,10 +42,7 @@
 
 \usepackage{natbib}
 
-\usepackage{listings}
-\lstset{language=C, breaklines=true}
-
-\usepackage[ruled]{algorithm2e}
+\usepackage[ruled, longend, linesnumbered]{algorithm2e}
 \renewcommand{\algorithmcfname}{ALGORITHM}
 \SetAlFnt{\small}
 \SetAlCapFnt{\small}
@@ -80,3 +77,72 @@
 \newcommand{\deltat}{\Delta t}
 \newcommand{\abs}[1]{\mathopen| #1 \mathclose|}   % use instead of $|x|$
 \newcommand{\pp}[2]{\frac{\partial #1}{\partial #2}}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%% REQUIRED FOR GENERALIZED SPARSE TILING SECTION %%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\newcommand{\oploop}{op\_par\_loop }
+\newcommand{\oploopn}{op\_par\_loop}
+\newcommand{\oploops}{op\_par\_loops }
+\newcommand{\oploopsn}{op\_par\_loops}
+
+\newcommand{\opset}{op\_set }
+\newcommand{\opsetn}{op\_set}
+\newcommand{\opsets}{op\_sets }
+\newcommand{\opsetsn}{op\_sets}
+
+\newcommand{\opmap}{op\_map }
+\newcommand{\opmapn}{op\_map}
+\newcommand{\opmaps}{op\_maps }
+\newcommand{\opmapsn}{op\_maps}
+
+\newcommand{\opdat}{op\_dat }
+\newcommand{\opdatn}{op\_dat}
+\newcommand{\opdats}{op\_dats }
+\newcommand{\opdatsn}{op\_dats}
+
+\newcommand{\opdset}{op\_decl\_set }
+\newcommand{\opdsetn}{op\_decl\_set}
+\newcommand{\opdmap}{op\_decl\_map }
+\newcommand{\opdmapn}{op\_decl\_map}
+\newcommand{\opddat}{op\_decl\_dat }
+\newcommand{\opddatn}{op\_decl\_dat}
+\newcommand{\oparg}{op\_arg }
+\newcommand{\opargn}{op\_arg}
+\newcommand{\opargs}{op\_args }
+\newcommand{\opargsn}{op\_args}
+\newcommand{\opargd}{op\_arg_dat }
+\newcommand{\opargdn}{op\_arg_dat}
+
+%\usepackage{cite}
+
+\DeclareMathOperator*{\Max}{\textsl{MAX}}
+
+\usepackage{algorithmic}
+
+\newcommand{\code}[1]{\lstset{basicstyle=\small\tt}\lstinline£#1£\lstset
+{basicstyle=\footnotesize\tt}}
+
+%
+\usepackage{caption}
+%\usepackage{subcaption}
+
+\usepackage{color}
+\usepackage{enumerate}
+
+\usepackage{listings}
+\lstset{
+	language=C++,
+	stepnumber=1,
+	numbersep=5pt,
+	backgroundcolor=\color{white},
+	showspaces=false,
+	showstringspaces=false,
+	showtabs=false,
+	tabsize=2,
+	breaklines=true,
+	breakatwhitespace=false,
+	escapeinside={\%*}{*)}
+}
