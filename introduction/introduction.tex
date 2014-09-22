@@ -62,15 +62,67 @@ The second contribution, in the context of the finite element method, is about
 optimizing the computation of so called local element matrices, which can 
 be responsible for a significant fraction of the overall computation run-time.
 This is a well-known problem, and several studies can be found in the literature,
-among which \cite{francis}, \cite{quadrature-olegaard}, \cite{petsc-integration-gpu}, 
-\cite{tensor-kirby}. With respect to these studies, we propose a novel 
+among which \citep{francis}, \citep{quadrature-olegaard}, \citep{petsc-integration-gpu}, 
+\citep{tensor-kirby}. With respect to these studies, we propose a novel 
 set of composable, model-aware code transformations explicitly targeting, for the first time,
 instruction-level parallelism - with emphasis on SIMD vectorization - and register locality. 
 These transformations are automated in COFFEE.
 \end{itemize}
 
-\section{Thesis Outline}
-
 \section{Dissemination}
+The research exposed in this thesis has been disseminated in the scientific community through various channels:
+\begin{itemize}
+\item \textbf{Papers.} The following is the list of publications derived from the research activity (chronological order):
+\begin{enumerate}
+\item Strout, M.M.; Luporini, F.; Krieger, C.D.; Bertolli, C.; Bercea, G.-T.; Olschanowsky, C.; Ramanujam, J.; Kelly, P.H.J., "Generalizing Run-Time Tiling with the Loop Chain Abstraction," Parallel and Distributed Processing Symposium, 2014 IEEE 28th International , vol., no., pp.1136,1145, 19-23 May 2014
+\item Fabio Luporini, Ana Lucia Varbanescu, Florian Rathgeber, Gheorghe-Teodor Bercea, J. Ramanujam, David A. Ham, and Paul H. J. Kelly. "Cross-loop optimization of arithmetic intensity for finite element local assembly". 2014. Submitted for publication.
+\item Fabio Luporini, David A. Ham, Paul H. J. Kelly. "Optimizing Automated Finite Element Integration through Expression Rewriting and Code Specialization". 2014. To be written.
+\end{enumerate}
+\item \textbf{Talks.} Talks have been delivered at the following conferences/workshops:
+\begin{enumerate}
+\item "Generalised Sparse Tiling for Unstructured Mesh Computations in the OP2 Framework". Compilers for Parallel Computing, July 2013.
+\item "COFFEE: an Optimizing Compiler for Fintie Element Local Assembly". FEniCS Workshop, July 2014.
+\end{enumerate}
+\item \textbf{Software.} The following software is released under open source licenses.
+\begin{enumerate}
+\item COFFEE (COmpiler For Finit Element local assEmbly), a compiler presented in Chapter~\ref{ch:coffee}.
+\end{enumerate}
+\end{itemize}
+, and the design of this software and results have
+been disseminated in the scientific community through publications.
 
-\section{Third Year Plan}
+
+\section{3rd Year Plan and Review of 1st and 2nd Year}
+\label{sec:thirdyear}
+A list of the contributions of the first two years as PhD Student and Teaching Assistant is provided next
+\begin{itemize}
+\item 
+\end{itemize}
+
+In the following, the research plan for the 3rd year is presented.
+\begin{itemize}
+\item 
+\end{itemize}
+
+The teaching plan for the 3rd year is as follows.
+\begin{itemize}
+\item 
+\end{itemize}
+
+
+\section{Thesis Outline}
+The plan is to structure the thesis as follows:
+\begin{itemize}
+\item Chapter 1: \textbf{Introduction}. This is going to be similar to the introduction presented in this LSA report.
+\item Chapter 2: \textbf{Background}. The basis for understading the contributions of the thesis will be provided. This chapter will be composed of three main sections:
+\begin{itemize}
+\item a summary of the finite element method, which is required to understand the structure of the numerical kernels optimized by COFFEE;
+\item an overview of the domain-specific languages, frameworks, methodologies, and compilers that inspired the research;
+\item a summary of contemporary multi-core architectures and compilers, including those used for the performance analysis carried out in this thesis.
+\end{itemize}
+\item Chapter 3: \textbf{Generalized Sparse Tiling with the OP2 Loop Chain Abstraction}. First contribution of the thesis. Presented in Chapter~\ref{ch:sparsetiling} of this report.
+\item Chapter 4: \textbf{Generalized Loop Fusion with the OP2 Loop Chain Abstraction.} Second contribution of the thesis. Part of the plan for the third year (see Section~\ref{sec:thirdyear}).
+\item Chapter 5: \textbf{Cross-loop Optimization of Arithmetic Intensity for Finite Element Local Assembly}. Third contribution of the thesis. Presented in Chapter~\ref{ch:coffee} of this report.
+\item Chapter 6: \textbf{Conclusions}. 
+\end{itemize}
+Note that performance evaluations of the techniques presented in Chapters 3, 4, and 5 will be included directly in these chapters.
