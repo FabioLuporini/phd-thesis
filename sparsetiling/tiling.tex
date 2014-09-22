@@ -16,7 +16,7 @@
 %The computational needs of scientific applications are constantly growing as scientists and engineers strive to simulate or analyze larger and more complex data sets. 
 %In order to satisfy these growing demands, scientific applications are optimized or transformed in order to maximize the achieved performance on existing architectures.
 Intranode parallelization is a difficult problem that many libraries and programming models attempt 
-to address~\cite{ASCRExascaleLethin}.
+to address~\citep{ST-ASCRExascaleLethin}.
 To expose parallelism in these programming models, 
 scientific simulations commonly express the application as a series of 
 data parallel or reduction loops. 
@@ -33,17 +33,17 @@ fluid dynamics, molecular dynamics, differential equation solvers on unstructure
 % Compressed version of the History of sparse tiling subsection.
 Sparse tiling techniques were developed to group iterations of irregular applications
 into atomic tiles at runtime with an 
-inspector~\cite{dimeEtna00,StroutIJHPCA,StroutPLDI03,commAvoidingSparse2009}.
+inspector~\citep{ST-dimeEtna00,ST-StroutIJHPCA,ST-StroutPLDI03,ST-commAvoidingSparse2009}.
 In general, the inspector iterates over index arrays that do not change during
 the main computation to determine data reorderings or new schedules, like
 sparse tiling schedules.
 The resulting tiles have either an implicit or explicit partial ordering (i.e., a task graph)
-that exposes asynchronous parallelism~\cite{Adams99c,dimeEtna00,StroutLCPC2002}.
+that exposes asynchronous parallelism~\citep{ST-Adams99c,ST-dimeEtna00,ST-StroutLCPC2002}.
 These benchmark-specific, sparse tiling executors
 exhibited performance improvements for sparse stencil computations, 
 %FIXME: dime?Jacobi, % FIXME:~\cite{dime?}, 
-Gauss-Seidel~\cite{Adams99c,StroutIJHPCA}, moldyn~\cite{StroutPLDI03},
-and sparse matrix powers kernel~\cite{commAvoidingSparse2009}.
+Gauss-Seidel~\citep{ST-Adams99c,ST-StroutIJHPCA}, moldyn~\citep{ST-StroutPLDI03},
+and sparse matrix powers kernel~\citep{ST-commAvoidingSparse2009}.
 The issue with these approaches is that the sparse tiling inspector algorithms
 were being developed by hand, per application.
 
@@ -51,7 +51,7 @@ In this paper, we present a generalized, full sparse tiling algorithm
 that leverages
 a common pattern in  irregular computations and many other scientific codes: a 
 series of parallel and/or reduction loops that reuse data.
-Previous work introduces an abstraction called the \emph{loop chain}\cite{KriegerHIPS2013}
+Previous work introduces an abstraction called the \emph{loop chain}\citep{ST-KriegerHIPS2013}
 to represent such loop sequences
 and the data access information about each of the loops. 
 %As an example of a loop chain, 
@@ -76,7 +76,7 @@ data access edges that are determined at inspector time.
 %The first loop updates the position of atoms based on the velocities of the atoms. The second loop updates the forces between interacting atoms based on their positions. Finally, the third loop updates each atom's velocity based on the applied forces. This pattern of loops is executed once for every time step in the molecular dynamics simulation; reusing the data within each time step.
 
 %Patterns of data reuse are commonly found in these types of applications.
-%One such pattern is the  \emph{loop chain}\cite{KriegerHIPS2013}.
+%One such pattern is the  \emph{loop chain}\cite{ST-KriegerHIPS2013}.
 %A loop chain is a sequence of parallel or reduction loops that reuse data. One example is a molecular dynamics kernel consisting of three loops, as shown in Fig. \ref{fig:moldyn}. 
 
 %%%%%%%%%%%%%%%%%%%
@@ -119,7 +119,7 @@ Generalized full sparse tiling (or gFST) converts data reuse
 within loop chains into data locality, while exposing task-graph
 parallelism.
 %Full sparse tiling provides the capability to generate a parallel 
-%execution schedule across the loops~\cite{StroutLCPC2002}.
+%execution schedule across the loops~\cite{ST-StroutLCPC2002}.
 Fig.~\ref{fig:fstOnOp2} illustrates a full sparse tiling on the 
 example loop chain in Fig.~\ref{fig:loopchain}.  Note that the
 resulting task graph in Fig.~\ref{fig:fstOnOp2} has two tiles/tasks
@@ -152,14 +152,14 @@ insert inspectors and executors that perform sparse tiling.
 
 %  \item We evaluate the generalized sparse tiling algorithm and the OP2 sparse tiling algorithm
 %  on six benchmarks.  We found ...
-The performance benefits of sparse tiling~\cite{dimeEtna00,Adams99c}
-and specifically full sparse tiling~\cite{StroutIJHPCA,StroutPLDI03,commAvoidingSparse2009}
+The performance benefits of sparse tiling~\citep{ST-dimeEtna00,ST-Adams99c}
+and specifically full sparse tiling~\citep{ST-StroutIJHPCA,ST-StroutPLDI03,ST-commAvoidingSparse2009}
 for irregular applications such as Gauss-Seidel, moldyn, and sparse matrix powers kernel
 have already been shown.  Generalizing the full sparse tiling algorithm
 does increase the inspector overhead, but the improvements in the executor are similar to specialized
 full sparse tiling executors.
 To further explore the performance benefits of full sparse tiling, we sparse tiled %a variety of benchmarks:
-Jacobi on sparse matrices from the Davis Florida collection~\cite{Davis2011}
+Jacobi on sparse matrices from the Davis Florida collection~\citep{ST-Davis2011}
 %a proxy application for molecular dynamics simulations CoMD (https://github.com/exmatex/CoMD)
 %~\cite{CoMD}, 
 and
@@ -174,8 +174,7 @@ We  compared the performance of these benchmarks when parallelized using
 OpenMP \texttt{parallel for} pragmas on each loop versus the performance when 
 the loops were full sparse tiled.
 %scheduled using generalized full sparse tiling. 
-The runtime reduction
-varied from 7\% to 47\%.  
+The runtime reduction varied from 7\% to 47\%.  
 %The inspector overhead ... [FIXME: want to say that the inspector
 %overhead when using loop chain properties was better by giving break even numbers].
 %%These results are presented in detail in 
@@ -184,7 +183,7 @@ varied from 7\% to 47\%.
 %%%%%%%%%%%%%%%%%%%%%%%%%
 \begin{figure}[t]
 \centering
-\includegraphics[width=\columnwidth]{sparsetiling/figures/tiling_example.pdf}
+\includegraphics[scale=0.5]{sparsetiling/figures/tiling_example.pdf}
 \caption{Visualization of a possible instance of the loop chain for the sequence of loops in Fig.~\ref{fig:op2-programexample}. The edge and cell loops use index arrays to indirectly access the data associated with the vertices in the mesh. Squares represent data associated with vertices in a mesh. Circles represent loop iterations. Note that iteration 0 in loop 0 visits the edge connecting vertices 0 and 6 and accesses the data associated with those vertices. Iteration 0 in loop 1 accesses all the vertices associated with the shaded triangular cell. Iteration 0 in loop 2 accesses vertices 0 and 6.}
 \label{fig:loopchain}	
 \end{figure}
@@ -193,7 +192,7 @@ varied from 7\% to 47\%.
 %%%%%%%%%%%%%%%%%%%%%%%%%
 \begin{figure}[t]
  \centering
-		\includegraphics[width=.45\textwidth]{sparsetiling/figures/tiling_example_tiled.pdf}
+		\includegraphics[scale=0.5]{sparsetiling/figures/tiling_example_tiled.pdf}
 \caption{A sparse tiling for the loop chain in Fig.~\ref{fig:loopchain}.  The iterations
 in the three loops have been placed into four tiles, which have been partially ordered
 into a task graph.  The partial ordering arises from dependencies between iterations
@@ -300,7 +299,7 @@ iteration in any loop $L_p$ to iterations in loop $L_q$ where $p<q$ in general.
 
 The previous sparse tiling approaches cited in Section~\ref{sec:intro} 
 were specialized per benchmark.
-In this paper we show how the loop chain programming abstraction~\cite{KriegerHIPS2013}
+In this paper we show how the loop chain programming abstraction~\citep{ST-KriegerHIPS2013}
 can be used as a basis for generalized full sparse tiling.
 As with all loop optimizations that reschedule the iterations in a sequence of loops, 
 any sparse tiling must satisfy the data dependencies.
@@ -315,7 +314,7 @@ contained in the loop chain abstraction. % [FIXME: not much clear to me].
 
 % MMS: paraphrased our loop chain definition from the HIPS paper.
 % FIXME: Krieger, the flow in this paragraph is in pain.
-As described in Krieger et al.~\cite{KriegerHIPS2013}, a loop chain consists
+As described in Krieger et al.~\cite{ST-KriegerHIPS2013}, a loop chain consists
 of the following:
 %\\
 %$~~~~~L$ a sequence of $N$ loops, $L_0, L_1, ..., L_{N-1}$.\\
@@ -428,7 +427,7 @@ Existing inspector/executor techniques for sparse tiling avoid
 explicitly enumerating data dependencies between loops by being specialized
 for specific computations.  Wavefront parallelization techniques
 for do across loops also avoid explicit enumeration of data dependencies
-by tracking how iterations access data~\cite{Rauchwerger:1998:RTP}.
+by tracking how iterations access data~\citep{Rauchwerger:1998:RTP}.
 Sparse tiling techniques are different in that they aggregate iterations into tasks
 and determine a task graph instead of determining level sets containing fine
 grained parallelism.  We use a similar approach of tracking data accesses
@@ -441,7 +440,7 @@ to avoid explicit data dependence enumeration.
 \label{sec:reduction}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-Strout et al.~\cite{StroutPLDI03} sparse tiled the moldyn computation
+Strout et al.~\cite{ST-StroutPLDI03} sparse tiled the moldyn computation
 across three of its loops.  The loop over interactions between atoms
 was a reduction loop.  Due to reduction dependencies and the resulting computation being performed
 serially, there was no need to consider dependencies between tiles.
@@ -499,7 +498,7 @@ Along with the iteration-to-tile mapping, a task graph representing a partial or
 More precisely, the input to the algorithm is a loop chain ($LC$), 
 the index of the loop chosen for seed partitioning ($s$), and the number of tiles ($T$).
 Note that any loop can be selected for seed partitioning, but heuristically a loop in the middle
-of the loop chain results in fewer dependencies between tiles~\cite{Strout2001poster}.
+of the loop chain results in fewer dependencies between tiles~\citep{Strout2001poster}.
 The number of tiles is a tuning parameter used to balance data locality and parallelism.
 The output is a function $\theta$ that maps each iteration of each loop in 
 the chain to a tile and a task graph $G$ that captures the
@@ -860,7 +859,7 @@ OPlus library, or Oxford Parallel Library.} is a library for implementing
 applications that solve partial differential equations over unstructured 
 meshes. For example, OP2 is employed in the Hydra CFD application, 
 used at Rolls Royce for the simulation of next-generation components 
-of jet engines, and in Volna~\cite{volna}, a CFD application for the 
+of jet engines, and in Volna~\citep{volna}, a CFD application for the 
 modelling of tsunami waves. These applications are composed of a 
 large number of parallel or reduction loops (hundreds in Hydra, tens 
 in Volna).  This section describes how we adapted the current
@@ -1014,7 +1013,7 @@ The code was compiled using {\tt gcc-4.7.0} with options {\tt -O3 -fopenmp} and 
 to execute the task graph. 
 %Two thousand convergence iterations were performed for each matrix by executing the loop chain 1000 times. 
 
-The Jacobi recurrence equation includes a sparse matrix vector multiplication and is representative of a broad class of sparse linear algebra applications. It is also an effective testbed because different data dependency patterns can be examined simply by using different input matrices. In these experiments, a set of 6 input matrices, drawn from the University of Florida Sparse Matrix Collection~\cite{MatrixMarket}, was used. The matrices were selected so that they would vary in overall data footprint, from 45 MB to 892 MB, and in percentage of non-zeros, from very sparse at 0.0006\% to 
+The Jacobi recurrence equation includes a sparse matrix vector multiplication and is representative of a broad class of sparse linear algebra applications. It is also an effective testbed because different data dependency patterns can be examined simply by using different input matrices. In these experiments, a set of 6 input matrices, drawn from the University of Florida Sparse Matrix Collection~\citep{MatrixMarket}, was used. The matrices were selected so that they would vary in overall data footprint, from 45 MB to 892 MB, and in percentage of non-zeros, from very sparse at 0.0006\% to 
 %significantly 
 much more dense at 0.5539\% non-zeros. % values.
 
@@ -1047,12 +1046,12 @@ In Figure \ref{fig:jacobiSpeedup},  the scalability of the full sparse tiled Jac
 \end{figure*}
 
 
-The OP2 adaptation of the generalized sparse tiling technique was evaluated in a representative unstructured mesh application called Airfoil~\cite{AIRFOIL}. Three implementations of Airfoil, namely $omp$, $mpi$ and $tiled$, were compared on two shared-memory machines, an Intel Westmere (dual-socket 6-core Intel Xeon X5650 2.66 GHz, 12MB of shared L3 cache per socket) and a more recent Intel Sandy Bridge (dual-socket 8-core Intel Xeon E5-2680 2.00Ghz, 20MB of shared L3 cache per socket). The code was compiled using the Intel \texttt{icc 2013} compiler with optimizations enabled (\texttt{-O3}, \texttt{-xSSE4.2/-xAVX}).
+The OP2 adaptation of the generalized sparse tiling technique was evaluated in a representative unstructured mesh application called Airfoil~\citep{AIRFOIL}. Three implementations of Airfoil, namely $omp$, $mpi$ and $tiled$, were compared on two shared-memory machines, an Intel Westmere (dual-socket 6-core Intel Xeon X5650 2.66 GHz, 12MB of shared L3 cache per socket) and a more recent Intel Sandy Bridge (dual-socket 8-core Intel Xeon E5-2680 2.00Ghz, 20MB of shared L3 cache per socket). The code was compiled using the Intel \texttt{icc 2013} compiler with optimizations enabled (\texttt{-O3}, \texttt{-xSSE4.2/-xAVX}).
 
 The OP2 Airfoil application consists of a main time loop with 2000 iterations. This loop contains a sequence of four parallel loops that carry out the computation. In this sequence, the first two loops, called $adt$-$calc$ and $res$-$calc$, constitute the bulk of the computation. $Adt$-$calc$ iterates over cells, reads from adjacent vertices and write to a local dataset, whereas $res$-$calc$ iterates over edges and exploits indirect mappings to vertices and cells for incrementing indirect datasets associated to cells. These loops share datasets associated with cells and vertices. Datasets are composed of doubles.
 %-precision floating-point values.
 
-In the $omp$ and $mpi$ implementations of Airfoil, the OpenMP and the MPI back-ends of OP2, were used. The effectiveness of these parallelization schemes has been demonstrated in~\cite{op2-main}. The OP2 OpenMP back-end has been intuitively described in Section~\ref{sec:OP2}. The $tiled$ implementation exploits the OP2 gFST library for tiling a loop chain composed of 6 loops: the time loop was unrolled by a factor of two so as to tile over $adt$-$calc$ and $res$-$calc$ twice. The OP2 gFST library uses $METIS$~\cite{METIS} for computing a seed partitioning
+In the $omp$ and $mpi$ implementations of Airfoil, the OpenMP and the MPI back-ends of OP2, were used. The effectiveness of these parallelization schemes has been demonstrated in~\cite{op2-main}. The OP2 OpenMP back-end has been intuitively described in Section~\ref{sec:OP2}. The $tiled$ implementation exploits the OP2 gFST library for tiling a loop chain composed of 6 loops: the time loop was unrolled by a factor of two so as to tile over $adt$-$calc$ and $res$-$calc$ twice. The OP2 gFST library uses $METIS$~\citep{METIS} for computing a seed partitioning
 of the mesh vertices.
 % set of vertices between the two loops.
 
@@ -1070,7 +1069,7 @@ Results shown for $tiled$ do not include the overhead of the inspector. By also 
 
 The performance results presented here for Jacobi and Airfoil support 
 previous work demonstrating the benefits of full sparse 
-tiling~\cite{StroutIJHPCA,StroutPLDI03,commAvoidingSparse2009}.
+tiling~\citep{ST-StroutIJHPCA,ST-StroutPLDI03,ST-commAvoidingSparse2009}.
 Extending this approach by grouping iteration that share data across 
 loops into tiles improves performance due to improved data locality. 
 On multicore machines this avoids memory bandwidth saturation while scaling.
@@ -1097,7 +1096,7 @@ the degree of parallelism in the task graph.
 
 
 %The benefits of the full sparse tiling approach has already been 
-%shown~\cite{StroutIJHPCA,StroutPLDI03,commAvoidingSparse2009}.
+%shown~\cite{ST-StroutIJHPCA,ST-StroutPLDI03,ST-commAvoidingSparse2009}.
 %The reason grouping iterations that share data across loops into tiles improves
 %performance is the improvement of data locality and on multicore machines
 %this can enable avoiding memory bandwidth saturation  while scaling.
@@ -1131,62 +1130,17 @@ the degree of parallelism in the task graph.
 \section{Related Work}
 \label{sec:relatedwork}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-Our definition of a loop chain was presented in \cite{KriegerHIPS2013} along with 
-a discussion of how the loop chain abstraction is complimentary to previous projects 
-that performed task scheduling in order to achieve asynchronous parallelism.
-In essence, projects that require manual task 
-definition~\cite{Cicotti11,CnCIPDPS10,Augonnet11,Duran2008} may benefit from the 
-semantics of a loop chain.  Additionally, loop chaining is a general abstraction that 
-allows for broader application than abstractions tailored to specific applications~\cite{Chan2008} 
-or with more restrictive requirements such as iteration space slicing~\cite{Pugh97, slicingLocality99},
-which is applicable in regular codes.
+Our definition of a loop chain was presented in \cite{ST-KriegerHIPS2013} along with a discussion of how the loop chain abstraction is complimentary to previous projects that performed task scheduling in order to achieve asynchronous parallelism. 
 
-For unstructured codes, there has been various
-inspector/executor strategies~\cite{Saltz91}
-that reschedule across loops to improve data locality
-while still providing parallelism~\cite{dimeEtna00,StroutLCPC2002,Demmel08,KriegerIAAA2012}.
-These methods include \emph{communication avoiding} approaches~\cite{commAvoidingSparse2009} 
-that optimize a series of loops over unstructured meshes. 
-These strategies fall under the broader category of sparse tiling.
-% FIXME: might want to smooth this. 
-%and were detailed in Section~\ref{sec:history}.
-In this paper we present a generalized sparse tiling algorithm, whereas 
-previous work was specific to particular benchmarks.
+For unstructured codes, there has been various inspector/executor strategies~\citep{ST-Saltz91} that reschedule across loops to improve data locality while still providing parallelism~\citep{ST-dimeEtna00,ST-StroutLCPC2002,ST-Demmel08,ST-KriegerIAAA2012}. These methods include \emph{communication avoiding} approaches~\citep{ST-commAvoidingSparse2009} that optimize a series of loops over unstructured meshes. These strategies fall under the broader category of sparse tiling. In this paper we have presented a generalized sparse tiling algorithm, whereas previous work was specific to particular benchmarks.
 
+Various code transformation have been developed to reschedule computation and reorder data for loop-chain-like code patterns. Many of these techniques also generate parallel execution schedules for the loops. The approach in \cite{ST-OhioStateMPICodeGen} identifies \emph{partitionable loops}, and schedules these loops for execution on a distributed memory machine. Likewise, there are approaches that take parallel loops identified by OpenMP pragmas and transform them for execution on distributed memory clusters~\citep{ST-Basumallik2006}. 
 
-%%%%%%%%%%%%%%%%%%%%%%
-%  \item Various code transformations reschedule computation and/or reorder data to turn
-%  such data reuse into data locality as well as parallelizing the computations. [Summarize communication avoiding and sparse tiling work.  
-%  Also OSU and Purdue work.  Summarize previous work that Carlo did.  Paper that describes the benefit Hydra could achieve.]
-Various code transformation have been developed to reschedule 
-computation and reorder data for loop-chain-like code patterns.
-Many of these techniques also generate parallel execution schedules for the loops. 
-The approach in \cite{OhioStateMPICodeGen} identifies \emph{partitionable loops}, 
-and schedules these loops for execution on a distributed memory machine. 
-Likewise, there are approaches that take parallel loops identified by OpenMP 
-pragmas and transform them for execution on distributed memory clusters~\cite{Basumallik2006}. 
-%NEED TO SUMMARIZE HYDRA WORK HERE AS WELL.
-
-%  \item Some of these approaches were general, but they did not schedule across the loops and
-%  therefore are throwing some possible data locality away.
-%  The techniques that schedule across loops are specific to individual loop kernels.
-The approach presented in this paper differs from these techniques in two key ways. 
-First, these approaches generate a schedule in which each partition or processing 
-element executes its assigned iterations of one loop, then communicates a subset 
-of its results to other partitions that are dependent on that data. 
-After executing its iterations of a loop, each processing element potentially 
-waits to receive data from other partitions. 
-The full sparse tiling approach described here does not require any 
-synchronization or communication during the execution of a tile due to the \emph{atomicity} 
-of the tile. Before a tile begins execution, it waits until all necessary data is available 
-and then executes from start to finish without further communication or synchronization. 
-This approach can better exploit the locality available across the sequence of loops.
+The approach presented in this paper differs from these techniques in two key ways. First, these approaches generate a schedule in which each partition or processing element executes its assigned iterations of one loop, then communicates a subset of its results to other partitions that are dependent on that data. After executing its iterations of a loop, each processing element potentially waits to receive data from other partitions. The full sparse tiling approach described here does not require any synchronization or communication during the execution of a tile due to the \emph{atomicity} of the tile. Before a tile begins execution, it waits until all necessary data is available and then executes from start to finish without further communication or synchronization. This approach can better exploit the locality available across the sequence of loops.
 
 % OK, what should we say here without harming the arguments about specializing the algorithm for OP2? Also, are we trying to contrast with Demmel's stuff or what? Does the communication avoiding work rely on the topology of the mesh? I seem to remember that it did and they had
 % specific versions for 1D, 2D, 3D. Compared to the others, we are about the same
 % in terms of loop chains vs partitionable loops vs OpenMP loops, etc-- Krieger
-
-%Secondly, the approach presented in this paper is general and only requires that the provided sequence of loops be a valid loop chain. %It does not make any assumptions about the pattern of data dependencies or the number of loops.
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

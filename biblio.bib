@@ -1,6 +1,30 @@
 % This file was created with JabRef 2.7b.
 % Encoding: UTF-8
 
+@INPROCEEDINGS{ST-Adams99c,
+  author = {Adams, M. F. and J. Demmel},
+  title = {Parallel Multigrid Solver Algorithms and Implementations for 3{D}
+	Unstructured Finite Element Problem},
+  booktitle = {Proceedings of SC99},
+  year = {1999},
+  address = {Portland, Oregon},
+  month = {November},
+  annote = {status: Paper Copy{\par}misc: -there is a tech paper version of this
+	paper{\par} summary: {\par}-"the application of multigrid to unstructured
+	grid problems, however, is not well developed." I wonder if Mike
+	Holst would agree with this statement. -MIS, maximal independent
+	sets to coarsen unstructured grids -open problem: scalable algorithms
+	which can be easily integrated into exising FE codes, when he is
+	talking scalable I think he means only parallel scalable -he doesn't
+	seem to mention modeling the application running time, or when parallel
+	tradeoffs should be made -multiplicative multigrid, full mutigrid?
+	see multigrid tutorial -their work "centers on the construction of
+	good quality restriction operators." },
+  date-added = {2013-04-26 18:09:11 +0000},
+  date-modified = {2013-04-26 18:09:11 +0000},
+  keywords = {(Adams), Multigrid,FEM,thesis}
+}
+
 @ARTICLE{ufl,
   author = {M. S. Aln{\ae}s and A. Logg and K. B. {\O}lgaard and M. E. Rognes
 	and G. N. Wells},
@@ -16,6 +40,19 @@
   doi = {10.1145/2566630},
   numpages = {37},
   url = {http://dx.doi.org/10.1145/2566630}
+}
+
+@INPROCEEDINGS{ST-ASCRExascaleLethin,
+  author = {Saman Amarasinghe and Mary Hall and Richard Lethin and Keshav Pingali
+	and Dan Quinlan and Vivek Sarkar and John Shalf and Robert Lucas
+	and Katherine Yelick and Pavan Balanji and Pedro C. Diniz and Alice
+	Koniges and Marc Snir},
+  title = {Exascale Programming Challenges},
+  booktitle = {Proc. Workshop on Exascale Programming Challenges, Marina del Rey,
+	CA, USA},
+  year = {2011},
+  month = {Jul},
+  publisher = {ASCR, DOE}
 }
 
 @MANUAL{fluidity_manual_v4,
@@ -49,6 +86,19 @@
   numpages = {26},
   publisher = {Pergamon Press, Inc.},
   url = {http://dx.doi.org/10.1016/j.camwa.2014.01.021}
+}
+
+@CONFERENCE{ST-Basumallik2006,
+  author = {Ayon Basumallik and Rudolf Eigenmann},
+  title = {Optimizing irregular shared-memory applications for distributed-memory
+	systems},
+  booktitle = {Proc. 11th ACM SIGPLAN Symp. Prin. \& Prac. of Par. Prog.},
+  year = {2006},
+  pages = {119-128},
+  address = {New York, New York, USA},
+  publisher = {ACM},
+  date-added = {2013-03-26 03:54:00 +0000},
+  date-modified = {2013-03-26 04:57:31 +0000}
 }
 
 @INCOLLECTION{carlolcpc,
@@ -91,6 +141,27 @@
   url = {http://doi.acm.org/10.1145/1375581.1375595}
 }
 
+@ARTICLE{ST-Davis2011,
+  author = {Davis, Timothy A. and Hu, Yifan},
+  title = {The university of Florida sparse matrix collection},
+  journal = {ACM Trans. Math. Softw.},
+  year = {2011},
+  volume = {38},
+  pages = {1:1--1:25},
+  number = {1},
+  month = dec
+}
+
+@INPROCEEDINGS{ST-Demmel08,
+  author = {James Demmel and Mark Hoemmen and Marghoob Mohiyuddin and Katherine
+	Yelick},
+  title = {Avoiding Communication in Sparse Matrix Computations},
+  booktitle = {Proceedings of International Parallel and Distributed Processing
+	Symposium (IPDPS)},
+  year = {2008},
+  publisher = {{IEEE} Computer Society}
+}
+
 @INPROCEEDINGS{lizst,
   author = {DeVito, Zachary and Joubert, Niels and Palacios, Francisco and Oakley,
 	Stephen and Medina, Montserrat and Barrientos, Mike and Elsen, Erich
@@ -114,6 +185,17 @@
   location = {Seattle, Washington},
   numpages = {12},
   url = {http://doi.acm.org/10.1145/2063384.2063396}
+}
+
+@ARTICLE{ST-dimeEtna00,
+  author = {Craig C. Douglas and Jonathan Hu and Markus Kowarschik and Ulrich
+	R{\"u}de and Christian Wei\ss.},
+  title = {{C}ache {O}ptimization for {S}tructured and {U}nstructured {G}rid
+	{M}ultigrid},
+  journal = {Electronic Transaction on Numerical Analysis},
+  year = {2000},
+  pages = {21-40},
+  month = {February}
 }
 
 @MISC{firedrake-code,
@@ -259,6 +341,44 @@
   url = {http://doi.acm.org/10.1145/2427023.2427027}
 }
 
+@INPROCEEDINGS{ST-KriegerIAAA2012,
+  author = {Christopher D. Krieger and Michelle Mills Strout},
+  title = {Executing Optimized Irregular Applications Using Task Graphs Within
+	Existing Parallel Models},
+  booktitle = {Proceedings of the Second Workshop on Irregular Applications: Architectures
+	and Algorithms ($IA^3$) held in conjunction with SC12},
+  year = {2012},
+  month = {November 11,}
+}
+
+@INPROCEEDINGS{ST-KriegerLCPC2012,
+  author = {Christopher D. Krieger and Michelle Mills Strout},
+  title = {A Fast Parallel Graph Partitioner for Shared-Memory Inspector/Executor
+	Strategies},
+  booktitle = {Proc. 25th Intl. Workshop on Lang. \& Comp. for Par. Comp. (LCPC)},
+  year = {2012},
+  month = {September},
+  date-added = {2013-03-28 04:45:59 +0000},
+  date-modified = {2013-03-28 04:45:59 +0000}
+}
+
+@CONFERENCE{ST-KriegerHIPS2013,
+  author = {Christopher D. Krieger and Michelle Mills Strout and Catherine Olschanowsky
+	and Andrew Stone and Stephen Guzik and Xinfeng Gao and Carlo Bertolli
+	and Paul Kelly and Gihan Mudalige and Brian {Van Straalen} and Sam
+	Williams},
+  title = {Loop Chaining: A Programming Abstraction For Balancing Locality and
+	Parallelism},
+  booktitle = {Proceedings of the 18th International Workshop on High-Level Parallel
+	Programming Models and Supportive Environments (HIPS)},
+  year = {2013},
+  address = {Boston, Massachusetts, USA},
+  month = {May},
+  date-added = {2013-03-26 03:20:28 +0000},
+  date-modified = {2013-03-26 03:25:12 +0000},
+  keywords = {Loop chaining, programming abstractions}
+}
+
 @ARTICLE{assembly-opencl,
   author = {Kruel, Filip and Bana, Krzysztof},
   title = {Vectorized OpenCL Implementation of Numerical Integration for Higher
@@ -353,6 +473,27 @@
   note = {In press}
 }
 
+@INPROCEEDINGS{ST-commAvoidingSparse2009,
+  author = {Mohiyuddin, Marghoob and Hoemmen, Mark and Demmel, James and Yelick,
+	Katherine},
+  title = {Minimizing communication in sparse matrix solvers},
+  booktitle = {Proceedings of the Conference on High Performance Computing Networking,
+	Storage and Analysis},
+  year = {2009},
+  series = {SC '09},
+  pages = {36:1--36:12},
+  publisher = {ACM},
+  acmid = {1654096},
+  articleno = {36},
+  bdsk-url-1 = {http://doi.acm.org/10.1145/1654059.1654096},
+  date-added = {2013-04-15 14:49:59 +0000},
+  date-modified = {2013-04-15 14:49:59 +0000},
+  doi = {http://doi.acm.org/10.1145/1654059.1654096},
+  isbn = {978-1-60558-744-8},
+  location = {Portland, Oregon},
+  numpages = {12}
+}
+
 @ARTICLE{quadrature-olegaard,
   author = {Olgaard, Kristian B. and Wells, Garth N.},
   title = {Optimizations for quadrature representations of finite element tensors
@@ -396,6 +537,24 @@
   number = {2}
 }
 
+@INPROCEEDINGS{ST-OhioStateMPICodeGen,
+  author = {Ravishankar, Mahesh and Eisenlohr, John and Pouchet, Louis-No\"{e}l
+	and Ramanujam, J. and Rountev, Atanas and Sadayappan, P.},
+  title = {Code generation for parallel execution of a class of irregular loops
+	on distributed memory systems},
+  booktitle = {Proc. Intl. Conf. on High Perf. Comp., Net., Sto. \& Anal.},
+  year = {2012},
+  pages = {72:1--72:11},
+  articleno = {72},
+  bdsk-url-1 = {http://dl.acm.org/citation.cfm?id=2388996.2389094},
+  date-added = {2013-04-15 22:45:02 +0000},
+  date-modified = {2013-04-15 22:45:30 +0000},
+  isbn = {978-1-4673-0804-5},
+  keywords = {Ohio State},
+  location = {Salt Lake City, Utah},
+  numpages = {11}
+}
+
 @INPROCEEDINGS{Rossinelli2013,
   author = {Rossinelli, Diego and Hejazialhosseini, Babak and Hadjidoukas, Panagiotis
 	and Bekas, Costas and Curioni, Alessandro and Bertsch, Adam and Futral,
@@ -428,6 +587,20 @@
   number = {4},
   accepted = {28 February 2013},
   upcoming = {true}
+}
+
+@ARTICLE{ST-Saltz91,
+  author = {Joel H. Salz and Ravi Mirchandaney and Kay Crowley},
+  title = {Run-Time Parallelization and Scheduling of Loops},
+  journal = {IEEE Transactions on Computers},
+  year = {1991},
+  volume = {40},
+  pages = {603--612},
+  number = {5},
+  annote = {Sparse Programming Models},
+  date-added = {2010-09-20 19:54:26 -0600},
+  date-modified = {2010-09-20 19:54:26 -0600},
+  keywords = {Keep, Sparse Programming Models}
 }
 
 @INPROCEEDINGS{nek5000,
@@ -495,6 +668,47 @@
 	parallelism;sparse Jacobi iterative solver;task graph;Arrays;Benchmark
 	testing;Indexes;Jacobian matrices;Parallel processing;Sparse matrices;inspector/executor;run-time
 	reordering transformations;tiling}
+}
+
+@INPROCEEDINGS{ST-StroutPLDI03,
+  author = {Michelle Mills Strout and Larry Carter and Jeanne Ferrante},
+  title = {Compile-time Composition of Run-time Data and Iteration Reorderings},
+  booktitle = {Proc. {ACM} {SIGPLAN} Conf. Prog. Lang. Des. \& Impl. (PLDI)},
+  year = {2003},
+  address = {New York, NY, USA},
+  month = {June},
+  publisher = {ACM},
+  annote = {This paper describes the framework for describing RTRT at compile
+	time. It also steps through the moldyn example.},
+  date-added = {2013-04-26 18:10:31 +0000},
+  date-modified = {2013-04-26 18:10:31 +0000}
+}
+
+@INPROCEEDINGS{ST-StroutLCPC2002,
+  author = {Michelle Mills Strout and Larry Carter and Jeanne Ferrante and Jonathan
+	Freeman and Barbara Kreaseck},
+  title = {Combining Performance Aspects of Irregular {Gauss-Seidel} via Sparse
+	Tiling},
+  booktitle = {Proceedings of the 15th Workshop on Languages and Compilers for Parallel
+	Computing (LCPC)},
+  year = {2002},
+  month = {July},
+  publisher = {Springer}
+}
+
+@ARTICLE{ST-StroutIJHPCA,
+  author = {Michelle Mills Strout and Larry Carter and Jeanne Ferrante and Barbara
+	Kreaseck},
+  title = {Sparse Tiling for Stationary Iterative Methods},
+  journal = {International Journal of High Performance Computing Applications},
+  year = {2004},
+  volume = {18},
+  pages = {95-114},
+  number = {1},
+  month = {February},
+  date-added = {2013-04-26 18:12:14 +0000},
+  date-modified = {2013-04-26 18:12:14 +0000},
+  local-url = {file://localhost/Users/mstrout/Papers/IJHPCA04.pdf}
 }
 
 @INPROCEEDINGS{pochoir,
