@@ -324,10 +324,10 @@ The second objective of expression rewriting (Section~\ref{sec:coffee-avoidzeros
 
 \begin{figure}
 \centering
-\label{code:original-code}
 \footnotesize
 \lstinputlisting{coffee/listings/simple.code}
 \caption{Original (simplified) code}
+\label{code:original-code}
 \end{figure}
 
 Consider the local element matrix computation in Figure~\ref{code:original-code}, which is an excerpt from the Burgers problem shown in Listing~\ref{code:burgers}. The assembly expression, produced by the FEniCS and Firedrake's form compiler, has been deliberately simplified, and code details have been omitted for brevity and readability. In practice, as already emphasized, assembly expressions can be much more complex depending on the differential operators employed in the variational form; however, this example is representative enough for highlighting patterns that are common in a large class of equations. 
@@ -336,10 +336,10 @@ A first glimpse of the code suggests that the \texttt{a*f0*A[i][j]+b*f1*B[i][j]}
 
 \begin{figure}
 \centering
-\label{code:invariant-code}
 \footnotesize
 \lstinputlisting{coffee/listings/invariant.code}
 \caption{Invariant code}
+\label{code:invariant-code}
 \end{figure}
 
 We work around these limitations with source-level loop-invariant code motion. In particular, we pre-compute all values that an invariant sub-expression assumes along its fastest varying dimension. This is implemented by introducing a temporary array per invariant sub-expression and by adding a new loop to the nest. At the price of extra memory for storing temporaries, the gain is that lifted terms can be auto-vectorized as part of an inner loop. Given the short trip counts of our loops, it is important to achieve auto-vectorization of hoisted terms in order to minimize the percentage of scalar instructions, which could otherwise be significant. It is also worth noting that, in some problems, for instance Helmholtz in Listing~\ref{code:helmholtz}, invariant sub-expressions along \texttt{j} are identical to those along \texttt{k}, and both loops iterate over the same iteration space, as anticipated in Section~\ref{sec:coffe-motivations}. In these cases, we safely avoid redundant pre-computation. The resulting code for the running Burgers example is shown in Figure~\ref{code:invariant-code}.
@@ -352,10 +352,10 @@ In the following, we refer to this series of transformations as \textit{generali
 
 \begin{figure}
 \centering
-\label{code:factorized-code}
 \footnotesize
 \lstinputlisting{coffee/listings/factorized.code}
 \caption{Factorized code}
+\label{code:factorized-code}
 \end{figure}
 
 After generalized loop-invariant code motion has been applied, some assembly expressions can still  ``hide'' opportunities for code hoisting. By examining again the code in Figure~\ref{code:invariant-code}, we notice that the basis function array \texttt{A} iterating along the \texttt{[i,j]} loops appears twice in the expression. By expanding the products in which \texttt{A} is accessed and by applying sum commutativity, terms can be factorized. This has two effects: firstly, it reduces the number of arithmetic operations performed; secondly, and most importantly, it exposes a new sub-expression \texttt{A[i][k]/c+T2[k]*f} invariant with respect to loop \texttt{j}. Consequently, hoisting can be performed, resulting in the code in Figure~\ref{code:factorized-code}. In general, exposing factorization opportunities requires traversing the whole expression tree, and then expanding and moving terms. It also needs heuristics to select a factorization strategy: there may be different opportunities of reorganizing sub-expressions, and, in our case, the best is the one that maximizes the invariant code eventually disclosed. We will discuss this aspect formally in Section~\ref{sec:coffee-rewrite-rules}.
@@ -365,10 +365,10 @@ After generalized loop-invariant code motion has been applied, some assembly exp
 
 \begin{figure}
 \centering
-\label{code:scalarexp-code}
 \footnotesize
 \lstinputlisting{coffee/listings/vectexpanded.code}
 \caption{Scalar-expanded code}
+\label{code:scalarexp-code}
 \end{figure}
 
 We note that integration-dependent expressions are inherently executed as scalar code. For example, the \texttt{f0*a} and \texttt{f1*b} products in Figure~\ref{code:factorized-code} depend on the loop along quadrature points; these operations are performed in a non-vectorized way at every \texttt{i} iteration. This is not a big issue in our running example, in which the scalar computation represents a small fraction of the total, but it becomes a concrete problem in complicated forms, like those at the heart of hyperelasticity (which will be part of our performance evaluation). In such forms, the amount of computation independent of both test and trial functions loops is so large that it has a significant impact on the run-time, despite being executed only $O(I)$ times (with $I$ number of quadrature points). We have therefore implemented an algorithm to move and scalar-expand integration-dependent expressions, which leads to codes as in Figure~\ref{code:scalarexp-code}.
@@ -493,10 +493,10 @@ In complex kernels, like Burgers in Listing~\ref{code:burgers}, and on certain a
 
 \begin{figure}
 \centering
-\label{code:burgers-split}
 \scriptsize
 \lstinputlisting{coffee/listings/expr-split.code}
 \caption{Local assembly code for the Burgers problem in Figure~\ref{code:expanded-2-code} after the application of \emph{split}. In this example, the split factor is 2.}
+\label{code:burgers-split}
 \end{figure}
 
 Splitting an expression (henceforth \emph{split}) has, however, several drawbacks. Firstly, it increases the number of accesses to $A$ proportionally to the ``split factor'', which is the number of sub-expressions produced. Also, depending on how the split is executed and the way expression rewriting is performed, it can lead to redundant computation. For example, the number of times the product $det*W3[i]$ is performed is proportional to the number of sub-expressions, as shown in the code snippet. Further, it increases loop overhead, for example through additional branch instructions. Finally, it might affect register locality: for instance, the same array could be accessed in different sub-expressions, requiring a proportional number of loads be performed; this, again, depends on expression rewriting. Nevertheless, as shown in Section~\ref{sec:coffee-perfeval-single}, the performance gain from improved register reuse along inner dimensions can be important, especially if the selection of the split factor uses heuristics to minimize the aforementioned issues.
@@ -506,10 +506,10 @@ Splitting an expression (henceforth \emph{split}) has, however, several drawback
 
 \begin{figure}
 \centering
-\label{code:burgers-opvect}
 \scriptsize
 \lstinputlisting{coffee/listings/opvect.code}
 \caption{Local assembly code for the Burgers problem in Figure~\ref{fig:withzeros-code} after the application of vector-register tiling (outer-product vectorization). In this example, the unroll-and-jam factor is 1.}
+\label{code:burgers-opvect}
 \end{figure}
 
 One notable problem of assembly kernels concerns register allocation and register locality. The critical situation occurs when loop trip counts and the variables accessed are such that the vector-register pressure is high. Since the kernel's working set fits the L1 cache, it is particularly important to optimize register management. Standard optimizations, such as loop interchange, unroll, and unroll-and-jam, can be employed to deal with this problem. Tiling at the level of vector registers represents another opportunity. Based on the observation that the evaluation of the element matrix can be reduced to a summation of outer products along the \texttt{j} and \texttt{k} dimensions, a model-driven vector-register tiling strategy can be implemented. If we consider the codes in the various listings and we focus on the body of the test and trial functions loops (\texttt{j} and \texttt{k}), the computation of the element matrix is abstractly expressible as
@@ -586,7 +586,7 @@ By comparison with implementations characterized by manually-unrolled loops, we 
 \end{center}
 \end{figure}
 
-Our research resulted in the implementation of COFFEE\footnote{COFFEE stands for COmpiler For FinitE Element local assembly.}, a mature, platform-independent compiler capable of optimizing any local assembly code generated through Firedrake or FEniCS. COFFEE has been fully integrated with Firedrake, so it can optimize any equation expressible with this framework. The code, which comprises more than 5000 lines, is available at~\citep{coffee-implementation}.
+Our research resulted in the implementation of COFFEE\footnote{COFFEE stands for COmpiler For FinitE Element local assembly.}, a mature, platform-independent compiler capable of optimizing any local assembly code generated through Firedrake or FEniCS. COFFEE has been fully integrated with Firedrake, so it can optimize any equation expressible with this framework. The code, which comprises more than 5000 lines, is available at~\citep{coffee-code}.
 
 Firedrake users employ the Unified Form Language to express problems in a notation resembling mathematical equations. At run-time, the high-level specification is translated by a modified version of its form compiler, the FEniCS Form Compiler (FFC)~\cite{FFC-Compiler}, into an abstract syntax tree (AST) representation of one or more finite element assembly kernels. ASTs are then passed to COFFEE to apply the transformations described in the previous sections. The output of COFFEE, C code, is eventually provided to PyOP2~\citep{pyop2isc}, where just-in-time compilation and execution over the discretized domain take place. The flow and the compiler structure are outlined in Figure~\ref{fig:coffee-pipeline}. 
 
@@ -870,9 +870,9 @@ problem & \specialcell{number of\\variants} & \specialcell{rewrite\\strategy} & 
 
 In this section, we investigate the performance gain for an entire finite element computation developed in Firedrake, a linear elasticity problem. The source code is available at~\citep{ufl-code-fullapp}. The equation is used to simulate deformation of an object caused by pre-established loading conditions.
 
-The execution time of a steady finite element problem is dominated by two factors: assembly and solve. The evaluation of all local element matrices and vectors, and their insertion, respectively, in a ``global'' sparse matrix and a global vector, compose the ``assembly'' phase. The global matrix and vector form a linear system, usually solved by an iterative method; this is the ``solve'' phase. The percentage of time spent in assembly and solve varies from problem to problem. As reiterated in the available literature, for example in~\cite{quadrature1}, the computational cost of local assembly grows with the \textit{complexity} of the partial differential equation (e.g. because of larger loops and more articulated expressions), while the solve time increases with polynomial order and mesh discretization. The complexity of an equation depends on several factors, including the number of derivatives and coefficient functions (i.e. additional known functions that characterize the equation).
+The execution time of a steady finite element problem is dominated by two factors: assembly and solve. The evaluation of all local element matrices and vectors, and their insertion, respectively, in a ``global'' sparse matrix and a global vector, compose the ``assembly'' phase. The global matrix and vector form a linear system, usually solved by an iterative method; this is the ``solve'' phase. The percentage of time spent in assembly and solve varies from problem to problem. As reiterated in the available literature, for example in~\cite{quadrature-olegaard}, the computational cost of local assembly grows with the \textit{complexity} of the partial differential equation (e.g. because of larger loops and more articulated expressions), while the solve time increases with polynomial order and mesh discretization. The complexity of an equation depends on several factors, including the number of derivatives and coefficient functions (i.e. additional known functions that characterize the equation).
 
-We study two versions of the static linear elasticity problem: 1) with one coefficient function, $f=1$, and 2) with two coefficient functions, $f=2$. More coefficient functions are also plausible; however, as we will see, the assembly process starts being particularly expensive already with $f=1$. For each of these two versions, we examine the cases of polynomial order $q=1$ and $q=2$. To run our experiments, we use a single core of the Sandy Bridge architecture described in Section~\ref{sec:perf-results}. The application runs on a tetrahedral mesh composed of 196608 elements.
+We study two versions of the static linear elasticity problem: 1) with one coefficient function, $f=1$, and 2) with two coefficient functions, $f=2$. More coefficient functions are also plausible; however, as we will see, the assembly process starts being particularly expensive already with $f=1$. For each of these two versions, we examine the cases of polynomial order $q=1$ and $q=2$. To run our experiments, we use a single core of the Sandy Bridge architecture used in the previous Section. The application runs on a tetrahedral mesh composed of 196608 elements.
 
 \begin{figure}
 	\centering
@@ -926,7 +926,7 @@ The expression represents the numerical evaluation of an integral at $n_1$ point
 \begin{enumerate}
 \item In Equation~\eqref{eq:assembly-model}, the summations correspond to reduction loops, whereas loops over indices $i$ and $j$ are fully parallel. Throughout the paper we assumed that a kernel will be executed by a single thread, which is likely to be the best strategy for standard multi-core CPUs. On the other hand, we note that for certain architectures (for example GPUs) this could be prohibitive due to memory requirements. Intra-kernel parallelization is one possible solution: a domain-specific compiler such as COFFEE could map mathematical quantifiers and operators to different parallelization schemes and generate distinct variants of multi-threaded kernel code. Based on our experience, we believe this is the right approach to achieve performance portability.
 \item The various sub-expressions in $\beta$ only depend on (i.e. iterate along) a subset of the enclosing loops. In addition, some of these sub-expressions might reduce to the same values as iterating along certain iteration spaces. This code structure motivated the generalized loop-invariant code motion technique. The intuition is that whenever sub-expressions invariant with respect to different sets of affine loops can be identified, the question of whether, where and how to hoist them, while minimizing redundant computation, arises. Pre-computation of invariant terms also increases memory requirements due to the need for temporary arrays, so it is possible that for certain architectures the transformation could actually cause slowdowns (e.g. whenever the available per-core memory is small).
-\item Associative arithmetic operators are the prerequisite for expression splitting. In essence, this transformation concerns resource-aware execution. In the context of COFFEE, expression splitting has been successfully applied to improve register pressure. However, the underlying idea of re-scheduling (re-associating) operations to optimize for some generic parameters is far more general. It could be used, for example, as a starting point to perform kernel fission; that is, splitting a kernel into multiple parts, each part characterized by less stringent memory requirements (a variant of this idea for non-affine loops in unstructured mesh applications has been adopted in~\citep{carlolcpca}). In Equation~\eqref{eq:assembly-model}, for instance, not only can any of the functions $\alpha$, $\beta$ and $\gamma$ be split (assuming they include associative operators), but $\alpha$ could be completely extracted and evaluated in a separate kernel. This would reduce the working set size of each of the kernel functions, an option which is particularly attractive for many-core architectures in which the available per-core memory is much smaller than that in traditional CPUs.
+\item Associative arithmetic operators are the prerequisite for expression splitting. In essence, this transformation concerns resource-aware execution. In the context of COFFEE, expression splitting has been successfully applied to improve register pressure. However, the underlying idea of re-scheduling (re-associating) operations to optimize for some generic parameters is far more general. It could be used, for example, as a starting point to perform kernel fission; that is, splitting a kernel into multiple parts, each part characterized by less stringent memory requirements (a variant of this idea for non-affine loops in unstructured mesh applications has been adopted in~\citep{op2-lcpc}). In Equation~\eqref{eq:assembly-model}, for instance, not only can any of the functions $\alpha$, $\beta$ and $\gamma$ be split (assuming they include associative operators), but $\alpha$ could be completely extracted and evaluated in a separate kernel. This would reduce the working set size of each of the kernel functions, an option which is particularly attractive for many-core architectures in which the available per-core memory is much smaller than that in traditional CPUs.
 \end{enumerate}
 \item \textbf{Code generation and applicability of the transformations.} All array sizes and loop bounds, for example $n1$ and $n2$ in Equation~\ref{eq:assembly-model}, are known at code generation time. This means that ``good'' code can be generated. For example, loop bounds can be made explicit, arrays can be statically initialized, and pointer aliasing is easily avoidable. Further, all of these factors contribute to the applicability and the effectiveness of some of our code transformations. For instance, knowing loop bounds allows both generation of correct code when applying vector-register tiling and discovery of redundant computation  opportunities. Padding and data alignment are special cases, since they could be performed at run-time if some values were not known at code generation time. Theoretically, they could also be automated by a general-purpose compiler through profile-guided optimization, provided that some sort of data-flow analysis is performed to ensure that the extra loop iterations over the padded region do not affect the numerical results. 
 \item \textbf{Multi-loop vectorization.} Compiler auto-vectorization has become increasingly effective in a variety of codes. However, to the best of our knowledge, multi-loop vectorization involving the loading and storing of data along a subset of the loops characterizing the iteration space (rather than just along the innermost loop), is not supported by available general-purpose and polyhedral compilers. The outer-product vectorization technique presented in this paper shows that two-loop vectorization can outperform standard auto-vectorization. In addition, we expect the performance gain to scale with the number of vectorized loops and the vector length (as demonstrated in  the Xeon Phi experiments). Although the automation of multi-loop vectorization in a general-purpose compiler is far from straightforward, especially if stencils are present, we believe that this could be more easily achieved in specific domains. The intuition is to map the memory access pattern onto vector registers, and then to exploit in-register shuffling to minimize the traffic between memory and processor. By demonstrating the effectiveness of multi-loop vectorization in a real scenario, our research represents an incentive for studying this technique in a broader and systematic way.

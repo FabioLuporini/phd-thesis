@@ -101,7 +101,7 @@
   date-modified = {2013-03-26 04:57:31 +0000}
 }
 
-@INCOLLECTION{carlolcpc,
+@INCOLLECTION{op2-lcpc,
   author = {Bertolli, C. and Betts, A. and Loriant, N. and Mudalige, G.R. and
 	Radford, D. and Ham, D.A. and Giles, M.B. and Kelly, P.H.J.},
   title = {Compiler Optimizations for Industrial Unstructured Mesh CFD Applications
@@ -152,6 +152,18 @@
   month = dec
 }
 
+@ARTICLE{ST-MatrixMarket,
+  author = {T. A. Davis and Y. Hu},
+  title = {The {University of Florida} Sparse Matrix Collection},
+  journal = {ACM Transactions on Mathematical Software},
+  year = {2011},
+  volume = {38},
+  pages = {1:1 - 1:25},
+  number = {1},
+  date-added = {2013-01-03 03:09:50 +0000},
+  date-modified = {2013-01-03 03:12:04 +0000}
+}
+
 @INPROCEEDINGS{ST-Demmel08,
   author = {James Demmel and Mark Hoemmen and Marghoob Mohiyuddin and Katherine
 	Yelick},
@@ -198,6 +210,20 @@
   month = {February}
 }
 
+@ARTICLE{ST-volna,
+  author = {Denys Dutykh and Rapha{\"e}l Poncet and Fr{\'e}d{\'e}ric Dias},
+  title = {The {VOLNA} code for the numerical modeling of tsunami waves: Generation,
+	propagation and inundation},
+  journal = {European Journal of Mechanics - B/Fluids},
+  year = {2011},
+  volume = {30},
+  pages = {598 - 615},
+  number = {6},
+  note = {Special Issue: Nearshore Hydrodynamics},
+  bdsk-url-1 = {http://www.sciencedirect.com/science/article/pii/S0997754611000574},
+  keywords = {Finite volumes}
+}
+
 @MISC{firedrake-code,
   author = {{Firedrake contributors}},
   title = {{The Firedrake Project}},
@@ -211,6 +237,34 @@
   booktitle = {Proceedings of the IEEE},
   year = {2005},
   pages = {216--231}
+}
+
+@ARTICLE{ST-AIRFOIL,
+  author = {Giles, MB and Ghate, D and Duta, MC},
+  title = {Using Automatic Differentiation for Adjoint CFD Code Development},
+  year = {2005},
+  publisher = {Unspecified}
+}
+
+@ARTICLE{op2-main,
+  author = {Giles, M. B. and Mudalige, G. R. and Sharif, Z. and Markall, G. and
+	Kelly, P. H.J.},
+  title = {Performance Analysis of the OP2 Framework on Many-core Architectures},
+  journal = {SIGMETRICS Perform. Eval. Rev.},
+  year = {2011},
+  volume = {38},
+  pages = {9--15},
+  number = {4},
+  month = mar,
+  acmid = {1964221},
+  address = {New York, NY, USA},
+  doi = {10.1145/1964218.1964221},
+  issn = {0163-5999},
+  issue_date = {March 2011},
+  keywords = {CFD, CUDA, GPU, OP2, OpenMP, performance, unstructured mesh applications},
+  numpages = {7},
+  publisher = {ACM},
+  url = {http://doi.acm.org/10.1145/1964218.1964221}
 }
 
 @ARTICLE{TCE,
@@ -255,6 +309,15 @@
   author = {{Intel Corporation}},
   year = {2012},
   note = {[Online]. Available: http://software.intel.com/en-us/articles/intel-architecture-code-analyzer/}
+}
+
+@MISC{METIS,
+  author = {George Karypis and Vipin Kumar},
+  title = {{MeTis: Unstructured Graph Partitioning and Sparse Matrix Ordering
+	System, Version 5.0}},
+  howpublished = {\url{http://www.cs.umn.edu/~metis}},
+  year = {2011},
+  organization = {University of Minnesota, Minneapolis, MN}
 }
 
 @ARTICLE{tensor-kirby,
@@ -411,23 +474,30 @@
   isbn = {978-3-642-23098-1}
 }
 
+@MISC{coffee-code,
+  author = {Fabio Luporini},
+  title = {{COFFEE code repository}},
+  howpublished = {\url{https://github.com/OP2/PyOP2/tree/master/pyop2/coffee}},
+  year = {2014}
+}
+
 @MISC{ufl-code-allforms,
   author = {Fabio Luporini},
-  title = {{Code for experiments on forms of increasing complexity in COFFEE}},
+  title = {{Code of experiments on forms of increasing complexity in COFFEE}},
   howpublished = {\url{https://github.com/firedrakeproject/firedrake-bench/blob/experiments/forms/firedrake_forms.py}},
   year = {2014}
 }
 
 @MISC{ufl-code-fullapp,
   author = {Fabio Luporini},
-  title = {{Code for the full application study in COFFEE}},
+  title = {{Code of the full application study in COFFEE}},
   howpublished = {\url{https://github.com/firedrakeproject/firedrake-bench/tree/experiments/elasticity}},
   year = {2014}
 }
 
 @MISC{ufl-code-individual,
   author = {Fabio Luporini},
-  title = {{Code for experiments on individual transformations in COFFEE}},
+  title = {{Code of experiments on individual transformations in COFFEE}},
   howpublished = {\url{https://github.com/firedrakeproject/firedrake/tree/pyop2-ir-perf-eval/tests/perf-eval}},
   year = {2014}
 }
