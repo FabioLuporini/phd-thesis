@@ -144,7 +144,7 @@ $\rbrace$
 \label{code:weighted-laplace}
 \end{algorithm}
 
-More complex assembly expressions, due to the employment of particular differential operators in the original PDE, are obviously possible. Intuitively, as the complexity of the PDE grows, the implementation of local assembly becomes increasingly more complicated. This fact is actually the real motivation behind reasearch in automated code generation techniques, such as those used by state-of-the-art frameworks like FEniCS and Firedrake. Automated code generation allows scientists to express the finite element specfication using a domain-specific language resembling mathematical notation, and obtain with no effort a semantically correct implementation of local assembly. The research in the present work is about making such an implementation also extremely effective, in terms of run-time performance, on standard CPU architectures. 
+More complex assembly expressions, due to the employment of particular differential operators in the original PDE, are obviously possible. Intuitively, as the complexity of the PDE grows, the implementation of local assembly becomes increasingly more complicated. This fact is actually the real motivation behind reasearch in automated code generation techniques, such as those used by state-of-the-art frameworks like FEniCS and Firedrake. Automated code generation allows scientists to express the finite element specfication using a domain-specific language resembling mathematical notation, and to obtain with minimum effort a semantically correct implementation of local assembly. The goal of this research is maximizing the efficiency, in terms of run-time performance, of generic local assembly kernels, on standard CPU architectures. 
 
 \begin{algorithm}[t]
 \scriptsize
@@ -162,9 +162,9 @@ a = weight\KwSty{*}\KwSty{dot}(\KwSty{grad}(v), \KwSty{grad}(u))\KwSty{*dx}
 \label{code:weighted-laplace-ufl}
 \end{algorithm}
 
-The domain-specific language used by Firedrake and FEniCS to express finite element problems is the Unified Form Language (UFL) \citep{ufl}. Listing~\ref{code:weighted-laplace-ufl} shows a possible UFL implementation for the weighted Laplace form. Note the resemblance of \emph{a = weight*...} with Equation~\ref{eq:stiffness}. A form compiler translates UFL code into the C code shown in Listing~\ref{code:weighted-laplace}. We will describe these aspects carefully in Section~\ref{sec:coffee-implementation}; for the moment, this level of detail sufficies to open a discussion on how to optimize local assembly kernels arising from generic partial differential equations.
+The domain-specific language used by Firedrake and FEniCS to express finite element problems is the Unified Form Language (UFL) \citep{ufl}. Listing~\ref{code:weighted-laplace-ufl} shows a possible UFL implementation for the weighted Laplace form. Note the resemblance of \emph{a = weight*...} with Equation~\ref{eq:stiffness}. A form compiler translates UFL code into the C code shown in Listing~\ref{code:weighted-laplace}. We will describe these aspects carefully in Section~\ref{sec:coffee-implementation}; for the moment, this level of detail sufficies to open a discussion on the optimization of local assembly kernels arising from different partial differential equations.
 
-\subsubsection{Other Examples and Motivations for Optimizations}
+\subsubsection{More Examples and Motivations for Optimizations}
 \label{sec:coffe-motivations}
 
 \begin{figure}
@@ -306,7 +306,9 @@ To generate high performance implementation of local assembly kernels, assembly 
 \item instruction-level parallelism
 \item data locality
 \end{itemize}
-Three conceptually distinct kind of transformations can be individuated, which we refer to as \textit{expression rewriting}, \textit{code specialization}, and \textit{general-purpose optimizations}. Expression rewriting mainly targets arithmetic intensity by transforming the assembly expression (and its enclosing loop nest) so as to minimize the number of floating point operations required to evaluate the local element matrix. Code specialization is tailored to optimizing for instruction-level parallelism, particularly SIMD vectorization, and data (register) locality. Both classes of transformations are inspired by the inherent structure of local assembly code and make use of domain knowledge: as elaborated in the next sections, these two aspects are the core motivations for which standard general-purpose compilers fail at maximizing the performance of local assembly kernels. The third class of transformations is about general-purpose optimizations; that is, generic, well-known techniques for improving code performance, such as loop unrolling or loop interchange, that for some reasons are not applied by the compiler generating machine code, but potentially useful in certain equations.
+Three conceptually distinct classes of transformations can be individuated, which we refer to as \textit{expression rewriting}, \textit{code specialization}, and \textit{general-purpose optimizations}. 
+
+Expression rewriting mainly targets arithmetic intensity by transforming the assembly expression (and its enclosing loop nest) so as to minimize the number of floating point operations required to evaluate the local element matrix. Code specialization is tailored to optimizing for instruction-level parallelism, particularly SIMD vectorization, and data (register) locality. Both classes of transformations are inspired by the inherent structure of local assembly code and make use of domain knowledge: as elaborated in the next sections, these two aspects are the core motivations for which standard general-purpose compilers fail at maximizing the performance of local assembly kernels. The third class of transformations is about general-purpose optimizations; that is, generic, well-known techniques for improving code performance, such as loop unrolling or loop interchange, that for some reasons are not applied by the compiler generating machine code, but potentially useful in certain equations.
 
 In Sections~\ref{sec:coffee-expr-rewrite}--\ref{sec:coffee-genpurp-opts}, these classes of code transformations are presented. In Section~\ref{sec:coffee-implementation}, it is explained that their application to local assembly kernels must follow a specific order to ensure the correctness of the resulting code. Some effort was invested in ensuring that optimizations at stage $i$ (e.g. expression rewriting) would not break any further optimization opportunity at stage $i+1$ (code specialization). The theory and the implementation of a technique to select the optimal combination of transformations for a given equation are finally discussed.
 
@@ -326,7 +328,7 @@ The second objective of expression rewriting (Section~\ref{sec:coffee-avoidzeros
 \centering
 \footnotesize
 \lstinputlisting{coffee/listings/simple.code}
-\caption{Original (simplified) code}
+\caption{Excerpt of the non-optimized local assembly code from the Burgers problem shown in Listing~\ref{code:burgers}.}
 \label{code:original-code}
 \end{figure}
 
@@ -338,7 +340,7 @@ A first glimpse of the code suggests that the \texttt{a*f0*A[i][j]+b*f1*B[i][j]}
 \centering
 \footnotesize
 \lstinputlisting{coffee/listings/invariant.code}
-\caption{Invariant code}
+\caption{Local assembly code for the Burgers example after application of generalized loop-invariant code motion.}
 \label{code:invariant-code}
 \end{figure}
 
@@ -354,7 +356,7 @@ In the following, we refer to this series of transformations as \textit{generali
 \centering
 \footnotesize
 \lstinputlisting{coffee/listings/factorized.code}
-\caption{Factorized code}
+\caption{Terms factorization exposes additional code hoisting opportunities, as it can be evinced by comparison of the code in this Figure with that in Figure~\ref{code:invariant-code}.}
 \label{code:factorized-code}
 \end{figure}
 
@@ -367,7 +369,7 @@ After generalized loop-invariant code motion has been applied, some assembly exp
 \centering
 \footnotesize
 \lstinputlisting{coffee/listings/vectexpanded.code}
-\caption{Scalar-expanded code}
+\caption{Local assembly code for the Burgers example after precomputation and scalar-expansion of loop-invariant terms.}
 \label{code:scalarexp-code}
 \end{figure}
 
@@ -382,13 +384,17 @@ Expression rewriting also aims at minimizing register pressure in the assembly l
 
 \begin{figure}
 \footnotesize
-\subfigure[Original (simplified) code]{\label{code:toexpand-code}\lstinputlisting{coffee/listings/toexpand.code}}
+\subfigure[Excerpt of the non-optimized local assembly code from the Burgers problem shown in Listing~\ref{code:burgers}, slightly modified for illustration purposes.]{\label{code:toexpand-code}\lstinputlisting{coffee/listings/toexpand.code}}
 ~\\
 ~\\
-\subfigure[The code after expansion of \texttt{det*W[i]}]{\label{code:expanded-1-code}\lstinputlisting{coffee/listings/expanded-1.code}}
 ~\\
 ~\\
-\subfigure[The code after expansion of \texttt{g}. Note the need to introduce a new temporary array.]{\label{code:expanded-2-code}\lstinputlisting{coffee/listings/expanded-2.code}}
+\subfigure[Local assembly code after expansion of term \texttt{det*W[i]}]{\label{code:expanded-1-code}\lstinputlisting{coffee/listings/expanded-1.code}}
+~\\
+~\\
+~\\
+~\\
+\subfigure[Local assembly code after expansion of symbol \texttt{g}. Note the need to introduce a new temporary array.]{\label{code:expanded-2-code}\lstinputlisting{coffee/listings/expanded-2.code}}
 \caption{Expansion of terms to improve register pressure in a local assembly kernel}\label{code:expanded-code}
 \end{figure}
 
@@ -449,11 +455,11 @@ Skipping arithmetic operations over blocks of zero-valued entries in basis funct
 \begin{figure}[t]
 \tiny
 \centerline{
-\subfigure[Original code. Note the annotation over the definition of the tabulated basis function \texttt{D}, which is used to identify the presence of zero-valued columns]{\label{fig:withzeros-code}\lstinputlisting{coffee/listings/withzeros.code}}
+\subfigure[]{\label{fig:withzeros-code}\lstinputlisting{coffee/listings/withzeros.code}}
 ~~~~~~~~~
-\subfigure[The code after symbolic execution took place]{\label{fig:withzeros-skipped-code}\lstinputlisting{coffee/listings/skipzeros.code}}
+\subfigure[]{\label{fig:withzeros-skipped-code}\lstinputlisting{coffee/listings/skipzeros.code}}
 }
-\caption{Simplified excerpt of local assembly code from a Burgers form using vector-valued basis functions, before and after symbolic execution is performed to rewrite the iteration space}\label{fig:skip-code}
+\caption{On the left, excerpt of the non-optimized local assembly code from the Burgers problem shown in Listing~\ref{code:burgers}. On the right, the code after the assembly expression's iteration space has been restructured, based on the propagation of zero-valued columns as determined through symbolic execution. Note the code annotation over the definition of the tabulated vector-valued basis function \texttt{D}, which is provided as input to identify zero-valued columns.}\label{fig:skip-code}
 \end{figure}
 
 In Figure~\ref{fig:withzeros-code}, an enriched version of the Burgers excerpt in Figure~\ref{code:original-code} is illustrated. The code is instantiated for the specific case of polynomial order $q=1$ Lagrange basis functions on a 2D mesh. The array \texttt{D} represents a derivative of a basis function tabulated at the various quadrature points. There are four zero-valued columns. Any multiplications or additions along these columns could (should) be skipped to avoid irrelevant floating point operations. The solution adopted in~\cite{quadrature-olegaard} is not to generate the zero-valued columns (i.e. to generate a dense 6$\times$2 array), to reduce the size of the iteration space over test and trial functions (from 6 to 2), and to use an indirection array (e.g. $ind = \lbrace 3, 5\rbrace$) to update the right entries in the element tensor $A$. This prevents, among the various optimizations, effective SIMD vectorization, because memory loads and store would eventually reference non-contiguous locations. 
@@ -892,15 +898,15 @@ increasing polynomial order and number of coefficient functions, or by simply st
 
 \section{Related Work}
 \label{sec:coffee-related-work}
-The finite element method is extensively used to approximate solutions of PDEs. Well-known frameworks and applications include nek5000~\cite{nek5000-web-page}, the FEniCS project~\cite{Fenics}, Fluidity~\cite{fluidity_manual_v4}, and of course Firedrake. Numerical integration based on quadrature, as in Firedrake, is usually employed to implement the local assembly phase. The recent introduction of domain specific languages (DSLs) to decouple the finite element specification from its underlying implementation facilitated, however, the development of novel approaches. Methods based on tensor contraction~\citep{FFC-Compiler} and symbolic manipulation~\citep{francis} have been implemented. Nevertheless, it has been demonstrated that quadrature-based integration remains the most efficient choice for a wide class of problems~\citep{quadrature-olegaard}, which motivates our work in COFFEE.
+The finite element method is extensively used to approximate solutions of PDEs. Well-known frameworks and applications include nek5000~\citep{nek5000-web-page}, the FEniCS project~\citep{Fenics}, Fluidity~\citep{fluidity_manual_v4}, and of course Firedrake. Numerical integration based on quadrature, as in Firedrake, is usually employed to implement the local assembly phase. The recent introduction of domain specific languages (DSLs) to decouple the finite element specification from its underlying implementation facilitated, however, the development of novel approaches. Methods based on tensor contraction~\citep{FFC-Compiler} and symbolic manipulation~\citep{francis} have been implemented. Nevertheless, it has been demonstrated that quadrature-based integration remains the most efficient choice for a wide class of problems~\citep{quadrature-olegaard}, which motivates our work in COFFEE.
 
 Optimization of quadrature-based local assembly for CPU architectures has been addressed in FEniCS~\cite{quadrature-olegaard}. The comparison between COFFEE and this work has been presented in Section~\ref{sec:coffee-allforms-perf}. In~\citep{Markall20101815}, and more recently in~\citep{petsc-integration-gpu}, the same problem has been studied for GPU architectures. In~\citep{assembly-opencl}, variants of the standard numerical integration algorithm have been specialized and evaluated for the PowerXCell processor, but an exhaustive study from the compiler viewpoint - like ours - is missing, and none of the optimizations presented in this chapter are mentioned. Among these efforts, to the best of our knowledge, COFFEE is the first work targeting low-level optimizations through a real compiler approach.
 
 The code transformations presented are inspired by standard compilers optimizations and exploit domain properties. Our loop-invariant code motion technique individuates invariant sub-expressions and redundant computation by analyzing all loops in an iteration space, which is a generalization of the algorithms often implemented by general-purpose compilers. Expression splitting is an abstract variant of loop fission based on properties of arithmetic operators. The outer-product vectorization is an implementation of tiling at the level of vector registers; tiling, or ``loop blocking'', is commonly used to improve data locality (especially for caches). Padding has been used to achieve data alignment and to improve the effectiveness of vectorization. A standard reference for the compilation techniques re-adapted in this work is~\citep{dragonbook}.
 
-Our compiler-based optimization approach is made possible by the top-level DSL, which enables automated code generation. DSLs have been proven successful in auto-generating optimized code for other domains: Spiral~\citep{Pueschel:05} for digital signal processing numerical algorithms, ~\citep{Spampinato:14} for dense linear algebra, or Pochoir~\cite{pochoir} and SDSL~\cite{stencil-compiler} for image processing and finite difference stencils. Similarly, PyOP2 is used by Firedrake to express iteration over unstructured meshes in scientific codes. COFFEE improves automated code generation in Firedrake.
+Our compiler-based optimization approach is made possible by the top-level DSL, which enables automated code generation. DSLs have been proven successful in auto-generating optimized code for other domains: Spiral~\citep{Pueschel:05} for digital signal processing numerical algorithms, ~\citep{Spampinato:14} for dense linear algebra, or Pochoir~\citep{pochoir} and SDSL~\citep{stencil-compiler} for image processing and finite difference stencils. Similarly, PyOP2 is used by Firedrake to express iteration over unstructured meshes in scientific codes. COFFEE improves automated code generation in Firedrake.
 
-Many code generators, like those based on the Polyhedral model~\cite{pluto} and those driven by domain-knowledge~\cite{modeldriven}, make use of cost models. The alternative of using auto-tuning to select the best implementation for a given problem on a certain platform has been adopted by nek5000~\cite{nek5000} for small matrix-matrix multiplies, the ATLAS library~\cite{ATLAS}, and FFTW~\cite{FFTW} for fast fourier transforms. In both cases, pruning the implementation space is fundamental to mitigate complexity and overhead. Likewise, COFFEE uses heuristics and a model-driven auto-tuning system (Section~\ref{sec:coffee-autotune}) to steer the optimization process.
+Many code generators, like those based on the Polyhedral model~\citep{pluto} and those driven by domain-knowledge~\citep{modeldriven}, make use of cost models. The alternative of using auto-tuning to select the best implementation for a given problem on a certain platform has been adopted by nek5000~\citep{nek5000} for small matrix-matrix multiplies, the ATLAS library~\citep{ATLAS}, and FFTW~\citep{FFTW} for fast fourier transforms. In both cases, pruning the implementation space is fundamental to mitigate complexity and overhead. Likewise, COFFEE uses heuristics and a model-driven auto-tuning system (Section~\ref{sec:coffee-autotune}) to steer the optimization process.
 
 
 \section{Generality of the Approach and Applicability to Other Domains}

@@ -1,8 +1,4 @@
-
-
-void burgers(double M[6][6], 
-             double **coordinates,
-             double **coeff0) {
+void burgers(double M[6][6], double **coords) {
   // Calculate determinant of jacobian (det)
   // using the coordinates field
   

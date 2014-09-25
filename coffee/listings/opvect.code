@@ -1,4 +1,4 @@
-void burgers(double M[6][6], double **coordinates) {
+void burgers(double M[6][6], double **coords) {
   // Calculate determinant of jacobian (det) using the coordinates field
   // Define tabulation of basis functions (and their derivatives) arrays
   ...

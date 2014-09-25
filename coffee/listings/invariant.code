@@ -1,6 +1,3 @@
-
-
-
 for (int i=0; i<I; ++i) {
   for (int r=0; r<T; ++r) { 
     f0 += ...; f1 += ...; ...;
@@ -14,7 +11,7 @@ for (int i=0; i<I; ++i) {
     for (int k=0; k<T; ++k) {
       M[j][k] += (((A[i][k]/c)*A[i][j])+
                   (T1[j]*A[i][k]*g)+
-		  (T2[k]*A[i][j]*f))*det*W[i];
+                  (T2[k]*A[i][j]*f))*det*W[i];
     }
   }
 }
