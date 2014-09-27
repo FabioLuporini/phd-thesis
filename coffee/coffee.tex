@@ -614,6 +614,15 @@ To make FFC output ASTs, its intermediate representation is intercepted prior to
 The enriched intermediate representation allows to create proper AST's Symbol nodes. A Symbol, as shown in Figure~\ref{fig:coffee-ast-vs-c}, has a name (the variable name), an array of indices, and an array of offsets. These information are fundamental for the implementation of expression rewriting and code specialization. Further, special AST's Declaration objects can be used to track the sparsity pattern in basis function arrays. 
 
 \subsection{On the Compiler Implementation}
+
+\begin{figure}
+\begin{center}
+\includegraphics[scale=0.70]{coffee/pictures/coffee-scheme.pdf}
+\caption{Structure of COFFEE.}
+\label{fig:coffee-compiler-structure}
+\end{center}
+\end{figure}
+
 Figure~\ref{fig:coffee-compiler-structure} outlines the various modules composing COFFEE. Expression rewriting, code specialization, and general-purpose transformations are applied by manipulating the AST representing the local assembly kernel. Providing the steps of all algorithms performing the various transformations would just be tedious and marginally helpful for the reader; essentially, implementing a transformation always reduces to write a routine that visits and manipulates a tree data structure (the AST) according to the semantics described in Sections~\ref{sec:coffee-expr-rewrite} and~\ref{sec:coffee-code-spec}. In this section, we rather focus on aspects of the compiler implementation that involve the orchestration of the different transformations, including a description of the data structures employed to track both the restructuring of the assembly expressions and data dependencies. 
 
 \subsubsection{Code Hoisting}
