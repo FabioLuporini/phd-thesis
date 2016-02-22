@@ -1,0 +1,222 @@
+\chapter{Background}
+
+\section{The Finite Element Method}
+\label{sec:bkg:fem}
+...
+
+\subsection{Variational Formulation}
+\label{sec:bkg:coffee-var-problems}
+...
+
+\subsection{Mapping from the Reference Element}
+\label{sec:bkg:mapping}
+...
+
+\subsection{Assembly}
+\label{sec:bkg:assembly}
+...
+
+\subsubsection{From Math to Loop Nests}
+\label{sec:bkg:mathcode}
+We have explained that local assembly is the computation of contributions of a specific cell in the discretized domain to the linear system which yields the PDE solution. The process consists of numerically evaluating problem-specific integrals to produce a matrix and a vector (only the derivation of the matrix was shown in Section~\ref{sec:quadrature-rep}), whose sizes depend on the order of the method. This operation is applied to all cells in the discretized domain (mesh).
+
+We consider again the weighted Laplace example of the previous section. A C-code implementation of Equation~\ref{eq:quadrature} is illustrated in Listing~\ref{code:weighted-laplace}. The values at the various quadrature points of basis functions ($\phi$) derivatives are tabulated in the A and B arrays. The summation along quadrature points $q$ is implemented by the \emph{i} loop, whereas the one along $\alpha_3$ is represented by the \emph{r} loop. In this example, we assume $d=2$ (2D mesh), so the summations along $\alpha_1$, $\alpha_2$ and $\beta$ have been straightforwardly expanded in the expression that evaluates the local element matrix $A$. 
+
+\begin{algorithm}[t]
+\scriptsize
+\SetAlgorithmName{LISTING}{}
+
+\KwSty{void} weighted$\_$laplace(\KwSty{double} A[3][3], \KwSty{double} **coords, \KwSty{double} **w) \\
+$\lbrace$ \\
+~~  // Compute Jacobian \\
+~~  \KwSty{double} J[4]; \\
+~~  compute$\_$jacobian$\_$triangle$\_$2d(J, coords); \\
+~~\\
+~~  // Compute Jacobian inverse and determinant \\
+~~  \KwSty{double} K[4]; \\
+~~  \KwSty{double} detJ; \\
+~~  compute$\_$jacobian$\_$inverse$\_$triangle$\_$2d(K, detJ, J); \\
+~~  \KwSty{const double} det = fabs(detJ); \\
+~~\\
+~~  // Quadrature weights \\
+~~  \KwSty{static const double} W1[1] = {0.5}; \\
+~~\\
+~~  // Basis functions \\
+~~  \KwSty{static const double} A[1][3] = $\lbrace\lbrace$ -0.999999999999999, ...$\rbrace\rbrace$ ;\\
+~~  \KwSty{static const double} B[1][3] = $\lbrace\lbrace$ -1.0, ...$\rbrace\rbrace$ ;\\
+~~  \KwSty{static const double} C[1][3] = $\lbrace\lbrace$ 0.333333333333333, ...$\rbrace\rbrace$ ;\\
+~~\\
+~~  \KwSty{for} (\KwSty{int} i = 0; i < 6; ++i)\\
+~~  $\lbrace$\\
+~~~~  \KwSty{double} f0  = 0.0;\\
+~~~~  \KwSty{for} (\KwSty{int} r  = 0; r < 3; ++r)\\
+~~~~~~  f0 += (w[r][0] * C[i][r]);\\
+~~\\
+~~~~  \KwSty{for} (\KwSty{int} j = 0; j < 3; ++j)\\
+~~~~~~    \KwSty{for} (\KwSty{int} k = 0; k < 3; ++k)\\
+~~~~~~~~      A[j][k] += (\underline{(}\textbf{(}((K[1]*A[i][k])+(K[3]*B[i][k])) * \\
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~((K[1]*A[i][j])+(K[3]*B[i][j]))\textbf{)} + \\
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~\textbf{(}((K[0]*A[i][k])+(K[2]*B[i][k])) * \\
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~((K[0]*A[i][j])+(K[2]*B[i][j]))\textbf{)}\underline{)}*det*W1[i]*f0);\\
+~~  $\rbrace$\\
+$\rbrace$
+\caption{A possible implementation of Equation~\ref{eq:quadrature} assuming a 2D triangular mesh and polynomial order $q=2$ Lagrange basis functions.}
+\label{code:weighted-laplace}
+\end{algorithm}
+
+More complex assembly expressions, due to the employment of particular differential operators in the original PDE, are obviously possible. Intuitively, as the complexity of the PDE grows, the implementation of local assembly becomes increasingly more complicated. This fact is actually the real motivation behind reasearch in automated code generation techniques, such as those used by state-of-the-art frameworks like FEniCS and Firedrake. Automated code generation allows scientists to express the finite element specfication using a domain-specific language resembling mathematical notation, and to obtain with minimum effort a semantically correct implementation of local assembly. The goal of this research is maximizing the efficiency, in terms of run-time performance, of generic local assembly kernels, on standard CPU architectures. 
+
+\begin{algorithm}[t]
+\scriptsize
+\SetAlgorithmName{LISTING}{}
+
+// This is a Firedrake construct (\textbf{not} an UFL's) to instantiate a 2D mesh.\\
+mesh = UnitSquareMesh(size, size)\\
+// FunctionSpace also belongs to the Firedrake language \\
+V = FunctionSpace(mesh, "Lagrange", 2)\\
+u = \KwSty{TrialFunction}(V)\\
+v = \KwSty{TestFunction}(V)\\
+weight = \KwSty{Function(V)}.\KwSty{assign}(value)\\
+a = weight\KwSty{*}\KwSty{dot}(\KwSty{grad}(v), \KwSty{grad}(u))\KwSty{*dx}
+\caption{UFL specification of the weighted Laplace equation for polynomial order $q=2$ Lagrange basis functions.}
+\label{code:weighted-laplace-ufl}
+\end{algorithm}
+
+The domain-specific language used by Firedrake and FEniCS to express finite element problems is the Unified Form Language (UFL) \citep{ufl}. Listing~\ref{code:weighted-laplace-ufl} shows a possible UFL implementation for the weighted Laplace form. Note the resemblance of \emph{a = weight*...} with Equation~\ref{eq:stiffness}. A form compiler translates UFL code into the C code shown in Listing~\ref{code:weighted-laplace}. We will describe these aspects carefully in Section~\ref{sec:coffee-implementation}; for the moment, this level of detail sufficies to open a discussion on the optimization of local assembly kernels arising from different partial differential equations.
+
+% More Examples now...
+
+\begin{figure}
+\begin{alltt}
+\scriptsize
+\textbf{Input:} element matrix (2D array, initialized to 0), coordinates (array), 
+       coefficients (array, e.g. velocity)
+\textbf{Output:} element matrix (2D array)
+- Compute Jacobian from coordinates
+- Define basis functions
+- Compute element matrix in an affine loop nest
+\end{alltt}
+\caption{Structure of a local assembly kernel}
+\label{code:general-structure}
+\end{figure}
+
+%The code transformations described in this work are also
+%generalizable to non-Firedrake assembly kernels, provided that the
+%same numerical integration algorithm is employed.
+
+The structure of a local assembly kernel can be generalized as in Figure~\ref{code:general-structure}. The inputs are a zero-initialized two dimensional array used to store the element matrix, the element's coordinates in the discretized domain, and coefficient fields, for instance indicating the values of velocity or pressure in the element. The output is the evaluated element matrix. The kernel body can be logically split into three parts:
+\begin{enumerate}
+  \item Calculation of the Jacobian matrix, its determinant and its
+    inverse required for the aforementioned change of coordinates from
+    the reference element to the one being computed.
+  % FIXME: this rather hand-wavy and not technically correct
+  \item Definition of basis functions used to interpolate fields at the
+    quadrature points in the element. The choice of basis functions is
+    expressed in UFL directly by users. In the generated code, they are
+    represented as global read-only two dimensional arrays (i.e., using
+    \texttt{static const} in C) of double precision floats.
+  \item Evaluation of the element matrix in an affine loop nest, in which
+    the integration is performed.
+\end{enumerate}
+Table~\ref{table:map-name-letters} shows the variable names we will use in the upcoming code snippets to refer to the various kernel objects.
+
+\begin{table}
+\scriptsize
+\begin{center}
+\begin{tabulary}{1.0\columnwidth}{C|C|C}
+\hline
+Object name & Type & Variable name(s) \\\hline
+Determinant of the Jacobian matrix & double & det  \\
+Inverse of the Jacobian matrix & double & K1, K2, ... \\
+Coordinates & double** & coords\\
+Fields (coefficients) & double** & w \\
+Coefficients at quadrature points & double & f0, f1, ...\\
+Numerical integration weights & double[] & W \\
+Basis functions (and derivatives) & double[][] & A, B, C, ... \\
+Element matrix & double[][] & M\\ \hline
+\end{tabulary}
+\end{center}
+\caption{Type and variable names used in the various listings to identify local assembly objects.}
+\label{table:map-name-letters}
+\end{table}
+
+
+\begin{algorithm}[t]
+\scriptsize
+\SetAlgorithmName{LISTING}{}
+
+\KwSty{void} helmholtz(\KwSty{double} M[3][3], \KwSty{double} **coords) $\lbrace$\\
+~~// K, det = Compute Jacobian (coords) \\
+~~\\
+~~\KwSty{static const double} W[3] = $\lbrace$...$\rbrace$\\
+~~\KwSty{static const double} A[3][3] = $\lbrace\lbrace$...$\rbrace\rbrace$\\
+~~\KwSty{static const double} B[3][3] = $\lbrace\lbrace$...$\rbrace\rbrace$\\
+~~\\
+~~\KwSty{for} (\KwSty{int} i = 0; i$<$3; i++) \\
+~~~~\KwSty{for} (\KwSty{int} j = 0; j$<$3; j++) \\
+~~~~~~\KwSty{for} (\KwSty{int} k = 0; k$<$3; k++) \\
+~~~~~~~~M[j][k] += \underline{(}Y[i][k]*Y[i][j]+\\
+~~~~~~~~~~~~~~~~~~~~~+((K1*A[i][k]+K3*B[i][k])*(K1*A[i][j]+K3*B[i][j]))+\\
+~~~~~~~~~~~~~~~~~~~~~+((K0*A[i][k]+K2*B[i][k])*(K0*A[i][j]+K2*B[i][j]))\underline{)}*\\
+~~~~~~~~~~~~~~~~~~~~~~*det*W[i];\\
+$\rbrace$
+\caption{Local assembly implementation for a Helmholtz problem on a 2D mesh using polynomial order $q=1$ Lagrange basis functions.}
+\label{code:helmholtz}
+\end{algorithm}
+
+\begin{algorithm}[t]
+\scriptsize
+\SetAlgorithmName{LISTING}{}
+
+\KwSty{void} burgers(\KwSty{double} A[12][12], \KwSty{double} **coords, \KwSty{double} **w) $\lbrace$\\
+~~// K, det = Compute Jacobian (coords) \\
+~~\\
+~~\KwSty{static const double} W[5] = $\lbrace$...$\rbrace$\\
+~~\KwSty{static const double} A[5][12] = $\lbrace\lbrace$...$\rbrace\rbrace$\\
+~~\KwSty{static const double} B[5][12] = $\lbrace\lbrace$...$\rbrace\rbrace$\\
+~~//11 other basis functions definitions.\\
+~~...\\
+~~\KwSty{for} (\KwSty{int} i = 0; i$<$5; i++) $\lbrace$\\
+~~~~\KwSty{double} f0 = 0.0;\\
+~~~~//10 other declarations (f1, f2,...)\\
+~~~~...\\
+~~~~\KwSty{for} (\KwSty{int} r = 0; r$<$12; r++) $\lbrace$\\
+~~~~~~f0 += (w[r][0]*C[i][r]);\\
+~~~~~~//10 analogous statements (f1, f2, ...)\\
+~~~~~~...\\
+~~~~$\rbrace$\\
+~~~~\KwSty{for} (\KwSty{int} j = 0; j$<$12; j++) \\
+~~~~~~\KwSty{for} (\KwSty{int} k = 0; k$<$12; k++) \\
+~~~~~~~~A[j][k] += (..(K5*F9)+(K8*F10))*Y1[i][j])+\\
+~~~~~~~~~~~~+(((K0*C[i][k])+(K3*D[i][k])+(K6*A[i][k]))*Y2[i][j]))*f11)+\\
+~~~~~~~~~~~~+(((K2*E[i][k])+...+(K8*B[i][k]))*((K2*E[i][j])+...+(K8*B[i][j])))+\\
+~~~~~~~~~~~~+ $<$roughly a hundred sum/muls go here$>$)..)*\\
+~~~~~~~~~~~~*det*W[i];\\
+~~$\rbrace$ \\
+$\rbrace$
+\caption{Local assembly implementation for a Burgers problem on a 3D mesh using polynomial order $q=1$ Lagrange basis functions.}
+\label{code:burgers}
+\end{algorithm}
+
+The actual complexity of a local assembly kernel depends on the finite element problem being solved. In simpler cases, the loop nest is perfect, has short trip counts (in the range 3--15), and the computation reduces to a summation of a few products involving basis functions. An example is provided in Listing~\ref{code:helmholtz}, which shows the assembly kernel for a Helmholtz problem using Lagrange basis functions on 2D elements with polynomial order $q=1$. In other scenarios, for instance when solving the Burgers equation, the number of arrays involved in the computation of the element matrix can be much larger. The assembly code is given in Listing~\ref{code:burgers} and contains 14 unique arrays that are accessed, where the same array can be referenced multiple times within the same expression. This may also require the evaluation of constants in outer loops (called $F$ in the code) to act as scaling factors of arrays. Trip counts grow proportionally to the order of the method and arrays may be block-sparse.
+
+In general, the variations in the structure of mathematical expressions and in loop trip counts (although typically limited to the order of tens of iterations) that different equations show, render the optimization process challenging, requiring distinct sets of transformations to bring performance closest to the machine peak. For example, the Burgers problem, given the large number of arrays accessed, suffers from high register pressure, whereas the Helmholtz equation does not. Moreover, arrays in Burgers are block-sparse due to the use of vector-valued basis functions (we will elaborate on this in the next sections). These few aspects (we could actually find more) already intuitively suggests that the two problems require a different treatment, based on an in-depth analysis of both data and iteration spaces. Furthermore, domain knowledge enables transformations that a general-purpose compiler could not apply, making the optimization space even larger. In this context, our goal is to understand the relationship between distinct code transformations, their impact on cross-loop arithmetic intensity, and to what extent their composability is effective in a wide class of real-world equations and architectures.
+
+We also note that despite the infinite variety of assembly kernels that frameworks like FEniCS and Firedrake can generate, it is still possible to identify common domain-specific traits that are potentially exploitable for our optimization strategy. These include: 1) memory accesses along the three loop dimensions are always unit stride; 2) the \texttt{j} and \texttt{k} loops are interchangeable, whereas interchanges involving the $i$ loop require pre-computation of values (e.g. the $F$ values in Burgers) and introduction of temporary arrays (explained next); 3) depending on the problem being solved, the \texttt{j} and \texttt{k} loops could iterate along the same iteration space; 4) most of the sub-expressions on the right hand side of the element matrix computation depend on just two loops (either \texttt{i}-\texttt{j} or \texttt{i}-\texttt{k}). In the following sections we show how to exploit these observations to define a set of systematic, composable optimizations.
+
+\subsection{Linear Solvers}
+\label{sec:bkg:linearsolvers}
+..
+
+\subsection{Impact of Assembly on Execution Time}
+\label{sec:bkg:impact}
+...
+
+
+\section{Compilers and Libraries for Code Optimization}
+\label{sec:bkg:codeopt}
+...
+
+\section{State-of-the-art Hardware Architectures}
+\label{sec:bkg:arch}
+...
