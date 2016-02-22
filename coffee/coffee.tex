@@ -1,7 +1,7 @@
 \chapter{Code Specialization for Finite Element Integration}
 \label{ch:coffee}
 
-\section{Introduction}
+\section{Recapitulation and Objectives}
 %In many fields such as computational fluid dynamics, computational electromagnetics and structural mechanics, phenomena are modelled by partial differential equations (PDEs). Numerical techniques, like the finite volume method and the finite element method, are widely employed to approximate solutions of these PDEs. Unstructured meshes are often used to discretize the computational domain, since they allow an accurate representation of complex geometries. The solution is sought by applying suitable numerical operations, or
 %kernels, to the entities of a mesh, such as edges, vertices, or cells. On standard clusters of multicores, typically, a kernel is executed sequentially by a thread, while parallelism is achieved by partitioning the mesh and assigning each partition to a different node or thread. Such an execution model, with minor variations, is adopted, for example, in \cite{pyop2isc}, \cite{Fenics}, \cite{fluidity_manual_v4}, \cite{lizst}.
 %
@@ -161,7 +161,7 @@ The storage layout of $A$, however, is incorrect after the application of this o
 \end{figure}
 
 
-\section{Exposing Matrix-Matrix Multiplications for BLAS Operations}
+\section{Exposing High-level BLAS Operations}
 \label{sec:coffee-blas}
 
 In this section, a way of systematically transforming the local element matrix computation into a sequence of matrix-matrix multiplication operations is discussed. 
