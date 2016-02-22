@@ -1,9 +1,9 @@
 \chapter{Introduction}
 
 \section{Thesis Statement}
-Computational efficiency in real-world unstructured-mesh-based applications requires specialized sequential code and execution models optimized for non-affine loops. We advocate and demonstrate that an approach centered on domain-specific languages, automated code generation and generalized (i.e. computation-independent) techniques for data locality and parallelism allows achieving this goal and scientists abstracting from the performance optimization problem, which is the key to software productivity.
+%Computational efficiency in real-world unstructured-mesh-based applications requires specialized sequential code and execution models optimized for non-affine loops. We advocate and demonstrate that an approach centered on domain-specific languages, automated code generation and generalized (i.e. computation-independent) techniques for data locality and parallelism allows achieving this goal and scientists abstracting from the performance optimization problem, which is the key to software productivity.
 
-\section{Overview and Motivation}
+\section{Overview}
 In many fields, such as computational fluid dynamics, computational
 electromagnetics and structural mechanics, phenomena are modelled by
 partial differential equations (PDEs). Unstructured meshes, which
@@ -34,33 +34,33 @@ this thesis studies, formalizes, and implements a number of
 code transformations to improve the performance of real-world scientific 
 applications using numerical methods over unstructured meshes. 
 
-\section{Contributions (1st and 2nd year)}
+\section{Contributions}
 \label{sec:contributions}
-Besides developing novel compilers theory, contributions of this thesis come in the form of tools that have been, and currently are, used to accelerate scientific computations, namely:
-\begin{itemize}
-\item \textbf{A run-time library, which can be regarded as a prototype compiler, capable of optimizing sequences of non-affine loops by fusion and automatic parallelization. The library has been used to speed up a real application for tsunami simulations as well as other representative benchmarks.}
-
-One limiting factor to the performance of unstructured mesh applications is imposed by
-the need for indirect memory accesses (e.g. \texttt{A[B[i]]}) to read and
-write data associated with the various entities of the discretized domain.
-For example, when executing a kernel that numerically computes an integral over a cell, 
-which is common in a finite element method, it may be necessary
-to read the coordinates of the adjacent vertices; this is achieved by
-using a suitable indirection array, often referred to as ``map'', that
-connects cells to vertices. The problem with indirect 
-memory accesses is that they break several hardware and compiler optimizations,
-including prefetching and standard loop blocking (or tiling). A first contribution of this thesis
-is the formalization and development of a technique, called ``generalized sparse tiling'',
-that aims at increasing data locality by fusing loops in which indirections
-are used. The challenges are 1) to determine if and how a sequence of loops can be fused,
-and 2) doing it efficiently, since the fusability analysis must be performed at
-run-time, once the maps are available (i.e. once the mesh topology has been read 
-from disk).
-
-\item \textbf{A fully-operating compiler, named COFFEE\footnote{COFFEE stands for COmpiler For FinitE Element local assembly.}, capable of optimizing numerical kernels solving partial differential equations using the finite element method. The compiler is integrated with the Firedrake system (\cite{firedrake-code}).}
-
-The second contribution, in the context of the finite element method, is about optimizing the computation of so called local element matrices, which can be responsible for a significant fraction of the overall computation run-time. This is a well-known problem, and several studies can be found in the literature, among which \citep{francis}, \citep{quadrature-olegaard}, \citep{petsc-integration-gpu}, \citep{tensor-kirby}. With respect to these studies, we propose a novel set of composable, model-aware code transformations explicitly targeting, for the first time, instruction-level parallelism - with emphasis on SIMD vectorization - and register locality. These transformations are automated in COFFEE.
-\end{itemize}
+%Besides developing novel compilers theory, contributions of this thesis come in the form of tools that have been, and currently are, used to accelerate scientific computations, namely:
+%\begin{itemize}
+%\item \textbf{A run-time library, which can be regarded as a prototype compiler, capable of optimizing sequences of non-affine loops by fusion and automatic parallelization. The library has been used to speed up a real application for tsunami simulations as well as other representative benchmarks.}
+%
+%One limiting factor to the performance of unstructured mesh applications is imposed by
+%the need for indirect memory accesses (e.g. \texttt{A[B[i]]}) to read and
+%write data associated with the various entities of the discretized domain.
+%For example, when executing a kernel that numerically computes an integral over a cell, 
+%which is common in a finite element method, it may be necessary
+%to read the coordinates of the adjacent vertices; this is achieved by
+%using a suitable indirection array, often referred to as ``map'', that
+%connects cells to vertices. The problem with indirect 
+%memory accesses is that they break several hardware and compiler optimizations,
+%including prefetching and standard loop blocking (or tiling). A first contribution of this thesis
+%is the formalization and development of a technique, called ``generalized sparse tiling'',
+%that aims at increasing data locality by fusing loops in which indirections
+%are used. The challenges are 1) to determine if and how a sequence of loops can be fused,
+%and 2) doing it efficiently, since the fusability analysis must be performed at
+%run-time, once the maps are available (i.e. once the mesh topology has been read 
+%from disk).
+%
+%\item \textbf{A fully-operating compiler, named COFFEE\footnote{COFFEE stands for COmpiler For FinitE Element local assembly.}, capable of optimizing numerical kernels solving partial differential equations using the finite element method. The compiler is integrated with the Firedrake system (\cite{firedrake-code}).}
+%
+%The second contribution, in the context of the finite element method, is about optimizing the computation of so called local element matrices, which can be responsible for a significant fraction of the overall computation run-time. This is a well-known problem, and several studies can be found in the literature, among which \citep{francis}, \citep{quadrature-olegaard}, \citep{petsc-integration-gpu}, \citep{tensor-kirby}. With respect to these studies, we propose a novel set of composable, model-aware code transformations explicitly targeting, for the first time, instruction-level parallelism - with emphasis on SIMD vectorization - and register locality. These transformations are automated in COFFEE.
+%\end{itemize}
 
 \section{Dissemination}
 The research exposed in this thesis has been disseminated in the scientific community through various channels:
@@ -85,40 +85,23 @@ The research exposed in this thesis has been disseminated in the scientific comm
 been disseminated in the scientific community through publications.
 
 
-\section{3rd Year Plan}
-\label{sec:thirdyear}
-
-\paragraph{Research plan}
-I believe the material presented in this report demonstrates that the research conducted so far already represents the bulk of the thesis. The main goal of the third year will be a systematic study of loop fusion for sequences of possibly non-affine loops. This will probably result in the re-implementation of part of the PyOP2 run-time support. Questions and research problems I will address are:
-\begin{itemize}
-\item When is it feasible to fuse loops?
-\item When is it useful to fuse loops, performance-wise?
-\item How to automate loop fusion?
-\end{itemize}
-This will require a formalization and an implementation efforts that will probably cover the entire third year of studies.
-
-\paragraph{Teaching plan}
-The teaching plan for the 3rd year is:
-\begin{itemize}
-\item Delivering 3 or 4 hours of new teaching materials (i.e. lectures that I personally prepared) in Paul Kelly's Advanced Computer Architecture course.
-\item Finishing the PGCert course that I started in my 2nd year. This requires attending and writing reports for two seminars in the coming Autumn term.
-\item I will help with various 2nd year labs, as I did over the last two years.
-\end{itemize}
-
 
 \section{Thesis Outline}
-The plan is to structure the thesis as follows:
-\begin{itemize}
-\item Chapter 1: \textbf{Introduction}. This is going to be similar to the introduction presented in this LSA report.
-\item Chapter 2: \textbf{Background}. The basis for understading the contributions of the thesis will be provided. This chapter will be composed of three main sections:
-\begin{itemize}
-\item a summary of the finite element method, which is required to understand the structure of the numerical kernels optimized by COFFEE;
-\item an overview of the domain-specific languages, frameworks, methodologies, and compilers that inspired the research;
-\item a summary of contemporary multi-core architectures and compilers, including those used for the performance analysis carried out in this thesis.
-\end{itemize}
-\item Chapter 3: \textbf{Generalized Sparse Tiling with the OP2 Loop Chain Abstraction}. First contribution of the thesis. Presented in Chapter~\ref{ch:sparsetiling} of this report.
-\item Chapter 4: \textbf{Generalized Loop Fusion with the OP2 Loop Chain Abstraction.} Second contribution of the thesis. Part of the plan for the third year (see Section~\ref{sec:thirdyear}).
-\item Chapter 5: \textbf{Cross-loop Optimization of Arithmetic Intensity for Finite Element Local Assembly}. Third contribution of the thesis. Presented in Chapter~\ref{ch:coffee} of this report.
-\item Chapter 6: \textbf{Conclusions}. 
-\end{itemize}
-Note that performance evaluations of the techniques presented in Chapters 3, 4, and 5 will be included directly in these chapters.
+\label{sec:outline}
+
+%The plan is to structure the thesis as follows:
+%
+%\begin{itemize}
+%\item Chapter 1: \textbf{Introduction}. This is going to be similar to the introduction presented in this LSA report.
+%\item Chapter 2: \textbf{Background}. The basis for understading the contributions of the thesis will be provided. This chapter will be composed of three main sections:
+%\begin{itemize}
+%\item a summary of the finite element method, which is required to understand the structure of the numerical kernels optimized by COFFEE;
+%\item an overview of the domain-specific languages, frameworks, methodologies, and compilers that inspired the research;
+%\item a summary of contemporary multi-core architectures and compilers, including those used for the performance analysis carried out in this thesis.
+%\end{itemize}
+%\item Chapter 3: \textbf{Generalized Sparse Tiling with the OP2 Loop Chain Abstraction}. First contribution of the thesis. Presented in Chapter~\ref{ch:sparsetiling} of this report.
+%\item Chapter 4: \textbf{Generalized Loop Fusion with the OP2 Loop Chain Abstraction.} Second contribution of the thesis. Part of the plan for the third year (see Section~\ref{sec:thirdyear}).
+%\item Chapter 5: \textbf{Cross-loop Optimization of Arithmetic Intensity for Finite Element Local Assembly}. Third contribution of the thesis. Presented in Chapter~\ref{ch:coffee} of this report.
+%\item Chapter 6: \textbf{Conclusions}. 
+%\end{itemize}
+%Note that performance evaluations of the techniques presented in Chapters 3, 4, and 5 will be included directly in these chapters.
