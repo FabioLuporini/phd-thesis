@@ -1,5 +1,5 @@
-\chapter{Code Specialization for Finite Element Integration}
-\label{ch:coffee}
+\chapter{Cross-loop Optimization of Arithmetic Intensity for Finite Element Integration}
+\label{ch:lowlevelopt}
 
 \section{Recapitulation and Objectives}
 In Chapter~\ref{ch:optimality}, we have developed a method to minimize the operation count of finite element operators, or ``assembly kernels''. This chapter focuses on the same class of kernels, but tackles an orthogonal issue: low level optimization of generated code. We will abstract from the mathematical structure inherent in the expressions and concentrate on the aspects impacting the computational efficiency.
@@ -198,7 +198,7 @@ where $B$ is the set of all basis functions (or temporary variables, e.g., \text
 %registers.
 
 \begin{figure}
-\centerline{\includegraphics[scale=0.6]{coffee/pictures/vect-by-vect-inline.pdf}}
+\centerline{\includegraphics[scale=0.6]{lowlevelopt/pictures/vect-by-vect-inline.pdf}}
 \caption{Outer-product vectorization by permuting values in a vector register.}
 \label{fig:vect-by-vect}
 \end{figure}
@@ -206,7 +206,7 @@ where $B$ is the set of all basis functions (or temporary variables, e.g., \text
 The storage layout of $A$, however, is incorrect after the application of this outer-product-based vectorization (\emph{op-vect}, in the following). It can be efficiently restored with a sequence of vector shuffles following the pattern highlighted in Figure~\ref{fig:restore-layout}, executed once outside of the \texttt{ijk} loop nest. The pseudo-code for the Burgers local assembly kernel when using \emph{op-vect} is shown in Listing~\ref{code:burgers-opvect}.
 
 \begin{figure}
-\centerline{\includegraphics[scale=0.6]{coffee/pictures/vect-restore-inline.pdf}}
+\centerline{\includegraphics[scale=0.6]{lowlevelopt/pictures/vect-restore-inline.pdf}}
 \caption{Restoring the storage layout after \emph{op-vect}. The figure shows how 4$\times$4 elements in the top-left block of the element matrix $A$ can be moved to their correct positions. Each rotation, represented by a group of three same-colored arrows, is implemented by a single shuffle intrinsic.}
 \label{fig:restore-layout}
 \end{figure}
@@ -225,88 +225,6 @@ The storage layout of $A$, however, is incorrect after the application of this o
 %We note that integration-dependent expressions are inherently executed as scalar code. For example, the \texttt{f0*a} and \texttt{f1*b} products in Figure~\ref{code:factorized-code} depend on the loop along quadrature points; these operations are performed in a non-vectorized way at every \texttt{i} iteration. This is not a big issue in our running example, in which the scalar computation represents a small fraction of the total, but it becomes a concrete problem in complicated forms, like those at the heart of hyperelasticity (which will be part of our performance evaluation). In such forms, the amount of computation independent of both test and trial functions loops is so large that it has a significant impact on the run-time, despite being executed only $O(I)$ times (with $I$ number of quadrature points). We have therefore implemented an algorithm to move and scalar-expand integration-dependent expressions, which leads to codes as in Figure~\ref{code:scalarexp-code}.
 
 
-
-
-\section{Implementation in COFFEE}
-\label{sec:coffee-implementation}
-\subsection{Outline and Integration with Firedrake}
-
-\begin{figure}
-\begin{center}
-\includegraphics[scale=0.70]{coffee/pictures/coffee-pipeline.pdf}
-\caption{High-level view of Firedrake. COFFEE is at the core, receiving ASTs from a modified version of the FEniCS Form Compiler and producing optimized C code kernels.}
-\label{fig:coffee-pipeline}
-\end{center}
-\end{figure}
-
-Our research resulted in the implementation of COFFEE\footnote{COFFEE stands for COmpiler For FinitE Element local assembly.}, a mature, platform-independent compiler capable of optimizing any local assembly code generated through Firedrake or FEniCS. COFFEE has been fully integrated with Firedrake, so it can optimize any equation expressible with this framework. The code, which comprises more than 5000 lines, is available at~\citep{coffee-code}.
-
-Firedrake users employ the Unified Form Language to express problems in a notation resembling mathematical equations. At run-time, the high-level specification is translated by a modified version of its form compiler, the FEniCS Form Compiler (FFC)~\cite{FFC-Compiler}, into an abstract syntax tree (AST) representation of one or more finite element assembly kernels. ASTs are then passed to COFFEE to apply the transformations described in the previous sections. The output of COFFEE, C code, is eventually provided to PyOP2~\citep{pyop2isc}, where just-in-time compilation and execution over the discretized domain take place. The flow and the compiler structure are outlined in Figure~\ref{fig:coffee-pipeline}. 
-
-The compiler applies an ordered sequence of optimization steps to the ASTs received from FFC. Expression rewriting is performed first, due to the introduction of temporary arrays and the need to create multiple loop nest starting from the original one (this may happen when computation over zero-valued blocks is avoided). Then, code specialization takes place. Finally, loop interchange and loop unroll are applied. COFFEE has an auto-tuning system, described in Section~\ref{sec:coffee-autotune}, to individuate the most suitable optimization strategy (i.e. to select which transformations to apply) for a certain equation. The implementation of all code transformations is centered on analysis and manipulation of the kernel AST. Any possible corner cases are handled: for example, if outer-product vectorization is to be applied but the size of the iteration space is not a multiple of the vector length, then a remainder loop, amenable to auto-vectorization, is inserted (as shown in Figure~\ref{code:burgers-opvect}).
-
-Users can either enable individual transformations by switching specific flags or leave the auto-tuning system, described in Section~\ref{sec:coffee-autotune}, in charge of determining the best optimization strategy (i.e. selecting and composing transformations).
-
-\subsection{Modifying the FEniCS Form Compiler}
-COFFEE expects as input either a string of C code or an AST. In the former case, a parser could be used to obtain an AST representation, which is required by the algorithms implementing the various code transformations. Therefore, FFC's output, which is a C-code implementation of a local assembly kernel, could be used straightforwardly as input to COFFEE. However, we note that this would also be conceptually pointless: FFC would generate C code from its intermediate representation that eventually COFFEE would have to re-parse to obtain an AST. A much cleaner solution, adopted and explained next, consists of modifying FFC to directly generate an AST. 
-
-\subsubsection{Generation of Abstract Syntax Trees}
-The construction of the FFC's intermediate representation from UFL code is refined as follows:
-\begin{itemize}
-\item The mathematical expression that evaluates the element matrix is represented by a tree data structure. A limitation of the original FFC was that nodes in such expression tree, which correspond to symbols or arithmetic operations, are not bound to the enclosing loops. For instance, consider the symbol \texttt{A[i][j]}: the FFC's expression tree has a node for this symbol, but visiting it there is no clean way of separating the variable name \texttt{A} from the loop indices \texttt{i} and \texttt{j}. Therefore, we have enriched symbol nodes with additional fields to capture these information. 
-\item Basis functions in the FFC's intermediate representation are characterized by a new field telling whether they originated from a vector-valued or a scalar-valued element. In the former case, the array rappresenting the tabulation of a basis function at the various quadrature points is block-sparse. This information is recorded and, as explained next, attached to the kernel's AST to enable COFFEE applying symbolic execution to avoid iteration over zero-valued blocks, as elaborated in Section~\ref{sec:coffee-avoidzeros}.
-\end{itemize}
-In the modified FFC, the intermediate representation is intercepted prior to the code generation stage and forwarded to a new module that builds ASTs. To this purpose, COFFEE exposes its hierarchy of AST nodes, whose design strictly adhere to standard object-oriented programming rules (e.g. by making extensive use of overloading). An example of such an AST representation for a simple C statement is provided in Figure~\ref{fig:coffee-ast-vs-c}.
-
-\begin{figure}
-\begin{center}
-\includegraphics[scale=0.50]{coffee/pictures/coffee-ast.pdf}
-\caption{AST representation of a C assignment in COFFEE.}
-\label{fig:coffee-ast-vs-c}
-\end{center}
-\end{figure}
-
-The enriched intermediate representation allows to create proper AST's Symbol nodes. A Symbol, as shown in the figure, has a name (the variable name), an array of indices, and an array of offsets. These information are fundamental for the implementation of expression rewriting and code specialization. Further, special AST's Declaration objects can be used to track the sparsity pattern in basis function arrays. 
-
-\subsection{On the Compiler Implementation}
-
-\begin{figure}
-\begin{center}
-\includegraphics[scale=0.70]{coffee/pictures/coffee-scheme.pdf}
-\caption{Structure of COFFEE.}
-\label{fig:coffee-compiler-structure}
-\end{center}
-\end{figure}
-
-Figure~\ref{fig:coffee-compiler-structure} outlines the various modules composing COFFEE. Expression rewriting, code specialization, and general-purpose transformations are applied by manipulating the AST representing the local assembly kernel. Providing the steps of all algorithms performing the various transformations would just be tedious and marginally helpful for the reader; essentially, implementing a transformation always reduces to write a routine that visits and manipulates a tree data structure (the AST) according to the semantics described in Sections~\ref{sec:coffee-expr-rewrite} and~\ref{sec:coffee-code-spec}. In this section, we rather focus on aspects of the compiler implementation that involve the orchestration of the different transformations, including a description of the data structures employed to track both the restructuring of the assembly expressions and data dependencies. 
-
-\subsubsection{Code Hoisting}
-Hoisting is the operation of moving code, for instance a statement or the evaluation of an expression, from an inner to an outer loop in a nest. This operation is performed in several occasions when rewriting an expression: generalized loop-invariant code motion, expansion of sub-expressions, and precomputation of terms all require code hoisting, as illustrated in Figures~\ref{code:invariant-code} and~\ref{code:expanded-code}. In order to perform code hoisting, in particular, several aspects must be known:
-\begin{enumerate}
-\item ``what'' to hoist
-\item ``where'' to hoist (possibly, outside of the loop nest)
-\item if scalar-expansion should be introduced
-\end{enumerate}
-Answers to these three points obviously depend on the specific transformation, although parts of the implementation are shared. COFFEE tracks hoisted code by means of a dictionary that binds variable names (guaranteed to be unique) to a set of information. In particular, for a variable \texttt{v}, the dictionary provides:
-\begin{itemize}
-\item a reference to the AST node corresponding to the expression \texttt{e} hosted by \texttt{v};
-\item a reference to the loop in which \texttt{v} is assigned \texttt{e};
-\item a reference to the AST node corresponding to the declaration of \texttt{v}.
-\end{itemize}
-As expressions are hoisted, the dictionary is populated and/or updated with new information. For example, when applying generalized loop-invariant code motion, a new entry is created, unless the sub-expression being lifted has already been pre-computed elsewhere. On the other hand, when sub-expressions are expanded, either a new entry is created or an old entry is updated, as explained in Section~\ref{sec:coffee-expansion}. 
-
-The dictionary is also queried at code specialization time for padding, data alignment and generation of BLAS calls. Therefore, different algorithms in COFFEE access the same data structure, which allows avoiding both duplicated code and an additional overhead due to revisiting the same portion of AST in distinct transformations.
-
-\subsubsection{Benefits of Tracking Data Dependencies}
-COFFEE implements ``smart'' code hoisting: everytime a sub-expression or a term are lifted, for example from the mathematical expression evaluating the local element matrix to an outer level in the loop nest, three optimizations are potentially applied. Consider a hoistable expression \texttt{e} assuming different values in the iteration space \texttt{I}:
-\begin{itemize}
-\item \textbf{Minimize redundant computation.} If an equivalent sub-expression \texttt{e'} has already been hoisted along the iteration space \texttt{I}, then COFFEE replaces \texttt{e} with a reference to the symbol hosting the value of \texttt{e'}. This avoids both redundant computation and the introduction of additional temporary variables;
-\item \textbf{Loop fusion.} If scalar-expansion is introduced (we recall this is useful to achieve SIMD auto-vectorization; see Sections~\ref{sec:coffee-licm} and~\ref{sec:coffee-precompute}), then the hoisted code must be placed in an outer loop \texttt{r}, \texttt{r $\in$ I}. This was the purpose of the second \texttt{r} loop in Figure~\ref{code:invariant-code}; note that this loop includes scalar-expanded sub-expressions that, in the non-transformed code, iterated along logically different spaces (loops \texttt{j} and \texttt{k}, corresponding to test and trial functions). In this example, it was possible to use a single \texttt{r} loop because we assumed that test and trial function spaces were the same, leading to identical loop bounds; in general, however, this is not true. Another assumption of the example was that the space of the equation's coefficients (variables \texttt{f0, f1} in the figure) coincided with that of test and trial functions. This would allow fusing the two \texttt{r} loops, which is exactly what COFFEE does, although not displayed by the figure. Fusing loops, which increases data locality and reduces loop overhead, is possible in some circumnstances, in particular when there are no data dependencies among hoisted expressions and the spaces of test, trial, and coefficent functions are identical. As explained next, COFFEE reasons about data dependencies and iteration spaces to determine the safeness of loop fusion.
-\item \textbf{Reduce extra memory.} When expanding an expression, terms hoisting is possible to relieve register pressure. This poses the challenge described in Section~\ref{sec:coffee-expansion} and intuitively summarized in Figure~\ref{code:expanded-code}; that is, understanding whether it is possible to absorb the hoistable term in an available temporary value or a new temporary is needed. Obviously, the less is the number of temporaries introduced, the smaller is the size of the working set, which may result in better performance.
-\end{itemize}
-To implement these optimizations, it is necessary to track the evolution of data dependencies as the assembly expression is rewritten. For this purpose, COFFEE uses a dependency graph, which is a standard approach used by general-purpose compilers relying on abstract syntax trees (in addition to other data structures) as intermediate representation. The dependency graph has as many nodes as the number of variables in the loop nest characterizing the assembly expression. A direct edge from a node \texttt{A} to a node \texttt{B} indicates that the value of symbol \texttt{B} depends on that of \texttt{A}. 
-
-The implementation of the depedency graph data structure and of the various algorithms using it is made simple by the fact that COFFEE ensures \textit{static single assignment} form. This property, typically adopted by intermediate representations in compilers, requires that variables are assigned exactly once, and that each variable is defined in advance. 
 
 
 \section{Experiments}
@@ -343,7 +261,7 @@ The benchmarks were written in UFL (code available at~\citep{ufl-code-individual
 These problems were studied varying both the shape of mesh elements and the polynomial order $q$ of the method, whereas the element family, Lagrange, is fixed. As might be expected, the larger the element shape and $q$, the larger the iteration space. Triangles, tetrahedra, and prisms were tested as element shape. For instance, in the case of Helmholtz with $q=1$, the size of the \texttt{j} and \texttt{k} loops for the three element shapes is, respectively, $3$, $4$, and $6$. Moving to bigger shapes has the effect of increasing the number of basis function arrays, since, intuitively, the behaviour of the equation has to be approximated also along a third axis. On the other hand, the polynomial order affects only the problem size (the three loops \texttt{i}, \texttt{j}, and \texttt{k}, and, as a consequence, the size of $X$ and $Y$ arrays). A range of polynomial orders from $q=1$ to $q=4$ were tested; higher polynomial orders are excluded from the study because of current Firedrake limitations. In all these cases, the size of the element matrix rarely exceeds 30$\times$30, with a peak of 105$\times$105 in Burgers with prisms and $q=4$.
 
 \begin{figure}[t]
-\centerline{\includegraphics[scale=0.45]{coffee/perf-results/individual/graph}}
+\centerline{\includegraphics[scale=0.45]{lowlevelopt/perf-results/individual/graph}}
 \caption{Performance improvement due to generalized loop-invariant code motion (\emph{licm}), data alignment and padding (\emph{ap}), outer-product vectorization (\emph{op-vect}), and expression splitting (\emph{split}) over the original non-optimized code. In each plot, the horizontal axis reports speed ups, whereas the polynomial order $q$ of the method varies along the vertical axis.}
 \label{fig:coffee-individual-res}
 \end{figure}
