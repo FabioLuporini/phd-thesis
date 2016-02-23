@@ -1,0 +1,17 @@
+for (int i=0; i<I; ++i) {
+  for (int r=0; r<T; ++r) {
+    f0 += ...; f1 += ...; ...;
+  }
+  double T1[T], T2[T];
+  for (int r=0; r<T; ++r) {
+    T1[r] = ((f0*a*A[i][r])+(f1*b*B[i][r]));
+    T2[r] = ((d*D[i][r])+(e*E[i][r]));
+    T3[r] = ((A[i][r]/c)+T2[r]*f);
+  }
+  for (int j=0; j<T; ++j) {
+    for (int k=0; k<T; ++k) {
+      M[j][k] += ((T1[j]*A[i][k]*g)+
+                  (T3[k]*A[i][j]))*det*W[i];
+    }
+  }
+}

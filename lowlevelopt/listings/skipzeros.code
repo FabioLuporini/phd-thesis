@@ -1,0 +1,31 @@
+void burgers(double M[6][6], double **coords) {
+  // Calculate determinant of jacobian (det)
+  // using the coordinates field
+  
+  // Define tabulation of basis functions
+  // (and their derivatives) arrays
+  ...
+  @coffee mfs[3, 5]
+  static const double D[6][6] = 
+     {{0.0, 0.0, 0.0, -1.0, 0.0, 1.0},
+      {0.0, 0.0, 0.0, -1.0, 0.0, 1.0},
+      {0.0, 0.0, 0.0, -1.0, 0.0, 1.0},
+      {0.0, 0.0, 0.0, -1.0, 0.0, 1.0},
+      {0.0, 0.0, 0.0, -1.0, 0.0, 1.0},
+      {0.0, 0.0, 0.0, -1.0, 0.0, 1.0}};
+  ...
+  for (int i=0; i<6; ++i) {
+    ...
+    double T1[6], T2[6];
+    for (int r=0; r<6; ++r) {
+      T1[r] = a*A[i][r]+b*B[i][r];
+      T2[r] = d*D[i][k]+e*E[i][k];
+    }
+    for (int j0=0; j0<3; ++j0)
+      for (int k0=0; k0<3; ++k0)
+        M[j0+3][k0+3] += f(T1[j0+3], A[i][k0+3], ...);
+    for (int j1=0; j1<3; ++j1)
+      for (int k1=0; k1<6; ++k1)
+        M[j1][k1] += g(T2[k1], A[i][j1+3], ...);
+  }
+}
