@@ -4,7 +4,10 @@
 \section{Overview}
 ...
 
-\section{Outline and Integration with Firedrake}
+\section{The Optimization Pipeline}
+...
+
+\section{Integration with Firedrake}
 \label{sec:coffee-implementation}
 
 \begin{figure}
@@ -83,5 +86,3 @@ COFFEE implements ``smart'' code hoisting: everytime a sub-expression or a term 
 To implement these optimizations, it is necessary to track the evolution of data dependencies as the assembly expression is rewritten. For this purpose, COFFEE uses a dependency graph, which is a standard approach used by general-purpose compilers relying on abstract syntax trees (in addition to other data structures) as intermediate representation. The dependency graph has as many nodes as the number of variables in the loop nest characterizing the assembly expression. A direct edge from a node \texttt{A} to a node \texttt{B} indicates that the value of symbol \texttt{B} depends on that of \texttt{A}. 
 
 The implementation of the depedency graph data structure and of the various algorithms using it is made simple by the fact that COFFEE ensures \textit{static single assignment} form. This property, typically adopted by intermediate representations in compilers, requires that variables are assigned exactly once, and that each variable is defined in advance. 
-
-

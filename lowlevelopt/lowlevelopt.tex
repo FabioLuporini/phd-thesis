@@ -39,7 +39,7 @@ In our computational model, the element matrix is one of the kernel's input para
 
 Array padding also allows to safely round the loop trip count to the nearest multiple of $\mbox{\texttt{VL}}$. This avoids the introduction of a remainder (scalar) loop from the compiler, which would render vectorization less efficient. These extra iterations only write to the padded region of the element matrix, and therefore have no side effects on the final result.
 
-Listing~\ref{code:helmholtz-licm-pad} illustrates the effect of padding and data alignment on top of generalized code motion applied to the weighted Laplace operator presented in Listing~\ref{code:weighted-laplace}.
+Listing~\ref{code:weighted-laplace-licm-pad} illustrates the effect of padding and data alignment on top of generalized code motion applied to the weighted Laplace operator presented in Listing~\ref{code:weighted-laplace}.
 
 \begin{algorithm}
 \scriptsize\ttfamily
@@ -79,15 +79,15 @@ Listing~\ref{code:helmholtz-licm-pad} illustrates the effect of padding and data
 ~~~~~~$\rbrace$\\
 ~~~~$\rbrace$\\
 ~~$\rbrace$\\
-~~\KwSty{for} (\KwSty{int} j = 0; j$<$3; j++) $\lbrace$\\
-~~~~\KwSty{for} (\KwSty{int} k = 0; k$<$3; k++) $\lbrace$\\
-~~~~~~A[j][k] = $\_$A[j][k];\\
-~~~~$\rbrace$\\
+$\rbrace$\\
+\KwSty{for} (\KwSty{int} j = 0; j$<$3; j++) $\lbrace$\\
+~~\KwSty{for} (\KwSty{int} k = 0; k$<$3; k++) $\lbrace$\\
+~~~~A[j][k] = $\_$A[j][k];\\
 ~~$\rbrace$\\
-$\rbrace$
+$\rbrace$\\
 
 \caption{The assembly kernel for the weighted Laplace operator in Listing~\ref{code:weighted-laplace} after application of padding and data alignment (on top of generalized code motion). An AVX architecture, which implies $\mbox{\texttt{VL}}=4$, is assumed.}
-\label{code:helmholtz-licm-pad}
+\label{code:weighted-laplace-licm-pad}
 \end{algorithm}
 
 %\subsubsection{Example}
@@ -121,8 +121,8 @@ In complex kernels, like Burgers in Listing~\ref{code:burgers}, and on certain a
 ~~~~~~A[j][k] += (T$\_$1[k]*T$\_$1[j])*det*W[i]*f0;\\
 ~~~~$\rbrace$\\
 ~~$\rbrace$\\
-~~...\\
-$\rbrace$
+$\rbrace$\\
+...
 \caption{The assembly kernel for the weighted Laplace operator in Listing~\ref{code:weighted-laplace} after application of expression splitting (on top of generalized code motion). In this example, the split factor is 2.}
 \label{code:weighted-laplace-split}
 \end{algorithm}
@@ -173,9 +173,8 @@ Splitting an expression (henceforth \emph{split}) has, however, several drawback
 ~~~~~~// \emph{STORE} $\_$A[j+1][k], $\_$A[j+2][k], $\_$A[j+3][k]\\
 ~~~~$\rbrace$\\
 ~~$\rbrace$\\
-~~...\\
-$\rbrace$
-
+$\rbrace$\\
+...
 \caption{The assembly kernel for the weighted Laplace operator in Listing~\ref{code:weighted-laplace} after application of vector-register tiling (on top of generalized code motion, padding, and data alignment). In this example, the unroll-and-jam factor is 1.}
 \label{code:weighted-laplace-opvect}
 \end{algorithm}
@@ -239,7 +238,7 @@ Experiments were run on a single core of an Intel architecture, a Sandy Bridge I
 \label{fig:coffee-individual-res}
 \end{figure}
 
-The speed-ups achieved by applying the transformations on top of the original assembly kernel code are shown in Figure~\ref{fig:coffee-individual-res}. This figure is a four-dimensional plot: element shape and equation vary along the outermost axes, whereas $q$ varies within each sub-plot. In the next sections, we refer to this figure and elaborate on the impact of individual transformations. We shorten generalized loop-invariant code motion as \emph{licm}; padding and data alignment as \emph{ap}; outer-product vectorization as \emph{op-vect}; expression splitting as \emph{split}.
+The speed-ups achieved by applying the transformations on top of the original assembly kernel code are shown in Figure~\ref{fig:coffee-individual-res}. This figure is a three-dimensional plot: element shape and equation vary along the outermost axes, whereas $q$ varies within each sub-plot. In the next sections, we will refer to this figure and elaborate on the impact of the individual transformations. We shorten generalized loop-invariant code motion as \emph{licm}; padding and data alignment as \emph{ap}; outer-product vectorization as \emph{op-vect}; expression splitting as \emph{split}.
 
 \subsubsection{Impact of Generalized Loop-invariant Code Motion}
 \label{sec:perf-eval-licm}
@@ -271,19 +270,16 @@ Application of \emph{op-vect} to the Burgers problem induces significant slowdow
 
 \subsubsection{Impact of Expression Splitting}
 \label{sec:perf-results-split} 
-Expression splitting relieves the register pressure when the element matrix evaluation needs to read from a large number of basis function arrays. As detailed in Section~\ref{sec:coffee-split}, the price to pay for this optimazion is an increased number of accesses to the element matrix and, potentially, redundant computation. 
+Expression splitting relieves the register pressure when the element matrix evaluation needs to read from a large number of basis function arrays. As detailed in Section~\ref{sec:coffee-split}, the price to pay for this optimization is an increased number of accesses to the element matrix and, potentially, redundant computation. 
 
 For the Helmholtz and Diffusion kernels, in which only between 4 and 8 temporaries are read at every loop iteration, \texttt{split} tends to slow down the computation, because of the aforementioned drawbacks. Slow downs up to 1.4$\times$ were observed. 
 
 In the Burgers kernels, between 12 and 24 temporaries are accessed at every loop iteration, so \emph{split} plays a key role since the number of available logical registers on the Sandy Bridge architecture is only 16. In almost all cases, a split factor of 1, meaning that the original expression was divided into two parts, ensured close-to-peak perforance. The transformation negligibly affected register locality, so speed ups up to 1.5$\times$ were observed. For instance, when $q=4$ and a prismatic mesh is employed, the overall performance improvement increases from 1.44$\times$ to 2.11$\times$. 
 
 The performance of the Burgers kernel on a prismatic mesh was 20.0 GFlop/s from $q=1$ to $q=3$, while it was 21.3 GFlop/s in the case of $q=4$. These values are notably close to the peak performance of 30.4 GFlop/s. Disabling \emph{split} makes the performance drop to 17.0 GFlop/s for $q=1, 2$, 18.2 GFlop/s for $q=3$,
-and 14.3 GFlop/s for $q=4$. These values are in line with the speedups shown in Figure~\ref{fig:coffee-individual-res}.
+and 14.3 GFlop/s for $q=4$. These values are in line with the speed-ups shown in Figure~\ref{fig:coffee-individual-res}.
 
 The \emph{split} transformation was also tried in combination with \emph{op-vect} (\emph{split-op-vect}). Despite improvements up to 1.22$\times$, \emph{split-op-vect} never outperforms \emph{split}. This is motivated by two factors: for small split factors, such as 1 and 2, the data space to be tiled is still too big, and register spilling affects run-time; for higher ones, sub-expressions become so small that, as explained in Section~\ref{sec:perf-eval-opvect}, extensive unrolling already allows to achieve a certain degree of register re-use.
-
-\subsection*{Results on Other Architectures}
-To avoid impairing the readability of the section, which already contains a vast amount of information, we are not reporting performance results on the Intel Xeon Phi  architecture (each core running at 1.05Ghz in native mode, 32KB L1 cache and 512KB L2 cache). With respect to the Sandy Bridge, this architecture has a different number of logical registers and SIMD lanes (16 256-bit registers in the Sandy Bridge, and 32 512-bit registers in the Xeon Phi), which can impact the optimization strategy. The interested reader is invited to refer to the published paper~\citep{Luporini-coffee}.
 
 
 \section{Experience with Traditional Compiler Optimizations}
@@ -291,41 +287,61 @@ To avoid impairing the readability of the section, which already contains a vast
 
 \subsection{Loop Interchange}
 \label{sec:coffee-genpurp-opts-interchange}
-All loops are interchangeable, provided that temporaries are introduced if the nest is not perfect. For the employed storage layout, the loop permutations \texttt{ijk} and \texttt{ikj} are likely to maximize performance. Conceptually, this is motivated by the fact that if the \texttt{i} loop were in an inner position, then a significantly higher number of load instructions would be required at every iteration. We tested this hypothesis in manually crafted kernels. We found that the performance loss is greater than the gain due to the possibility of accumulating increments in a register, rather than memory, along the \texttt{i} loop. The choice between \texttt{ijk} and \texttt{ikj} depends on the number of load instructions that can be hoisted out of the innermost dimension. As discussed in the next sections, a good heuristics it to choose as outermost the loop along which the number of invariant loads is smaller so that more registers remain available to carry out the computation of the local element matrix.
+All loops are interchangeable, provided that temporaries are introduced if the nest is not perfect. For the employed storage layout, the loop permutations \texttt{ijk} and \texttt{ikj} are likely to maximize the performance. Conceptually, this is motivated by the fact that if the \texttt{i} loop were in an inner position, then a significantly higher number of load instructions would be required at every iteration. We tested this hypothesis in manually crafted kernels. We found that the performance loss is greater than the gain due to the possibility of accumulating increments in a register, rather than memory, along the \texttt{i} loop. The choice between \texttt{ijk} and \texttt{ikj} depends on the number of load instructions that can be hoisted out of the innermost dimension. A good heuristics it to choose as outermost the loop along which the number of invariant loads is smaller so that more registers remain available to carry out the computation of the local element matrix. 
+
+Our experience with the Intel's and GNU's compilers is controversial: if, from one hand, the former applies this transformation following a reasonable cost model, the latter results in general more conservative, even at highest optimization level. This behaviour was verified in different variational forms (by looking at assembly code and compiler reports), including the complex hyperelastic model analyzed in Chapter~\ref{ch:optimality}.
 
 \subsection{Loop Unroll}
 Loop unroll (or unroll-and-jam of outer loops) is fundamental to the exposure of instruction-level parallelism, and tuning unroll factors is particularly important.
 
 We first observe that manual full (or extensive) unrolling is unlikely to be effective for two reasons. Firstly, the \texttt{ijk} loop nest would need to be small enough such that the unrolled instructions do not exceed the instruction cache, which is rarely the case: it is true that in a local assembly kernel the minimum size of the \texttt{ijk} loop nest is 3$\times$3$\times$3 (triangular mesh and polynomial order 1), but this increases rapidly with the polynomial order of the method and the discretization employed (e.g. tetrahedral meshes imply larger loop nests than triangular ones), so sizes greater than 10$\times$10$\times$10, for which extensive unrolling would already be harmful, are in practice very common. Secondly, manual unrolling is dangerous because it may compromise compiler auto-vectorization by either removing loops (most compilers search for vectorizable loops) or losing spatial locality within a vector register.
 
-By comparison with implementations characterized by manually-unrolled loops, we noticed that recent versions of compilers like GNU's and Intel's estimate close-to-optimal unroll factors when the loops are affine and their bounds are relatively small and known at compile-time, which is the case of our kernels. Unless an auto-tuning system is used (this option is discussed in Section~\ref{sec:coffee-autotune}) our choice is to leave the backend compiler in charge of applying loop unroll. 
-
-%TODO: maybe we can clarify that unroll-and-jam for opvect corresponds to changing the tile size...
+By comparison to implementations with manually-unrolled loops, we noticed that recent versions of compilers like GNU's and Intel's estimate close-to-optimal unroll factors when the loops are affine and their bounds are relatively small and known at compile-time, which is the case of our kernels. Our choice, therefore, is to leave the back-end compiler in charge of selecting unroll factors.
 
 \subsection{Vector promotion}
 \label{sec:coffee-precompute}
-...
-%\item[Vector-expansion of invariant sub-expressions] In Chapter~\ref{ch:optimality} we have explained that some sub-expressions can be hoisted at the level of the integration loop. This transformation ``trades'' space for exposing a parallel dimension (the integration loop), thus promoting SIMD vectorization at the level of an outer loop.
+Vector promotion is a transformation that ``trades'' space in exchange of a parallel dimension (a ``clone'' of the integration loop), thus promoting SIMD vectorization at the level of an outer loop.
 
-%\begin{figure}
-%\centering
-%\footnotesize
-%\lstinputlisting{coffee/listings/vectexpanded.code}
-%\caption{Local assembly code for the Burgers example after precomputation and scalar-expansion of loop-invariant terms.}
-%\label{code:scalarexp-code}
-%\end{figure}
-%
-%We note that integration-dependent expressions are inherently executed as scalar code. For example, the \texttt{f0*a} and \texttt{f1*b} products in Figure~\ref{code:factorized-code} depend on the loop along quadrature points; these operations are performed in a non-vectorized way at every \texttt{i} iteration. This is not a big issue in our running example, in which the scalar computation represents a small fraction of the total, but it becomes a concrete problem in complicated forms, like those at the heart of hyperelasticity (which will be part of our performance evaluation). In such forms, the amount of computation independent of both test and trial functions loops is so large that it has a significant impact on the run-time, despite being executed only $O(I)$ times (with $I$ number of quadrature points). We have therefore implemented an algorithm to move and scalar-expand integration-dependent expressions, which leads to codes as in Figure~\ref{code:scalarexp-code}.
+\begin{algorithm}
+\scriptsize\ttfamily
+\SetAlgorithmName{LISTING}{}
 
+\KwSty{void} weighted$\_$laplace(\KwSty{double} A[3][3], \KwSty{double} **coords, \KwSty{double} w[3]) $\lbrace$\\
+~~// Omitting redundant code \\
+~~...\\
+~~\KwSty{double} f0[3] = $\lbrace$0.0$\rbrace$;\\
+~~\KwSty{for} (\KwSty{int} i = 0; i$<$6; i++) $\lbrace$ \\
+~~~~\KwSty{for} (\KwSty{int} r  = 0; r < 3; ++r) $\lbrace$ \\
+~~~~~~f0[i] += (w[r] * C[i][r]);\\
+~~~~$\rbrace$ \\
+~~$\rbrace$\\
+~~\KwSty{for} (\KwSty{int} i = 0; i$<$6; i++) $\lbrace$ \\
+~~~~\KwSty{double} T$\_$0[3] ALIGN;\\
+~~~~\KwSty{double} T$\_$1[3] ALIGN;\\
+~~~~\KwSty{for} (\KwSty{int} k = 0; k$<$3; r++) $\lbrace$ \\
+~~~~~~T$\_$0[r] = ((K[1]*B[i][k])+(K[3]*D[i][k]));\\
+~~~~~~T$\_$1[r] = ((K[0]*B[i][k])+(K[2]*D[i][k]));\\
+~~~~$\rbrace$\\
+~~~~\KwSty{for} (\KwSty{int} j = 0; j$<$3; j++) $\lbrace$\\
+~~~~~~\KwSty{for} (\KwSty{int} k = 0; k$<$3; k++) $\lbrace$\\
+~~~~~~~~A[j][k] += (T$\_$0[k]*T$\_$0[j] + T$\_$1[k]*T$\_$1[j])*det*W[i]*f0[i]);\\
+~~~~~~$\rbrace$\\
+~~~~$\rbrace$\\
+~~$\rbrace$\\
+$\rbrace$
+
+\caption{The assembly kernel for the weighted Laplace operator in Listing~\ref{code:weighted-laplace} after application of vector promotion (on top of generalized code motion).}
+\label{code:weighted-laplace-vector-prom}
+\end{algorithm}
+
+Consider Listing~\ref{code:weighted-laplace-vector-prom}. The evaluation of the coefficient \texttt{w} at each quadrature point can be vectorized by ``promoting'' \texttt{f} from a scalar to a vector of size 3. Any other sub-expression hoisted at the level of the integration loop (as described in Chapter~\ref{ch:optimality}) can be transformed in a similar way. The impact of this optimization obviously increases with the number of operations involving coefficients. At the same time, the allocation of extra memory may lead to the same issues described in Section~\ref{sec:opt:mem-constraints}. Loop tiling could be used to counteract this negative effect, although this would significantly increase the implementation complexity.
+
+We have not seen this transformation being applied by neither the GNU's nor the Intel's compilers. In our experience -- and in absence of loop tiling -- the impact on execution time is difficult to predict. This transformation requires further investigation. Despite being fully implemented in COFFEE, it is therefore not applied in the default optimization process.
 
 
 \section{Related Work}
 \label{sec:coffee-related-work}
-The finite element method is extensively used to approximate solutions of PDEs. Well-known frameworks and applications include nek5000~\citep{nek5000-web-page}, the FEniCS project~\citep{Fenics}, Fluidity~\citep{fluidity_manual_v4}, and of course Firedrake. Numerical integration based on quadrature, as in Firedrake, is usually employed to implement the local assembly phase. The recent introduction of domain specific languages (DSLs) to decouple the finite element specification from its underlying implementation facilitated, however, the development of novel approaches. Methods based on tensor contraction~\citep{FFC-Compiler} and symbolic manipulation~\citep{francis} have been implemented. Nevertheless, it has been demonstrated that quadrature-based integration remains the most efficient choice for a wide class of problems~\citep{quadrature-olegaard}, which motivates our work in COFFEE.
-
-Optimization of quadrature-based local assembly for CPU architectures has been addressed in FEniCS~\cite{quadrature-olegaard}. The comparison between COFFEE and this work has been presented in Section~\ref{sec:coffee-allforms-perf}. In~\citep{Markall20101815}, and more recently in~\citep{petsc-integration-gpu}, the same problem has been studied for GPU architectures. In~\citep{assembly-opencl}, variants of the standard numerical integration algorithm have been specialized and evaluated for the PowerXCell processor, but an exhaustive study from the compiler viewpoint - like ours - is missing, and none of the optimizations presented in this chapter are mentioned. Among these efforts, to the best of our knowledge, COFFEE is the first work targeting low-level optimizations through a real compiler approach.
-
-The code transformations presented are inspired by standard compilers optimizations and exploit domain properties. Our loop-invariant code motion technique individuates invariant sub-expressions and redundant computation by analyzing all loops in an iteration space, which is a generalization of the algorithms often implemented by general-purpose compilers. Expression splitting is an abstract variant of loop fission based on properties of arithmetic operators. The outer-product vectorization is an implementation of tiling at the level of vector registers; tiling, or ``loop blocking'', is commonly used to improve data locality (especially for caches). Padding has been used to achieve data alignment and to improve the effectiveness of vectorization. A standard reference for the compilation techniques re-adapted in this work is~\citep{dragonbook}.
+The code transformations presented are inspired by standard compilers optimizations and exploit several domain properties. Our loop-invariant code motion technique individuates invariant sub-expressions and redundant computation by analyzing all loops in an iteration space, which is a generalization of the algorithms often implemented by general-purpose compilers. Expression splitting is an abstract variant of loop fission based on properties of arithmetic operators. The outer-product vectorization is an implementation of tiling at the level of vector registers; tiling, or ``loop blocking'', is commonly used to improve data locality (especially for caches). Padding has been used to achieve data alignment and to improve the effectiveness of vectorization. A standard reference for the compilation techniques re-adapted in this work is~\citep{dragonbook}.
 
 Our compiler-based optimization approach is made possible by the top-level DSL, which enables automated code generation. DSLs have been proven successful in auto-generating optimized code for other domains: Spiral~\citep{Pueschel:05} for digital signal processing numerical algorithms, ~\citep{Spampinato:14} for dense linear algebra, or Pochoir~\citep{pochoir} and SDSL~\citep{stencil-compiler} for image processing and finite difference stencils. Similarly, PyOP2 is used by Firedrake to express iteration over unstructured meshes in scientific codes. COFFEE improves automated code generation in Firedrake.
 
@@ -334,13 +350,9 @@ Many code generators, like those based on the Polyhedral model~\citep{pluto} and
 
 \section{Applicability to Other Domains}
 \label{sec:generality}
-We have demonstrated that our cross-loop optimizations for arithmetic intensity are effective in the context of automated code generation for finite element local assembly. In this section, we discuss their applicability in other computational domains and, in general, their integrability within a general-purpose compiler.
+We have demonstrated that our cross-loop optimizations for arithmetic intensity are effective in the context of automated code generation for finite element integration. In this section, we discuss their applicability in other computational domains and, in general, their integrability within a general-purpose compiler.
 
-COFFEE was developed as a separate, self-contained software module, with clear input/output interfaces, rather then incorporating it within PyOP2. This choice was motivated by two critical aspects that characterize the generality of our research:
-
-\paragraph{Separation of concerns} We believe that in domain-specific frameworks there must be a clear, logical separation of roles reflecting the various levels of abstraction, where domain specialists are completely separated from performance optimization. In Firedrake, for instance, COFFEE decouples the mathematical specification of a finite element method, captured by the Unified Form Language and the FEniCS Form Compiler, from code optimization. This is of fundamental importance to maximize productivity by allowing scientists to focus only on their area of expertise. Practically speaking, from the perspective of the domain-specific language and compiler designers, our optimization strategy represents an incentive to produce extremely simple representations of the code (e.g. fully-inlined mathematical expressions in the form of an abstract syntax tree, in the case of Firedrake) so as to make the architecture-aware code optimizer completely responsible for choosing and applying the most suitable set of transformations.
-
-\paragraph{Generalizability to other domains} There are neither conceptual nor technical reasons which prevent our compiler from being used in applications other than Firedrake. For example, integration with the popular FEniCS framework, the pioneer of automated code generation for finite element local assembly, would be relatively easy to achieve. It is more challenging to assess the generality of the optimization strategy: the extent to which COFFEE and its transformations are transferable to other computational domains, perhaps other DSLs, and to what extent this would be helpful for improving full application performance. To answer these questions, we first need to go back to the origins of our compiler. The starting point of our work was the mathematical formulation of a local assembly operation, expressible as follows
+There are neither conceptual nor technical reasons which prevent our transformations from being used in other (general-purpose, research, ...) compilers. It is challenging, however, to assess the potential of the presented optimizations is another computational domains, and to what extent they would be helpful for improving the full application performance. To answer these questions, we first need to go back to the origins of our study. The starting point of our work was the mathematical formulation of a finite element operator, expressible as follows
 
 \begin{equation}
 \label{eq:assembly-model}
@@ -353,9 +365,9 @@ The expression represents the numerical evaluation of an integral at $n_1$ point
 \begin{itemize}
 \item \textbf{Optimizing mathematical expressions.} Expression manipulation (e.g. simplification, decomposition into sub-expressions) opens multiple semantically equivalent code generation opportunities, characterized by different trade-offs in parallelism, redundant computation, and data locality. The basic idea is to exploit properties of arithmetic operators, such as associativity and commutativity, to re-schedule the computation suitably for the underlying architecture. Loop-invariant code motion and expression splitting follow this principle, so they can be re-adapted or extended to any domains involving numerical evaluation of complex mathematical expressions (e.g. electronic structure calculations in physics and quantum chemistry relying on tensor contractions~\cite{TCE}). In this context, we highlight three notable points.
 \begin{enumerate}
-\item In Equation~\eqref{eq:assembly-model}, the summations correspond to reduction loops, whereas loops over indices $i$ and $j$ are fully parallel. Throughout the paper we assumed that a kernel will be executed by a single thread, which is likely to be the best strategy for standard multi-core CPUs. On the other hand, we note that for certain architectures (for example GPUs) this could be prohibitive due to memory requirements. Intra-kernel parallelization is one possible solution: a domain-specific compiler such as COFFEE could map mathematical quantifiers and operators to different parallelization schemes and generate distinct variants of multi-threaded kernel code. Based on our experience, we believe this is the right approach to achieve performance portability.
+\item In Equation~\eqref{eq:assembly-model}, the summations correspond to reduction loops, whereas loops over indices $i$ and $j$ are fully parallel. Throughout the paper we assumed that a kernel will be executed by a single thread, which is likely to be the best strategy for standard multi-core CPUs. On the other hand, we note that for certain architectures (for example GPUs) this could be prohibitive due to memory requirements. Intra-kernel parallelization is one possible solution: a domain-specific compiler could map mathematical quantifiers and operators to different parallelization schemes and generate distinct variants of multi-threaded kernel code. Based on our experience, we believe this is the right approach to achieve performance portability.
 \item The various sub-expressions in $\beta$ only depend on (i.e. iterate along) a subset of the enclosing loops. In addition, some of these sub-expressions might reduce to the same values as iterating along certain iteration spaces. This code structure motivated the generalized loop-invariant code motion technique. The intuition is that whenever sub-expressions invariant with respect to different sets of affine loops can be identified, the question of whether, where and how to hoist them, while minimizing redundant computation, arises. Pre-computation of invariant terms also increases memory requirements due to the need for temporary arrays, so it is possible that for certain architectures the transformation could actually cause slowdowns (e.g. whenever the available per-core memory is small).
-\item Associative arithmetic operators are the prerequisite for expression splitting. In essence, this transformation concerns resource-aware execution. In the context of COFFEE, expression splitting has been successfully applied to improve register pressure. However, the underlying idea of re-scheduling (re-associating) operations to optimize for some generic parameters is far more general. It could be used, for example, as a starting point to perform kernel fission; that is, splitting a kernel into multiple parts, each part characterized by less stringent memory requirements (a variant of this idea for non-affine loops in unstructured mesh applications has been adopted in~\citep{op2-lcpc}). In Equation~\eqref{eq:assembly-model}, for instance, not only can any of the functions $\alpha$, $\beta$ and $\gamma$ be split (assuming they include associative operators), but $\alpha$ could be completely extracted and evaluated in a separate kernel. This would reduce the working set size of each of the kernel functions, an option which is particularly attractive for many-core architectures in which the available per-core memory is much smaller than that in traditional CPUs.
+\item Associative arithmetic operators are the prerequisite for expression splitting. In essence, this transformation concerns resource-aware execution. In our context, expression splitting has successfully been applied to improve register pressure. However, the underlying idea of re-scheduling (re-associating) operations to optimize for some generic parameters is far more general. It could be used, for example, as a starting point to perform kernel fission; that is, splitting a kernel into multiple parts, each part characterized by less stringent memory requirements (a variant of this idea for non-affine loops in unstructured mesh applications has been adopted in~\citep{op2-lcpc}). In Equation~\eqref{eq:assembly-model}, for instance, not only can any of the functions $\alpha$, $\beta$ and $\gamma$ be split (assuming they include associative operators), but $\alpha$ could be completely extracted and evaluated in a separate kernel. This would reduce the working set size of each of the kernel functions, an option which is particularly attractive for many-core architectures in which the available per-core memory is much smaller than that in traditional CPUs.
 \end{enumerate}
 \item \textbf{Code generation and applicability of the transformations.} All array sizes and loop bounds, for example $n1$ and $n2$ in Equation~\ref{eq:assembly-model}, are known at code generation time. This means that ``good'' code can be generated. For example, loop bounds can be made explicit, arrays can be statically initialized, and pointer aliasing is easily avoidable. Further, all of these factors contribute to the applicability and the effectiveness of some of our code transformations. For instance, knowing loop bounds allows both generation of correct code when applying vector-register tiling and discovery of redundant computation  opportunities. Padding and data alignment are special cases, since they could be performed at run-time if some values were not known at code generation time. Theoretically, they could also be automated by a general-purpose compiler through profile-guided optimization, provided that some sort of data-flow analysis is performed to ensure that the extra loop iterations over the padded region do not affect the numerical results. 
 \item \textbf{Multi-loop vectorization.} Compiler auto-vectorization has become increasingly effective in a variety of codes. However, to the best of our knowledge, multi-loop vectorization involving the loading and storing of data along a subset of the loops characterizing the iteration space (rather than just along the innermost loop), is not supported by available general-purpose and polyhedral compilers. The outer-product vectorization technique presented in this paper shows that two-loop vectorization can outperform standard auto-vectorization. In addition, we expect the performance gain to scale with the number of vectorized loops and the vector length (as demonstrated in  the Xeon Phi experiments). Although the automation of multi-loop vectorization in a general-purpose compiler is far from straightforward, especially if stencils are present, we believe that this could be more easily achieved in specific domains. The intuition is to map the memory access pattern onto vector registers, and then to exploit in-register shuffling to minimize the traffic between memory and processor. By demonstrating the effectiveness of multi-loop vectorization in a real scenario, our research represents an incentive for studying this technique in a broader and systematic way.
@@ -363,4 +375,4 @@ The expression represents the numerical evaluation of an integral at $n_1$ point
 
 \section{Conclusion}
 \label{sec:coffee-conclusion}
-In this chapter, we have presented the study and systematic performance evaluation of a class of composable cross-loop optimizations for improving arithmetic intensity in finite element local assembly kernels, and their integration in a novel compiler, COFFEE. In the context of automated code generation for finite element local assembly, COFFEE is the first compiler capable of introducing low-level optimizations to maximize instruction-level parallelism, register locality and SIMD vectorization. Assembly kernels have particular characteristics. Their iteration space is usually very small, with the size depending on aspects like the degree of accuracy one wants to reach (polynomial order of the method) and the mesh discretization employed. The data space, in terms of number of arrays and scalars required to evaluate the element matrix, grows proportionally with the complexity of the finite element problem. COFFEE has been developed taking into account all of these degrees of freedom, based on the idea that reducing the problem of local assembly optimization to a fixed sequence of transformations is far too superficial if close-to-peak performance needs to be reached. The various optimizations overcome limitations of current vendor and research compilers. The exploitation of domain knowledge allows some of them to be particularly effective, as demonstrated by our experiments on a state-of-the-art Intel platform. COFFEE supports all of the problems expressible in Firedrake, and is integrated with this framework, which demonstrate the maturity of the research performed. The generality and the applicability of the proposed code transformations to other domains has also been discussed.
+In this chapter, we have presented the study and systematic performance evaluation of a class of composable cross-loop optimizations for improving arithmetic intensity in finite element local assembly kernels. In the context of automated code generation for finite element local assembly, COFFEE is the first compiler capable of introducing low-level optimizations to simultaneously maximize register locality and SIMD vectorization. Assembly kernels have particular characteristics. Their iteration space is usually very small, with the size depending on aspects like the degree of accuracy one wants to reach (polynomial order of the method) and the mesh discretization employed. The data space, in terms of number of arrays and scalars required to evaluate the element matrix, grows proportionally with the complexity of the finite element problem. The various optimizations overcome limitations of current vendor and research compilers. The exploitation of domain knowledge allows some of them to be particularly effective, as demonstrated by our experiments on a state-of-the-art Intel platform. The generality and the applicability of the proposed code transformations to other domains has also been discussed.
