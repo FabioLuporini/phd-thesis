@@ -15,8 +15,8 @@ Like in Chapter~\ref{ch:optimality}, we focus on optimizing the performance of a
 \item[Padding and data alignment] SIMD vectorization is more effective when the CPU registers are packed (unpacked) by means of aligned load (store) instructions. Data alignment is achieved through array padding, a conceptually simple yet powerful transformation that can result in dramatic reductions in execution time. We will see that the complexity of the transformation increases if non unite-stride memory accesses are present.
 \item[Vector-register tiling] Blocking at the level of vector registers aims to improve data locality. This transformation exploits the peculiar memory access pattern inherent in finite element operators (i.e., inner products involving test and trial functions).  
 \item[Expression splitting] Complex expressions are often characterized by high register pressure (i.e., the lack of available registers inducing the compiler to ``spill'' data from registers to cache). This happens, for example, when the number of arrays (e.g., basis functions, temporaries introduced by generalized code motion, temporaries produced by pre-evaluation) and constants is large compared to the number of available registers (typically 16 on state-of-the-art CPUs, 32 on future generations). This transformation exploits the associativity of addition to distribute, or ``split'', an expression into multiple sub-expressions; each sub-expression is then computed in a separate loop nest.
-\item[Vector-expansion of invariant sub-expressions] In Chapter~\ref{ch:optimality} we have explained that some sub-expressions can be hoisted at the level of the integration loop. This transformation ``trades'' space for exposing a parallel dimension (the integration loop), thus promoting SIMD vectorization at the level of an outer loop.
 \end{description}
+We will also provide insights into the effects of more ``traditional'' compiler optimizations, such as loop unroll, loop interchange, and vector promotion.
 
 To summarize, the contributions of this chapter are as follows:
 \begin{itemize}
@@ -39,7 +39,7 @@ In our computational model, the element matrix is one of the kernel's input para
 
 Array padding also allows to safely round the loop trip count to the nearest multiple of $\mbox{\texttt{VL}}$. This avoids the introduction of a remainder (scalar) loop from the compiler, which would render vectorization less efficient. These extra iterations only write to the padded region of the element matrix, and therefore have no side effects on the final result.
 
-Figure~\ref{code:helmholtz-licm-pad} illustrates the effect of padding and data alignment on top of generalized code motion applied to the weighted Laplace operator presented in Figure~\ref{code:weighted-laplace}.
+Listing~\ref{code:helmholtz-licm-pad} illustrates the effect of padding and data alignment on top of generalized code motion applied to the weighted Laplace operator presented in Listing~\ref{code:weighted-laplace}.
 
 \begin{algorithm}
 \scriptsize\ttfamily
@@ -67,6 +67,7 @@ Figure~\ref{code:helmholtz-licm-pad} illustrates the effect of padding and data 
 ~~~~$\rbrace$ \\
 ~~~~\KwSty{double} T$\_$0[4] ALIGN;\\
 ~~~~\KwSty{double} T$\_$1[4] ALIGN;\\
+~~~~\KwSty{$\#$pragma vector aligned}\\
 ~~~~\KwSty{for} (\KwSty{int} k = 0; k$<$4; r++) $\lbrace$ \\
 ~~~~~~T$\_$0[r] = ((K[1]*B[i][k])+(K[3]*D[i][k]));\\
 ~~~~~~T$\_$1[r] = ((K[0]*B[i][k])+(K[2]*D[i][k]));\\
@@ -85,7 +86,7 @@ Figure~\ref{code:helmholtz-licm-pad} illustrates the effect of padding and data 
 ~~$\rbrace$\\
 $\rbrace$
 
-\caption{The assembly kernel for the weighted Laplace operator in Figure~\ref{code:weighted-laplace} after application of padding and data alignment (on top of generalized code motion). An AVX architecture, which implies $\mbox{\texttt{VL}}=4$, is assumed.}
+\caption{The assembly kernel for the weighted Laplace operator in Listing~\ref{code:weighted-laplace} after application of padding and data alignment (on top of generalized code motion). An AVX architecture, which implies $\mbox{\texttt{VL}}=4$, is assumed.}
 \label{code:helmholtz-licm-pad}
 \end{algorithm}
 
@@ -101,85 +102,85 @@ $\rbrace$
 \subsection{Expression Splitting}
 \label{sec:coffee-split}
 
-In complex kernels, like Burgers in Listing~\ref{code:burgers}, and on certain architectures, achieving effective register allocation can be challenging. If the number of variables independent of the innermost-loop dimension is close to or greater than the number of available CPU registers, poor register reuse is likely. This usually happens when the number of basis function arrays, temporaries introduced by generalized loop-invariant code motion, and problem constants is large. For example, applying loop-invariant code motion to Burgers on a 3D mesh requires 24 temporaries for the \texttt{ijk} loop order. This can make hoisting of the invariant loads out of the \texttt{k} loop inefficient on architectures with a relatively low number of registers. One potential solution to this problem consists of suitably ``splitting'' the computation of the element matrix $A$ into multiple sub-expressions; an example, for the Burgers problem, is given in Listing~\ref{code:burgers-split}. The transformation can be regarded as a special case of classic loop fission, in which associativity of the sum is exploited to distribute the expression across multiple loops. To the best of our knowledge, expression splitting is not supported by available compilers.
+In complex kernels, like Burgers in Listing~\ref{code:burgers}, and on certain architectures, achieving effective register allocation can be challenging. If the number of variables independent of the innermost-loop dimension is close to or greater than the number of available CPU registers, poor register reuse is likely. This usually happens when the number of basis function arrays, temporaries introduced by either generalized code motion or pre-evaluation, and problem constants is large. For example, applying code motion to the Burgers example on a 3D mesh requires 24 temporaries for the \texttt{ijk} loop order. This can make hoisting of the invariant loads out of the \texttt{k} loop inefficient on architectures with a relatively low number of registers. One potential solution to this problem consists of suitably ``splitting'' the computation of the element matrix $A$ into multiple sub-expressions. An example of this idea is given in Listing~\ref{code:weighted-laplace-split}. The transformation can be regarded as a special case of classic loop fission, in which associativity of the sum is exploited to distribute the expression across multiple loops. To the best of our knowledge, expression splitting is not supported by available compilers.
 
 \begin{algorithm}
 \scriptsize\ttfamily
 \SetAlgorithmName{LISTING}{}
 
-\KwSty{void} helmholtz(\KwSty{double} A[3][4], \KwSty{double} **coords) $\lbrace$\\
-~~~~// Same code as in Listing~\ref{code:helmholtz-licm} up to the j loop\\
-~~~~\KwSty{for} (\KwSty{int} j = 0; j$<$3; j++) \\
-~~~~~~\KwSty{$\#$pragma vector aligned}\\
-~~~~~~\KwSty{for} (\KwSty{int} k = 0; k$<$4; k++) \\
-~~~~~~~~A[j][k] += (Y[i][k]*Y[i][j]+LI$\_$0[k]*LI$\_$0[j])*det*W3[i];\\
-~~~~\KwSty{for} (\KwSty{int} j = 0; j$<$3; j++) \\
-~~~~~~\KwSty{$\#$pragma vector aligned}\\
-~~~~~~\KwSty{for} (\KwSty{int} k = 0; k$<$4; k++) \\
-~~~~~~~~A[j][k] += LI$\_$1[k]*LI$\_$1[j]*det*W3[i];\\
+\KwSty{void} weighted$\_$laplace(\KwSty{double} A[3][3], \KwSty{double} **coords, \KwSty{double} w[3]) $\lbrace$\\
+~~// Omitting redundant code \\
+~~...\\
+~~\KwSty{for} (\KwSty{int} j = 0; j$<$3; j++) $\lbrace$\\
+~~~~\KwSty{for} (\KwSty{int} k = 0; k$<$3; k++) $\lbrace$\\
+~~~~~~A[j][k] += (T$\_$0[k]*T$\_$0[j])*det*W[i]*f0;\\
+~~~~$\rbrace$\\
+~~$\rbrace$\\
+~~\KwSty{for} (\KwSty{int} j = 0; j$<$3; j++) $\lbrace$\\
+~~~~\KwSty{for} (\KwSty{int} k = 0; k$<$3; k++) $\lbrace$\\
+~~~~~~A[j][k] += (T$\_$1[k]*T$\_$1[j])*det*W[i]*f0;\\
+~~~~$\rbrace$\\
+~~$\rbrace$\\
+~~...\\
 $\rbrace$
-\caption{Local assembly code generated by Firedrake for the Helmholtz
-  problem in which \emph{split} has been applied on top of the
-  optimizations shown in Listing~\ref{code:helmholtz-licm}. In this
-  example, the split factor is 2.}
-\label{code:helmholtz-split}
+\caption{The assembly kernel for the weighted Laplace operator in Listing~\ref{code:weighted-laplace} after application of expression splitting (on top of generalized code motion). In this example, the split factor is 2.}
+\label{code:weighted-laplace-split}
 \end{algorithm}
 
-Splitting an expression (henceforth \emph{split}) has, however, several drawbacks. Firstly, it increases the number of accesses to $A$ proportionally to the ``split factor'', which is the number of sub-expressions produced. Also, depending on how the split is executed and the way expression rewriting is performed, it can lead to redundant computation. For example, the number of times the product $det*W3[i]$ is performed is proportional to the number of sub-expressions, as shown in the code snippet. Further, it increases loop overhead, for example through additional branch instructions. Finally, it might affect register locality: for instance, the same array could be accessed in different sub-expressions, requiring a proportional number of loads be performed; this, again, depends on expression rewriting. Nevertheless, as shown in Section~\ref{sec:coffee-perfeval-single}, the performance gain from improved register reuse along inner dimensions can be important, especially if the selection of the split factor uses heuristics to minimize the aforementioned issues.
+Splitting an expression (henceforth \emph{split}) has, however, several drawbacks. Firstly, it increases the number of accesses to \texttt{A} in proportion to the ``split factor'', which is the number of sub-expressions produced. Also, depending on how splitting is done, it can lead to redundant computation. For example, the number of times the product \texttt{det*W3[i]} is performed is proportional to the number of sub-expressions, as shown in the code snippet. Further, it increases loop overhead, for example through additional branch instructions. Finally, it might affect register locality: for instance, the same array could be accessed in different sub-expressions, requiring a proportional number of loads be performed; this is not the case of the running example, though. Nevertheless, the performance gain from improved register reuse can still be greater if suitable heuristics are used. Our approach consists of traversing the expression tree and recursively splitting it into multiple sub-expressions as long as the number of variables independent of the innermost loop exceeds a certain threshold. This is elaborated in the next sections, and validated against empirical search in Section~\ref{sec:perf-results-split}.
 
 \subsection{Model-driven Vector-register Tiling}
 \label{sec:coffee-opvect}
 
 \begin{algorithm}
-\tiny\ttfamily
+\scriptsize\ttfamily
 \SetAlgorithmName{LISTING}{}
 
-\begin{multicols}{2}
-\KwSty{void} helmholtz(\KwSty{double} A[4][4], \KwSty{double} **coords) $\lbrace$\\
-~~// K, det = Compute Jacobian (coords) \\
-~~// Declaration of basis function matrices \\
+\KwSty{void} weighted$\_$laplace(\KwSty{double} A[3][3], \KwSty{double} **coords, \KwSty{double} w[3]) $\lbrace$\\
+~~// Omitting redundant code \\
+~~...\\
+~~// Padded buffer (note: both rows and columns) \\
+~~\KwSty{double} $\_$A[4][4] ALIGN = $\lbrace\lbrace$0.0$\rbrace\rbrace$;\\
 ~~\\
 ~~\KwSty{for} (\KwSty{int} i = 0; i$<$3; i++) $\lbrace$ \\
-~~~~// Do generalized loop-invariant code motion \\
-~~~~\KwSty{for} (\KwSty{int} j = 0; j$<$4; j+=4) \\
-~~~~~~\KwSty{for} (\KwSty{int} k = 0; k$<$4; k+=4) $\lbrace$\\
-~~~~~~~~// \emph{load} and \emph{set} intrinsics \\
-~~~~~~~~// Compute A[0,0], A[1,1], A[2,2], A[3,3] \\
-~~~~~~~~// One \emph{permute\_pd} intrinsic per \texttt{k}-loop \emph{load}\\
-~~~~~~~~// Compute A[0,1], A[1,0], A[2,3], A[3,2] \\
-~~~~~~~~// One \emph{permute2f128\_pd} intrinsic per \texttt{k}-loop \emph{load}\\
+~~~~// Omitting redundant code \\
+~~~~// ... \\
+~~~~\KwSty{for} (\KwSty{int} j = 0; j$<$4; j += 4) \\
+~~~~~~\KwSty{for} (\KwSty{int} k = 0; k$<$4; k += 4) $\lbrace$\\
+~~~~~~~~// Sequence of \emph{LOAD} and \emph{SET} intrinsics \\
+~~~~~~~~// Compute $\_$A[0][0], $\_$A[1][1], $\_$A[2][2], $\_$A[3][3] \\
+~~~~~~~~// One \KwSty{$\_$mm256$\_$permute$\_$pd} per \texttt{k}-loop \emph{LOAD}\\
+~~~~~~~~// Compute $\_$A[0][1], $\_$A[1][0], $\_$A[2][3], $\_$A[3][2] \\
+~~~~~~~~// One \KwSty{$\_$mm256$\_$permute2f128$\_$pd} per \texttt{k}-loop \emph{LOAD}\\
 ~~~~~~~~// ...\\
 ~~~~~~$\rbrace$\\
-~~~~// Remainder loop (from $j=4$ to $j=6$)\\
+~~~~// Scalar remainder loop (not necessary in this example)\\
 ~~$\rbrace$\\
-~~// Restore the storage layout:\\
-~~\KwSty{for} (\KwSty{int} j = 0; j$<$4; j+=4) $\lbrace$\\
-~~~~\KwSty{$\_\_$m256d} r0, r1, r2, r3, r4, r5, r6, r7;\\
-~~~~\KwSty{for} (\KwSty{int} k = 0; k$<$4; k+=4) $\lbrace$\\
-~~~~~~r0 = $\_$mm256$\_$load$\_$pd ($\&$A[j+0][k]);\\
-~~~~~~// Load A[j+1][k], A[j+2][k], A[j+3][k]\\
-~~~~~~r4 = $\_$mm256$\_$unpackhi$\_$pd (r1, r0);\\
-~~~~~~r5 = $\_$mm256$\_$unpacklo$\_$pd (r0, r1);\\
-~~~~~~r6 = $\_$mm256$\_$unpackhi$\_$pd (r2, r3);\\
-~~~~~~r7 = $\_$mm256$\_$unpacklo$\_$pd (r3, r2);\\
-~~~~~~r0 = $\_$mm256$\_$permute2f128$\_$pd (r5, r7, 32);\\
-~~~~~~r1 = $\_$mm256$\_$permute2f128$\_$pd (r4, r6, 32);\\
-~~~~~~r2 = $\_$mm256$\_$permute2f128$\_$pd (r7, r5, 49);\\
-~~~~~~r3 = $\_$mm256$\_$permute2f128$\_$pd (r6, r4, 49);\\
-~~~~~~$\_$mm256$\_$store$\_$pd ($\&$A[j+0][k], r0);\\
-~~~~~~// Store A[j+1][k], A[j+2][k], A[j+3][k]\\
+~~// Restore the storage layout\\
+~~\KwSty{for} (\KwSty{int} j = 0; j$<$4; j += 4) $\lbrace$\\
+~~~~\KwSty{for} (\KwSty{int} k = 0; k$<$4; k += 4) $\lbrace$\\
+~~~~~~\KwSty{$\_\_$m256d} r0 = \KwSty{$\_$mm256$\_$load$\_$pd} ($\&\_$A[j+0][k]);\\
+~~~~~~// \emph{LOAD} $\_$A[j+1][k], $\_$A[j+2][k], $\_$A[j+3][k]\\
+~~~~~~r4 = \KwSty{$\_$mm256$\_$unpackhi$\_$pd} (r1, r0);\\
+~~~~~~r5 = \KwSty{$\_$mm256$\_$unpacklo$\_$pd} (r0, r1);\\
+~~~~~~r6 = \KwSty{$\_$mm256$\_$unpackhi$\_$pd} (r2, r3);\\
+~~~~~~r7 = \KwSty{$\_$mm256$\_$unpacklo$\_$pd} (r3, r2);\\
+~~~~~~r0 = \KwSty{$\_$mm256$\_$permute2f128$\_$pd} (r5, r7, 32);\\
+~~~~~~r1 = \KwSty{$\_$mm256$\_$permute2f128$\_$pd} (r4, r6, 32);\\
+~~~~~~r2 = \KwSty{$\_$mm256$\_$permute2f128$\_$pd} (r7, r5, 49);\\
+~~~~~~r3 = \KwSty{$\_$mm256$\_$permute2f128$\_$pd} (r6, r4, 49);\\
+~~~~~~\KwSty{$\_$mm256$\_$store$\_$pd} ($\&\_$A[j+0][k], r0);\\
+~~~~~~// \emph{STORE} $\_$A[j+1][k], $\_$A[j+2][k], $\_$A[j+3][k]\\
 ~~~~$\rbrace$\\
 ~~$\rbrace$\\
+~~...\\
 $\rbrace$
-\end{multicols}
-\caption{Local assembly code generated by Firedrake for the Helmholtz
-  problem after application of \emph{op-vect} on top of the
-  optimizations shown in Listing~\ref{code:helmholtz-licm}. In this
-  example, the unroll-and-jam factor is 1.}
-\label{code:helmholtz-opvect}
+
+\caption{The assembly kernel for the weighted Laplace operator in Listing~\ref{code:weighted-laplace} after application of vector-register tiling (on top of generalized code motion, padding, and data alignment). In this example, the unroll-and-jam factor is 1.}
+\label{code:weighted-laplace-opvect}
 \end{algorithm}
 
-One notable problem of assembly kernels concerns register allocation and register locality. The critical situation occurs when loop trip counts and the variables accessed are such that the vector-register pressure is high. Since the kernel's working set fits the L1 cache, it is particularly important to optimize register management. Standard optimizations, such as loop interchange, unroll, and unroll-and-jam, can be employed to deal with this problem. Tiling at the level of vector registers represents another opportunity. Based on the observation that the evaluation of the element matrix can be reduced to a summation of outer products along the \texttt{j} and \texttt{k} dimensions, a model-driven vector-register tiling strategy can be implemented. If we consider the codes in the various listings and we focus on the body of the test and trial functions loops (\texttt{j} and \texttt{k}), the computation of the element matrix is abstractly expressible as
+One notable problem of assembly kernels concerns register allocation and register locality. The critical situation occurs when the loop trip counts and the variables accessed are such that the vector-register pressure is high. Since the kernel's working set is expected to fit the L1 cache, it is particularly important to optimize register management. Standard optimizations, such as loop interchange, unroll, and unroll-and-jam, can be employed to deal with this problem. Tiling at the level of vector registers represents another opportunity. Based on the observation that the evaluation of the element matrix can be reduced to a summation of outer products along the \texttt{j} and \texttt{k} dimensions, a model-driven vector-register tiling strategy can be implemented. If we consider the codes in the various listings and we focus on the body of the test and trial functions loops (\texttt{j} and \texttt{k}), the computation of the element matrix is abstractly expressible as
 \begin{equation}
 \scriptsize
 \label{outer-product}
@@ -188,7 +189,7 @@ A_{jk} = \sum_{\substack{
   y \in B'' \subseteq B}}
 x_j\cdot y_k ~~~~~~ j,k = 0,...,2
 \end{equation}
-where $B$ is the set of all basis functions (or temporary variables, e.g., \texttt{LI$\_$0}) accessed in the kernel, whereas $B'$ and $B''$ are generic problem-dependent subsets. Regardless of the specific input problem, by abstracting from the presence of all variables independent of both \texttt{j} and \texttt{k}, the element matrix computation is always reducible to this form. Figure~\ref{fig:vect-by-vect} illustrates how we can evaluate 16 entries ($j,k=0,...,3$) of the element matrix using just 2 vector registers, which represent a 4$\times$4 tile, assuming $\vert B' \vert = \vert B'' \vert = 1$. Values in a register are shuffled each time a product is performed. Standard compiler auto-vectorization for both GNU and Intel compilers, instead, executes 4 broadcast operations (i.e., ``splat'' of a value over all of the register locations) along the outer dimension to perform the calculation. In addition to incurring a larger number of cache accesses, it needs to keep between $f=1$ and $f=3$ extra registers to perform the same 16 evaluations when unroll-and-jam is used, with $f$ being the unroll-and-jam factor.
+where $B$ is the set of all basis functions or temporary variables accessed in the kernel, whereas $B'$ and $B''$ are generic problem-dependent subsets. Regardless of the specific input problem, by abstracting from the presence of all variables independent of both \texttt{j} and \texttt{k}, the element matrix computation is always reducible to this form. Figure~\ref{fig:vect-by-vect} illustrates how we can evaluate 16 entries ($j,k=0,...,3$) of the element matrix using just 2 vector registers, which represent a 4$\times$4 tile, assuming $\vert B' \vert = \vert B'' \vert = 1$. Values in a register are shuffled each time a product is performed. Standard compiler auto-vectorization for both GNU and Intel compilers, instead, executes 4 broadcast operations (i.e., ``splat'' of a value over all of the register locations) along the outer dimension to perform the calculation. In addition to incurring a larger number of cache accesses, it needs to keep between $f=1$ and $f=3$ extra registers to perform the same 16 evaluations when unroll-and-jam is used, with $f$ being the unroll-and-jam factor.
 
 %More importantly, we avoid using $\mbox{\texttt{VL}}$-1 registers per each
 %outer-loop-dependent variable (i.e., all $x$ terms in
@@ -197,68 +198,40 @@ where $B$ is the set of all basis functions (or temporary variables, e.g., \text
 %iteration space into bigger tiles, implemented directly by vector
 %registers.
 
-\begin{figure}
+\begin{figure}[h]
 \centerline{\includegraphics[scale=0.6]{lowlevelopt/pictures/vect-by-vect-inline.pdf}}
 \caption{Outer-product vectorization by permuting values in a vector register.}
 \label{fig:vect-by-vect}
 \end{figure}
 
-The storage layout of $A$, however, is incorrect after the application of this outer-product-based vectorization (\emph{op-vect}, in the following). It can be efficiently restored with a sequence of vector shuffles following the pattern highlighted in Figure~\ref{fig:restore-layout}, executed once outside of the \texttt{ijk} loop nest. The pseudo-code for the Burgers local assembly kernel when using \emph{op-vect} is shown in Listing~\ref{code:burgers-opvect}.
+The storage layout of $A$, however, is incorrect after the application of this outer-product-based vectorization (\emph{op-vect}, in the following). It can be efficiently restored with a sequence of vector shuffles following the pattern highlighted in Figure~\ref{fig:restore-layout}, executed once outside of the \texttt{ijk} loop nest. The pseudo-code for the weighted Laplace assembly kernel using \emph{op-vect} is shown in Listing~\ref{code:weighted-laplace-opvect}.
 
-\begin{figure}
+\begin{figure}[h]
 \centerline{\includegraphics[scale=0.6]{lowlevelopt/pictures/vect-restore-inline.pdf}}
 \caption{Restoring the storage layout after \emph{op-vect}. The figure shows how 4$\times$4 elements in the top-left block of the element matrix $A$ can be moved to their correct positions. Each rotation, represented by a group of three same-colored arrows, is implemented by a single shuffle intrinsic.}
 \label{fig:restore-layout}
 \end{figure}
-
-\subsection{Vector-expansion of Invariant Sub-expressions}
-\label{sec:coffee-precompute}
-...
-%\begin{figure}
-%\centering
-%\footnotesize
-%\lstinputlisting{coffee/listings/vectexpanded.code}
-%\caption{Local assembly code for the Burgers example after precomputation and scalar-expansion of loop-invariant terms.}
-%\label{code:scalarexp-code}
-%\end{figure}
-%
-%We note that integration-dependent expressions are inherently executed as scalar code. For example, the \texttt{f0*a} and \texttt{f1*b} products in Figure~\ref{code:factorized-code} depend on the loop along quadrature points; these operations are performed in a non-vectorized way at every \texttt{i} iteration. This is not a big issue in our running example, in which the scalar computation represents a small fraction of the total, but it becomes a concrete problem in complicated forms, like those at the heart of hyperelasticity (which will be part of our performance evaluation). In such forms, the amount of computation independent of both test and trial functions loops is so large that it has a significant impact on the run-time, despite being executed only $O(I)$ times (with $I$ number of quadrature points). We have therefore implemented an algorithm to move and scalar-expand integration-dependent expressions, which leads to codes as in Figure~\ref{code:scalarexp-code}.
-
 
 
 
 \section{Experiments}
 \label{sec:coffee-perfeval}
 
-\subsection{Experimental Setup}
-\label{sec:coffee-perfeval-setup}
-Experiments were run on a single core of an Intel architecture, a Sandy Bridge I7-2600 CPU running at 3.4GHz, with 32KB of L1 cache and 256KB of L2 cache). The \texttt{icc 14.1}  compiler was used. On the Sandy Bridge, the compilation flags used were \texttt{-O2} and \texttt{-xAVX} for auto-vectorization. Other optimization levels performed, in general, slightly worse.
-
-Three studies are presented. Firstly, in Section~\ref{sec:coffee-perfeval-single}, the impact of individual code transformations is analyzed in three real-world, representative equations. We believe it is important to clarify \textit{in which contexts} and \textit{why} such optimizations can provide speed ups. 
-
-...
-
-\subsection{Rationale of the Study}
-\label{sec:coffee-individual-rationale}
-We evaluate some critical code transformations in three real-world problems based on the following PDEs: (i) Helmholtz, (ii) Diffusion, and (iii) Burgers. The evaluation concerns:
-\begin{itemize}
-\item Generalized loop-invariant code motion (Section~\ref{sec:coffee-licm})
-\item Padding and data alignment (Section~\ref{sec:coffee-padding})
-\item Expression splitting (Section~\ref{sec:coffee-split})
-\item Vector-register tiling (Section~\ref{sec:coffee-opvect})
-\end{itemize}
-\textit{The goal of this section is to demonstrate the effectiveness of individual transformations and to explain under what circumnstances performance improvements are obtainable}. It is important to understand \textit{for what reasons} gains in run-time are achieved with these critical optimizations; some transformations are excluded from this study for reasons of time and readability of the section, but analogous considerations and observations would apply. 
-%However, in Section~\ref{sec:coffee-perfeval-allforms}, we will show that an aggressive optimization strategy based on extensive expression rewriting, code specialization, and exploitation of COFFEE's auto-tuning system can outperform the cumulative impact of the transformations analyzed in the present section.
+\subsection{Setup}
+The objective is to evaluate the impact of the code transformations presented in the previous sections in three representative PDEs, which we refer to as (i) Helmholtz, (ii) Diffusion, and (iii) Burgers. 
 
 The three chosen equations are \emph{real-life kernels} and comprise the core differential operators in some of the most frequently encountered finite element problems in scientific computing. This is of crucial importance because distinct problems, possibly arising in completely different fields, may employ (subsets of) the same differential operators of our benchmarks, which implies similarities and redundant patterns in the generated code. Consequently, the proposed code transformations have a domain of applicability that goes far beyond that of the three analyzed equations.
 
 The Helmholtz and Diffusion kernels are archetypal second order elliptic operators. They are complete and unsimplified examples of the operators used to model diffusion and viscosity in fluids, and for imposing pressure in compressible fluids. As such, they are both extensively used in climate and ocean modeling. Very similar operators, for which the same optimisations are expected to be equally effective, apply to elasticity problems, which are at the base of computational structural mechanics. The Burgers kernel is a typical example of a first order hyperbolic conservation law, which occurs in real applications whenever a quantity is transported by a fluid (the momentum itself, in our case). We chose this particular kernel since it applies to a vector-valued quantity, while the elliptic operators apply to scalar quantities; this impacts the generated code, as explained next. The operators we have selected are characteristic of both the second and first order operators that dominate fluids and solids simulations.
-%and a wide variety on local assembly codes can be tested.
 
-The benchmarks were written in UFL (code available at~\citep{ufl-code-individual}) and executed over real unstructured meshes through Firedrake. The Helmholtz code has already been shown in Listing~\ref{code:helmholtz}. The Diffusion equation uses the same differential operators as Helmholtz. In the Diffusion kernel code, the main differences with respect to Helmholtz are the absence of the $Y$ array and the presence of additional constants for computing the element matrix. Burgers is a non-linear problem employing differential operators different from those of Helmholtz and relying on vector-valued quantities, which has a major impact on the generated assembly code (see Listing~\ref{code:burgers}), where a larger number of basis function arrays ($X1$, $X2$, ...) and constants ($F0$, $F1$, ..., $K0$, $K1$,
-...) are generated. 
+The benchmarks were written in UFL (code available at~\citep{ufl-code-individual}) and executed over real unstructured meshes through Firedrake. The Helmholtz code has already been shown in Listing~\ref{code:helmholtz}. The Diffusion equation uses the same differential operators as Helmholtz. In the Diffusion kernel code, the main differences with respect to Helmholtz are the absence of the $Y$ array and the presence of additional constants for computing the element matrix. Burgers is a non-linear problem employing differential operators different from those of Helmholtz and relying on vector-valued quantities, which has a major impact on the generated assembly code (see Listing~\ref{code:burgers}), where a larger number of basis function arrays ($X1$, $X2$, ...) and constants ($F0$, $F1$, ..., $K0$, $K1$,...) are generated.
 
 These problems were studied varying both the shape of mesh elements and the polynomial order $q$ of the method, whereas the element family, Lagrange, is fixed. As might be expected, the larger the element shape and $q$, the larger the iteration space. Triangles, tetrahedra, and prisms were tested as element shape. For instance, in the case of Helmholtz with $q=1$, the size of the \texttt{j} and \texttt{k} loops for the three element shapes is, respectively, $3$, $4$, and $6$. Moving to bigger shapes has the effect of increasing the number of basis function arrays, since, intuitively, the behaviour of the equation has to be approximated also along a third axis. On the other hand, the polynomial order affects only the problem size (the three loops \texttt{i}, \texttt{j}, and \texttt{k}, and, as a consequence, the size of $X$ and $Y$ arrays). A range of polynomial orders from $q=1$ to $q=4$ were tested; higher polynomial orders are excluded from the study because of current Firedrake limitations. In all these cases, the size of the element matrix rarely exceeds 30$\times$30, with a peak of 105$\times$105 in Burgers with prisms and $q=4$.
+
+
+\subsection{Impact of Transformations}
+
+Experiments were run on a single core of an Intel architecture, a Sandy Bridge I7-2600 CPU running at 3.4 GHz, with 32KB of L1 cache and 256KB of L2 cache). The \texttt{icc 14.1}  compiler was used. On the Sandy Bridge, the compilation flags used were \texttt{-O2} and \texttt{-xAVX} for auto-vectorization (other optimization levels were tried, but they generally resulted in higher execution times).
 
 \begin{figure}[t]
 \centerline{\includegraphics[scale=0.45]{lowlevelopt/perf-results/individual/graph}}
@@ -266,13 +239,12 @@ These problems were studied varying both the shape of mesh elements and the poly
 \label{fig:coffee-individual-res}
 \end{figure}
 
-The speed ups due to applying optimizations over the original local assembly code are shown in Figure~\ref{fig:coffee-individual-res}. The figure itself can be read as a ``plot of plots'': the various element shapes are reported on the horizontal axis, whereas each equation corresponds to one point along the vertical axis. This allows to deduct the behaviour of transformations when varying the parameters of our study in an unified way. In the next sections, we refer to this figure and elaborate on the impact of individual transformations. We shorten generalized loop-invariant code motion as \emph{licm}; padding and data alignment as \emph{ap}; outer-product vectorization as \emph{op-vect}; expression splitting as \emph{split}.
+The speed-ups achieved by applying the transformations on top of the original assembly kernel code are shown in Figure~\ref{fig:coffee-individual-res}. This figure is a four-dimensional plot: element shape and equation vary along the outermost axes, whereas $q$ varies within each sub-plot. In the next sections, we refer to this figure and elaborate on the impact of individual transformations. We shorten generalized loop-invariant code motion as \emph{licm}; padding and data alignment as \emph{ap}; outer-product vectorization as \emph{op-vect}; expression splitting as \emph{split}.
 
-\subsection{Impact of Transformations}
 \subsubsection{Impact of Generalized Loop-invariant Code Motion}
 \label{sec:perf-eval-licm}
 
-In general, the speedups achieved by \emph{licm} are notable. The main reasons were anticipated in Section~\ref{sec:coffee-licm}: in the original code, 1) sub-expressions invariant to outer loops are not automatically hoisted, while 2) sub-expressions invariant to the innermost loop are hoisted, but their execution is not auto-vectorized. These observations come from inspection of assembly code generated by the compiler.
+In general, the speed-ups achieved by \emph{licm} are notable. The main reasons were anticipated in Section~\ref{sec:coffee-licm}: in the original code, 1) sub-expressions invariant to outer loops are not automatically hoisted, while 2) sub-expressions invariant to the innermost loop are hoisted, but their execution is not auto-vectorized. These observations come from inspection of assembly code generated by the compiler.
 
 The gain tends to grow with the computational cost of the kernels: bigger loop nests (i.e., larger element shapes and polynomial orders) usually benefit from the reduction in redundant computation, even though extra memory for the temporary arrays is required. Some discrepancies to this trend are due to a less effective auto-vectorization. For instance, on the Sandy Bridge, the improvement at $q=3$ is larger than that at $q=4$ because, in the latter case, the size of the innermost loop is not a multiple of the vector length, and a remainder scalar loop is introduced at compile time. Since the loop nest is small, the cost of executing the extra scalar iterations can have a significant impact.
 
@@ -314,7 +286,7 @@ The \emph{split} transformation was also tried in combination with \emph{op-vect
 To avoid impairing the readability of the section, which already contains a vast amount of information, we are not reporting performance results on the Intel Xeon Phi  architecture (each core running at 1.05Ghz in native mode, 32KB L1 cache and 512KB L2 cache). With respect to the Sandy Bridge, this architecture has a different number of logical registers and SIMD lanes (16 256-bit registers in the Sandy Bridge, and 32 512-bit registers in the Xeon Phi), which can impact the optimization strategy. The interested reader is invited to refer to the published paper~\citep{Luporini-coffee}.
 
 
-\section{Experience with General-purpose Compiler Optimizations}
+\section{Experience with Traditional Compiler Optimizations}
 \label{sec:coffee-genpurp-opts}
 
 \subsection{Loop Interchange}
@@ -329,6 +301,21 @@ We first observe that manual full (or extensive) unrolling is unlikely to be eff
 By comparison with implementations characterized by manually-unrolled loops, we noticed that recent versions of compilers like GNU's and Intel's estimate close-to-optimal unroll factors when the loops are affine and their bounds are relatively small and known at compile-time, which is the case of our kernels. Unless an auto-tuning system is used (this option is discussed in Section~\ref{sec:coffee-autotune}) our choice is to leave the backend compiler in charge of applying loop unroll. 
 
 %TODO: maybe we can clarify that unroll-and-jam for opvect corresponds to changing the tile size...
+
+\subsection{Vector promotion}
+\label{sec:coffee-precompute}
+...
+%\item[Vector-expansion of invariant sub-expressions] In Chapter~\ref{ch:optimality} we have explained that some sub-expressions can be hoisted at the level of the integration loop. This transformation ``trades'' space for exposing a parallel dimension (the integration loop), thus promoting SIMD vectorization at the level of an outer loop.
+
+%\begin{figure}
+%\centering
+%\footnotesize
+%\lstinputlisting{coffee/listings/vectexpanded.code}
+%\caption{Local assembly code for the Burgers example after precomputation and scalar-expansion of loop-invariant terms.}
+%\label{code:scalarexp-code}
+%\end{figure}
+%
+%We note that integration-dependent expressions are inherently executed as scalar code. For example, the \texttt{f0*a} and \texttt{f1*b} products in Figure~\ref{code:factorized-code} depend on the loop along quadrature points; these operations are performed in a non-vectorized way at every \texttt{i} iteration. This is not a big issue in our running example, in which the scalar computation represents a small fraction of the total, but it becomes a concrete problem in complicated forms, like those at the heart of hyperelasticity (which will be part of our performance evaluation). In such forms, the amount of computation independent of both test and trial functions loops is so large that it has a significant impact on the run-time, despite being executed only $O(I)$ times (with $I$ number of quadrature points). We have therefore implemented an algorithm to move and scalar-expand integration-dependent expressions, which leads to codes as in Figure~\ref{code:scalarexp-code}.
 
 
 
@@ -345,7 +332,7 @@ Our compiler-based optimization approach is made possible by the top-level DSL, 
 Many code generators, like those based on the Polyhedral model~\citep{pluto} and those driven by domain-knowledge~\citep{modeldriven}, make use of cost models. The alternative of using auto-tuning to select the best implementation for a given problem on a certain platform has been adopted by nek5000~\citep{nek5000} for small matrix-matrix multiplies, the ATLAS library~\citep{ATLAS}, and FFTW~\citep{FFTW} for fast fourier transforms. In both cases, pruning the implementation space is fundamental to mitigate complexity and overhead. Likewise, COFFEE uses heuristics and a model-driven auto-tuning system (Section~\ref{sec:coffee-autotune}) to steer the optimization process.
 
 
-\section{Generality of the Approach and Applicability to Other Domains}
+\section{Applicability to Other Domains}
 \label{sec:generality}
 We have demonstrated that our cross-loop optimizations for arithmetic intensity are effective in the context of automated code generation for finite element local assembly. In this section, we discuss their applicability in other computational domains and, in general, their integrability within a general-purpose compiler.
 
