@@ -2,13 +2,9 @@
 \label{ch:coffee}
 
 \section{Overview}
-...
+Sharing elimination and pre-evaluation, which we presented in Chapter~\ref{ch:optimality}, as well as the low level optimizations discussed in Chapter~\ref{ch:lowlevelopt}, have been implemented in COFFEE\footnote{COFFEE is the acronym for COmpiler For Fast Expression Evaluation.}, a mature, platform-agnostic compiler. COFFEE has fully been integrated with Firedrake, the framework for finite element methods introduced in Section~\ref{sec:bkg:firedrake}. The code, which comprises more than 5000 lines, is available at~\citep{coffee-code}.
 
-\section{The Optimization Pipeline}
-...
-
-\section{Integration with Firedrake}
-\label{sec:coffee-implementation}
+Firedrake users employ the Unified Form Language to express problems in a notation resembling mathematical equations. At run-time, the high-level specification is translated by a form compiler, the Two-Stage Form Compiler (TSFC)~\cite{TSFC-Compiler}, into one or more abstract syntax trees (ASTs) representing assembly kernels. ASTs are then passed to COFFEE for optimization. The output of COFFEE, C code, is eventually provided to PyOP2~\citep{pyop2isc}, where just-in-time compilation and execution over the discretized domain take place. The flow and the compiler structure are outlined in Figure~\ref{fig:coffee-pipeline}. 
 
 \begin{figure}
 \begin{center}
@@ -18,18 +14,40 @@
 \end{center}
 \end{figure}
 
-Our research resulted in the implementation of COFFEE\footnote{COFFEE stands for COmpiler For FinitE Element local assembly.}, a mature, platform-independent compiler capable of optimizing any local assembly code generated through Firedrake or FEniCS. COFFEE has been fully integrated with Firedrake, so it can optimize any equation expressible with this framework. The code, which comprises more than 5000 lines, is available at~\citep{coffee-code}.
+\section{The Optimization Pipeline}
+Similarly to general-purpose compilers, COFFEE provides different optimization levels, namely \texttt{O0}, \texttt{O1}, \texttt{O2} and \texttt{O3}. Apart from \texttt{O0}, which does not transform the code received from the form compiler (useful for debugging purposes), all optimization levels apply ordered sequences of optimizations. In essence, the higher the optimization level, the more aggressive (and potentially slower) is the transformation process. There also are aspects of the optimization process that are common to \texttt{O1}, \texttt{O2} and \texttt{O3}; in the following, when describing them, we will use the generic notation \texttt{Ox} (\texttt{x} $\in \lbrace 1, 2, 3\rbrace$).
 
-Firedrake users employ the Unified Form Language to express problems in a notation resembling mathematical equations. At run-time, the high-level specification is translated by a modified version of its form compiler, the FEniCS Form Compiler (FFC)~\cite{FFC-Compiler}, into an abstract syntax tree (AST) representation of one or more finite element assembly kernels. ASTs are then passed to COFFEE to apply the transformations described in the previous sections. The output of COFFEE, C code, is eventually provided to PyOP2~\citep{pyop2isc}, where just-in-time compilation and execution over the discretized domain take place. The flow and the compiler structure are outlined in Figure~\ref{fig:coffee-pipeline}. 
+The optimization level \texttt{Ox} can logically be split into three phases:
+\begin{description}
+\item[Expression rewriting] Any transformation changing the structure of the expressions (and, potentially, of the loop nests) in the assembly kernel. For example, a high level optimization (sharing elimination, pre-evaluation) or, more in general, any rewrite operator (described later in Section~\ref{sec:coffee:rewrite-ops}) such as generalized code motion or factorization. 
+\item[Handling of block-sparse tables] Explained in Section~\ref{ch:optimality:block-sparse}, this phase consists of restructuring the iteration spaces searching for a trade-off between avoidance of useless operations involving blocks of zeros in basis function tables and effectiveness of low level optimization.
+\item[Code Specialization] Low level optimization, tailored to the underlying architecture. The primary focus of this thesis has been conventional CPUs, although a generalization to other platforms is possible. In this phase, a specific combination of the transformations presented in Chapter~\ref{ch:coffee} is applied.
+\end{description}
+These three phases are totally ordered. Expression rewriting introduces temporaries and creates loops. These new loops, and the statements therein, may further be transformed in the subsequent phase, for instance by adjusting bounds and by introducing memory offsets. In the last phase, both temporaries and loops may be modified by padding and data alignment, vector-register tiling and vector promotion.
 
-The compiler applies an ordered sequence of optimization steps to the ASTs received from FFC. Expression rewriting is performed first, due to the introduction of temporary arrays and the need to create multiple loop nest starting from the original one (this may happen when computation over zero-valued blocks is avoided). Then, code specialization takes place. Finally, loop interchange and loop unroll are applied. COFFEE has an auto-tuning system, described in Section~\ref{sec:coffee-autotune}, to individuate the most suitable optimization strategy (i.e. to select which transformations to apply) for a certain equation. The implementation of all code transformations is centered on analysis and manipulation of the kernel AST. Any possible corner cases are handled: for example, if outer-product vectorization is to be applied but the size of the iteration space is not a multiple of the vector length, then a remainder loop, amenable to auto-vectorization, is inserted (as shown in Figure~\ref{code:burgers-opvect}).
+When provided to COFFEE, an AST is visited and several kinds of information are collected. In particular, COFFEE searches for special ``expression nodes''. Expression nodes are the candidates for expression rewriting. If we had to represent an expression node in plain C, we could think of it as a (usually compute-intensive) statement preceded by a special \texttt{$\#$pragma coffee expression}; the \texttt{pragma} would then trigger COFFEE's \texttt{Ox}, similarly to the way loops are parallelized in OpenMP. If at least one expression node is found, we proceed to the next step, otherwise the AST is unparsed and C code returned.
 
-Users can either enable individual transformations by switching specific flags or leave the auto-tuning system, described in Section~\ref{sec:coffee-autotune}, in charge of determining the best optimization strategy (i.e. selecting and composing transformations).
+In addition to selecting \texttt{Ox}, users can create their own custom optimization pipelines by composing the individual transformations available in COFFEE. For this reason, and since some of the transformations are not composable (because either unsupported or illegal), the second step of the compiler consists of checking the validity of the optimization process. 
 
-\section{Modifying the FEniCS Form Compiler}
+At this point, the AST is transformed according to the optimization pipeline. 
+\begin{description}
+\item[\texttt{O1}] At lowest optimization level, expression rewriting reduces to generalized code motion, while only padding and data alignment are applied among the lower level optimizations.
+\item[\texttt{O2}] With respect to \texttt{O1}, there is only one yet fundamental change: expression rewriting now performs sharing elimination (i.e., Algorithm~\ref{algo:sharing-elimination}).
+\item[\texttt{O3}] Algorithm~\ref{algo:gamma}, which coordinates sharing elimination and pre-evaluation, is applied. This is followed by handling of block-sparse tables, and finally by padding and data alignment. 
+\end{description}
+The dichotomy between \texttt{O2} and \texttt{O3} is elaborated in the next section.
+
+Once all optimizations have been applied, the AST is visited one last time and a C representation (a string) is returned.
+
+\section{Plugging COFFEE into Firedrake}
+\label{sec:coffee-implementation}
+
+\subsection{Abstract Syntax Trees}
+...
+
+\subsection{Integration with the FEniCS Form Compiler}
 COFFEE expects as input either a string of C code or an AST. In the former case, a parser could be used to obtain an AST representation, which is required by the algorithms implementing the various code transformations. Therefore, FFC's output, which is a C-code implementation of a local assembly kernel, could be used straightforwardly as input to COFFEE. However, we note that this would also be conceptually pointless: FFC would generate C code from its intermediate representation that eventually COFFEE would have to re-parse to obtain an AST. A much cleaner solution, adopted and explained next, consists of modifying FFC to directly generate an AST. 
 
-\subsection{Generation of Abstract Syntax Trees}
 The construction of the FFC's intermediate representation from UFL code is refined as follows:
 \begin{itemize}
 \item The mathematical expression that evaluates the element matrix is represented by a tree data structure. A limitation of the original FFC was that nodes in such expression tree, which correspond to symbols or arithmetic operations, are not bound to the enclosing loops. For instance, consider the symbol \texttt{A[i][j]}: the FFC's expression tree has a node for this symbol, but visiting it there is no clean way of separating the variable name \texttt{A} from the loop indices \texttt{i} and \texttt{j}. Therefore, we have enriched symbol nodes with additional fields to capture these information. 
@@ -47,7 +65,20 @@ In the modified FFC, the intermediate representation is intercepted prior to the
 
 The enriched intermediate representation allows to create proper AST's Symbol nodes. A Symbol, as shown in the figure, has a name (the variable name), an array of indices, and an array of offsets. These information are fundamental for the implementation of expression rewriting and code specialization. Further, special AST's Declaration objects can be used to track the sparsity pattern in basis function arrays. 
 
-\section{Implementation}
+
+TODO: Access functions affine in loop indices, so we have special fields in symbols /indices/ and /offsets/
+
+\subsection{Integration with the Two-Stage Form Compiler}
+...
+
+\subsection{The Default Optimization Level}
+...
+
+\section{Rewrite Operators}
+\label{sec:coffee:rewrite-ops}
+...
+
+\section{Aspects of the Implementation}
 
 \begin{figure}
 \begin{center}
@@ -58,6 +89,11 @@ The enriched intermediate representation allows to create proper AST's Symbol no
 \end{figure}
 
 Figure~\ref{fig:coffee-compiler-structure} outlines the various modules composing COFFEE. Expression rewriting, code specialization, and general-purpose transformations are applied by manipulating the AST representing the local assembly kernel. Providing the steps of all algorithms performing the various transformations would just be tedious and marginally helpful for the reader; essentially, implementing a transformation always reduces to write a routine that visits and manipulates a tree data structure (the AST) according to the semantics described in Sections~\ref{sec:coffee-expr-rewrite} and~\ref{sec:coffee-code-spec}. In this section, we rather focus on aspects of the compiler implementation that involve the orchestration of the different transformations, including a description of the data structures employed to track both the restructuring of the assembly expressions and data dependencies. 
+
+%TODO The implementation of all code transformations is centered on analysis and manipulation of the kernel AST
+
+\subsection{Tree Visitors}
+...
 
 \subsection{Code Hoisting}
 Hoisting is the operation of moving code, for instance a statement or the evaluation of an expression, from an inner to an outer loop in a nest. This operation is performed in several occasions when rewriting an expression: generalized loop-invariant code motion, expansion of sub-expressions, and precomputation of terms all require code hoisting, as illustrated in Figures~\ref{code:invariant-code} and~\ref{code:expanded-code}. In order to perform code hoisting, in particular, several aspects must be known:
@@ -76,7 +112,7 @@ As expressions are hoisted, the dictionary is populated and/or updated with new 
 
 The dictionary is also queried at code specialization time for padding, data alignment and generation of BLAS calls. Therefore, different algorithms in COFFEE access the same data structure, which allows avoiding both duplicated code and an additional overhead due to revisiting the same portion of AST in distinct transformations.
 
-\subsection{Benefits of Tracking Data Dependencies}
+\subsection{Tracking Data Dependencies}
 COFFEE implements ``smart'' code hoisting: everytime a sub-expression or a term are lifted, for example from the mathematical expression evaluating the local element matrix to an outer level in the loop nest, three optimizations are potentially applied. Consider a hoistable expression \texttt{e} assuming different values in the iteration space \texttt{I}:
 \begin{itemize}
 \item \textbf{Minimize redundant computation.} If an equivalent sub-expression \texttt{e'} has already been hoisted along the iteration space \texttt{I}, then COFFEE replaces \texttt{e} with a reference to the symbol hosting the value of \texttt{e'}. This avoids both redundant computation and the introduction of additional temporary variables;
@@ -86,3 +122,6 @@ COFFEE implements ``smart'' code hoisting: everytime a sub-expression or a term 
 To implement these optimizations, it is necessary to track the evolution of data dependencies as the assembly expression is rewritten. For this purpose, COFFEE uses a dependency graph, which is a standard approach used by general-purpose compilers relying on abstract syntax trees (in addition to other data structures) as intermediate representation. The dependency graph has as many nodes as the number of variables in the loop nest characterizing the assembly expression. A direct edge from a node \texttt{A} to a node \texttt{B} indicates that the value of symbol \texttt{B} depends on that of \texttt{A}. 
 
 The implementation of the depedency graph data structure and of the various algorithms using it is made simple by the fact that COFFEE ensures \textit{static single assignment} form. This property, typically adopted by intermediate representations in compilers, requires that variables are assigned exactly once, and that each variable is defined in advance. 
+
+\subsection{Handling Corner Cases}
+Any possible corner cases are handled: for example, if outer-product vectorization is to be applied but the size of the iteration space is not a multiple of the vector length, then a remainder loop, amenable to auto-vectorization, is inserted (as shown in Figure~\ref{code:burgers-opvect}).
