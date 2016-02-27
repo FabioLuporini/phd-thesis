@@ -94,47 +94,44 @@ All these operators are used by both sharing elimination and pre-evaluation (apa
 
 The rewrite operators accept a number of options to drive the transformation process. With code motion, for example, we can specify what kind of sub-expressions should be hoisted (by indicating the expected invariant loops) or the amount of memory that is spendable in temporaries. Factorization can be either ``explicit'', by providing a list of symbols to be factorized or a loop dimension along which searching for factorizable symbols, or ``heuristic'', with the algorithm searching for the groups of most recurrent symbols.
 
-\section{Aspects of the Implementation}
+\section{Features of the Implementation}
+Rather than providing the pseudo-code and an explanation for each of the algorithms implemented in COFFEE -- a mere exercise of scarce interest for the reader, given that the implementation is open-source and well-documented -- this section focuses on the structure of the compiler and its ``toolkit'' for implementing or extending rewrite operators.
 
-\begin{figure}
-\begin{center}
-\includegraphics[scale=0.70]{coffee/pictures/coffee-scheme.pdf}
-\caption{Structure of COFFEE.}
-\label{fig:coffee-compiler-structure}
-\end{center}
-\end{figure}
+\subsection{Tree Visitor Pattern}
+The need for a generic infrastructure for traversing ASTs has grown rapidly, together with the complexity of the compiler. In the early stages of COFFEE, any time that a new transformation (e.g., a rewrite operator) or data collector (e.g., for dependence analysis) were required, the full AST traversal had to be (re-)implemented. In addition, the lack of a common interface for tree traversals made the code more difficult to understand and to extend. This led to the introduction of a tree visitor design pattern\footnote{The tree visitor infrastructure was mainly developed by Lawrence Mitchell, and was inspired by that adopted in UFL, the language used to specify forms in Firedrake.}, whose aim is to decouple the algorithms from the data structure on which they are applied~\cite{wiki-tree-visitors}. 
 
-Figure~\ref{fig:coffee-compiler-structure} outlines the various modules composing COFFEE. Expression rewriting, code specialization, and general-purpose transformations are applied by manipulating the AST representing the local assembly kernel. Providing the steps of all algorithms performing the various transformations would just be tedious and marginally helpful for the reader; essentially, implementing a transformation always reduces to write a routine that visits and manipulates a tree data structure (the AST) according to the semantics described in Sections~\ref{sec:coffee-expr-rewrite} and~\ref{sec:coffee-code-spec}. In this section, we rather focus on aspects of the compiler implementation that involve the orchestration of the different transformations, including a description of the data structures employed to track both the restructuring of the assembly expressions and data dependencies. 
+Consider, without loss of generality, an algorithm that needs to perform special actions (e.g., collecting loop dependence information) any time a \texttt{Symbol} or a \texttt{ForLoop} nodes are encountered. Then, a tree visitor will only need to implement three methods, namely \texttt{visit$\_$Symbol} and \texttt{visit$\_$ForLoop} -- the actual handlers -- as well as \texttt{visit$\_$Node}, which implements the ``fallback'' action on all other node types (typically, just a propagation of the visit).
 
-%TODO The implementation of all code transformations is centered on analysis and manipulation of the kernel AST
+Tree visitors exploit the hierarchy of AST nodes by always dispatching to the most specialized handler. For example, symbols are simultaneously of type \texttt{Symbol} and \texttt{Expression}, but if a \texttt{Symbol} is encountered and \texttt{visit$\_$Symbol} is implemented, then \texttt{visit$\_$Symbol} is executed, whereas \texttt{visit$\_$Expression} (if any) is ignored.
 
-\subsection{Tree Visitors}
-...
+Most of the algorithms in COFFEE exploit the tree visitor pattern; a few, the ``oldest'' ones, still do not, due to the lack of time for porting to the new infrastructure.
 
-\subsection{Code Hoisting}
-Hoisting is the operation of moving code, for instance a statement or the evaluation of an expression, from an inner to an outer loop in a nest. This operation is performed in several occasions when rewriting an expression: generalized loop-invariant code motion, expansion of sub-expressions, and precomputation of terms all require code hoisting, as illustrated in Figures~\ref{code:invariant-code} and~\ref{code:expanded-code}. In order to perform code hoisting, in particular, several aspects must be known:
+\subsection{Flexible Code Motion}
+Code motion consists of lifting, or hoisting, a (sub-)expression out of one or more loops. This rewrite operator is used in many different contexts: as a stand-alone transformation (optimization level \texttt{O1}); in multiple steps during sharing elimination; in pre-evaluation. 
+
+When applying the operator, several pieces of information must be known:
 \begin{enumerate}
-\item ``what'' to hoist
-\item ``where'' to hoist (possibly, outside of the loop nest)
-\item if scalar-expansion should be introduced
+\item What sub-expression should be hoisted; for instance, should they be constant in the whole loop nest or invariant in at most one of the linear loops.
+\item Where to hoist it; that is, how many loops is the operator allowed to cross.
+\item How much memory are we allowed to use for a temporary.
+\item If a common sub-expression had already been hoisted.
 \end{enumerate}
-Answers to these three points obviously depend on the specific transformation, although parts of the implementation are shared. COFFEE tracks hoisted code by means of a dictionary that binds variable names (guaranteed to be unique) to a set of information. In particular, for a variable \texttt{v}, the dictionary provides:
-\begin{itemize}
-\item a reference to the AST node corresponding to the expression \texttt{e} hosted by \texttt{v};
-\item a reference to the loop in which \texttt{v} is assigned \texttt{e};
-\item a reference to the AST node corresponding to the declaration of \texttt{v}.
-\end{itemize}
-As expressions are hoisted, the dictionary is populated and/or updated with new information. For example, when applying generalized loop-invariant code motion, a new entry is created, unless the sub-expression being lifted has already been pre-computed elsewhere. On the other hand, when sub-expressions are expanded, either a new entry is created or an old entry is updated, as explained in Section~\ref{sec:coffee-expansion}. 
+The code motion operator is flexible and let the caller (i.e., a higher-level transformation) drive the hoisting process by specifying how to behave with respect to the aforementioned points.
 
-The dictionary is also queried at code specialization time for padding, data alignment and generation of BLAS calls. Therefore, different algorithms in COFFEE access the same data structure, which allows avoiding both duplicated code and an additional overhead due to revisiting the same portion of AST in distinct transformations.
-
-%\subsection{Tracking Data Dependencies}
-COFFEE implements ``smart'' code hoisting: everytime a sub-expression or a term are lifted, for example from the mathematical expression evaluating the local element matrix to an outer level in the loop nest, three optimizations are potentially applied. Consider a hoistable expression \texttt{e} assuming different values in the iteration space \texttt{I}:
+COFFEE must therefore track all of the hoisted sub-expressions for later retrieval. A dictionary mapping each of the temporaries introduced to a tuple of metadata is employed. For a temporary \texttt{t}, the dictionary records:
 \begin{itemize}
-\item \textbf{Minimize redundant computation.} If an equivalent sub-expression \texttt{e'} has already been hoisted along the iteration space \texttt{I}, then COFFEE replaces \texttt{e} with a reference to the symbol hosting the value of \texttt{e'}. This avoids both redundant computation and the introduction of additional temporary variables;
-\item \textbf{Loop fusion.} If scalar-expansion is introduced (we recall this is useful to achieve SIMD auto-vectorization; see Sections~\ref{sec:coffee-licm} and~\ref{sec:coffee-precompute}), then the hoisted code must be placed in an outer loop \texttt{r}, \texttt{r $\in$ I}. This was the purpose of the second \texttt{r} loop in Figure~\ref{code:invariant-code}; note that this loop includes scalar-expanded sub-expressions that, in the non-transformed code, iterated along logically different spaces (loops \texttt{j} and \texttt{k}, corresponding to test and trial functions). In this example, it was possible to use a single \texttt{r} loop because we assumed that test and trial function spaces were the same, leading to identical loop bounds; in general, however, this is not true. Another assumption of the example was that the space of the equation's coefficients (variables \texttt{f0, f1} in the figure) coincided with that of test and trial functions. This would allow fusing the two \texttt{r} loops, which is exactly what COFFEE does, although not displayed by the figure. Fusing loops, which increases data locality and reduces loop overhead, is possible in some circumnstances, in particular when there are no data dependencies among hoisted expressions and the spaces of test, trial, and coefficent functions are identical. As explained next, COFFEE reasons about data dependencies and iteration spaces to determine the safeness of loop fusion.
-\item \textbf{Reduce extra memory.} When expanding an expression, terms hoisting is possible to relieve register pressure. This poses the challenge described in Section~\ref{sec:coffee-expansion} and intuitively summarized in Figure~\ref{code:expanded-code}; that is, understanding whether it is possible to absorb the hoistable term in an available temporary value or a new temporary is needed. Obviously, the less is the number of temporaries introduced, the smaller is the size of the working set, which may result in better performance.
+\item A reference to the hoisted expression \texttt{e} assigned to \texttt{t}.
+\item A reference to the loop in which \texttt{e} is lifted.
+\item A reference to the declaration of \texttt{t}.
 \end{itemize}
+This dictionary belongs to the ``global state'' of COFFEE. It is updated each time the code motion operator is invoked, and read by other transformations (e.g., by all of the lower level optimizations).
+
+%The code motion operator is ``smart'', in the sense that common sub-expressions,  every time a sub-expression is about to be hoisted, \texttt{e} is lifted out of the iteration space \texttt{I}, three further ``extra'' optimizations are attempted. 
+%
+%\begin{description}
+%\item[Identification of common sub-expression] If a semantically equivalent sub-expression \texttt{e'} had been hoisted along the same iteration space \texttt{I}, then \texttt{e} is rather replaced with a reference to the temporary that \texttt{e'} is assigned to.
+%\item[Loop fusion.] When test and trial functions belong to the same function space, common sub-expressions may arise over different loops.  
+
 
 \subsection{Tracking Data Dependency}
 To implement these optimizations, it is necessary to track the evolution of data dependencies as the assembly expression is rewritten. For this purpose, COFFEE uses a dependency graph, which is a standard approach used by general-purpose compilers relying on abstract syntax trees (in addition to other data structures) as intermediate representation. The dependency graph has as many nodes as the number of variables in the loop nest characterizing the assembly expression. A direct edge from a node \texttt{A} to a node \texttt{B} indicates that the value of symbol \texttt{B} depends on that of \texttt{A}. 
