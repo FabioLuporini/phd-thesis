@@ -134,9 +134,14 @@ This dictionary belongs to the ``global state'' of COFFEE. It is updated each ti
 
 
 \subsection{Tracking Data Dependency}
-To implement these optimizations, it is necessary to track the evolution of data dependencies as the assembly expression is rewritten. For this purpose, COFFEE uses a dependency graph, which is a standard approach used by general-purpose compilers relying on abstract syntax trees (in addition to other data structures) as intermediate representation. The dependency graph has as many nodes as the number of variables in the loop nest characterizing the assembly expression. A direct edge from a node \texttt{A} to a node \texttt{B} indicates that the value of symbol \texttt{B} depends on that of \texttt{A}. 
+Data dependency analysis is necessary to ensure the legality of some transformations. For example:
+\begin{itemize}
+\item When lifting a sub-expression \texttt{e}, we may want to hoist ``as far as possible'' in the loop nest (possibly even outside of it); that is, right after the last write to a variable read in \texttt{e}.
+\item When expanding a product, some terms may be aggregated with previously hoisted sub-expressions. This would avoid introducing extra temporaries and increasing the register pressure. For example, if we have \texttt{(a + b)*c} and both \texttt{a} and \texttt{b} are temporaries created by code motion, we could expand the product and aggregate \texttt{c} with the sub-expressions stored by \texttt{a} and \texttt{b}. Obviously, this is as long as neither \texttt{a} nor \texttt{b} are accessed in other sub-expressions.
+\item For loop fusion (see Section~\ref{sec:coffee-loopfusion}).
+\end{itemize}
 
-The implementation of the depedency graph data structure and of the various algorithms using it is made simple by the fact that COFFEE ensures \textit{static single assignment} form. This property, typically adopted by intermediate representations in compilers, requires that variables are assigned exactly once, and that each variable is defined in advance. 
+In a similar way to general-purpose compilers, COFFEE uses a dependency graph for tracking data dependencies. The dependency graph has as many vertices as symbols in the code; a direct edge from \texttt{A} to \texttt{B} indicates that symbol \texttt{B} depends on (i.e., is going to read) symbol \texttt{A}. Since COFFEE relies on \textit{static single assignment} -- a property that ensures that variables are assigned exactly once -- such a minimalistic data structure suffices for data dependence analysis.
 
 \subsection{Minimizing Temporaries}
 ...

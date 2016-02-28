@@ -338,6 +338,11 @@ Consider Listing~\ref{code:weighted-laplace-vector-prom}. The evaluation of the 
 
 We have not seen this transformation being applied by neither the GNU's nor the Intel's compilers. In our experience -- and in absence of loop tiling -- the impact on execution time is difficult to predict. This transformation requires further investigation. Despite being fully implemented in COFFEE, it is therefore not applied in the default optimization process.
 
+\subsection{Loop Fusion}
+\label{sec:coffee-loopfusion}
+Loop fusion is a well-known compiler transformation that consists of merging a sequence of loops into a single one. This optimization can be applied by most general-purpose compilers. What we cannot expect these compilers to do, however, is identifying common sub-expressions across the fused loops -- an optimization of domain-specific nature.
+
+In assembly kernels arising from bilinear forms, test and trial functions may belong to the same function space. More interestingly, the same operators could be applied to both sets of functions. This would result in both linear loops having the same iteration space and common sub-expressions arising across them. To avoid this kind of redundant computation and simultaneously enforcing fusion, we implemented in COFFEE a specialized version of loop fusion. In our experiments, this optimization always resulted in relatively small performance improvements, ranging between $2\%$ and $8\%$. Therefore, it is automatically enabled in the default optimization process.
 
 \section{Related Work}
 \label{sec:coffee-related-work}
