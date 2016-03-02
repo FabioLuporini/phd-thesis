@@ -1,4 +1,137 @@
 \chapter{Automated Tiling for Irregular Computations}
 \label{ch:sparsetiling}
 
+\section{Motivation}
+...
+%mention dichotomy tiling/fusion...
+
+
+\section{Limitations in Real-World Applications and Related Work}
+\label{sec:tiling:limits}
+Loop tiling is widely studied in literature. In spite of a notable research effort, however, it is not clear how widespread this optimization actually is in real-world applications. Most studies centre their experimentation on relatively simple benchmarks and single-node performance; this unfortunately does not expose the complexity and the limitations of scientific codes. 
+
+%"Is non-trivial loop tiling really widely applied in real-world software ?"
+%
+%I've thought about this for quite a long time, and today, after a discussion with Lawrence and Michael, I finally decided to write down a few lines.
+%
+%Don't know what the result of this investigation will be (partly this depends on you), but ideally I would like to produce a document for those who, unfortunately, "study" tiling in codes, scenarios and examples that often seem (are) too far from reality (real codes, real simulations). It looks to me this class of people is quite large. 
+%
+%ll start with my impression. The answer to the question above, to me, seems:
+%
+%"No (at least in scientific software)."
+%
+%I might be completely wrong. I'd be glad, in that case, you could open up my mind. In the following, I'll try to provide arguments to support my opinion.
+%
+%Let's restrict for a moment to scientific codes. But feel free to cite examples from different areas. Actually, that'd be very nice.
+%
+
+\subsection{Space Tiling vs Space Filling Curves}
+% Is skewing used for optimizing cross-time dependency, i.e., is the wave due to time?
+
+\subsection{Issues with Time Tiling}
+%The first thing I wanna clarify is what I mean by "non-trivial loop tiling". We all know what loop tiling is. But what does that "non-trivial" actually mean? Well, it looks to me there are two ways of thinking tiling:
+%
+%- "Pure" tiling, i.e. applied to a "monolithic" iteration space. For example:
+%for t  // timestepping loop
+%  for x  // loops along spacial dimensions
+%    for y
+%      for z
+%        // some sort of stencil code
+%One can think of tiling this loop nest. Relatively straightforward. Plenty of tools that (hopefully) can automate this. Also, why should I bother myself with tiling when I can just stick some sort of space filling curve into the loop traversal? Don't have the answer.
+%
+%- "Fusion + Tiling". This is "the real tiling in scientific codes". For example:
+%for t  // timestepping loop
+%  // first sweep over the mesh
+%  for x  // loops along spacial dimensions
+%    for y
+%      for z
+%        // some sort of stencil code
+%  MAGIC BOX
+%  // second sweep over the mesh
+%  for x  // loops along spacial dimensions
+%    for y
+%      for z
+%        // some sort of stencil code
+%  ...
+%Things here are more complicated. We would like (if semantically possible) to tile across time including both the embedded loop nests [xyz]. This requires: 1) somehow "fusing" these loop nests iterating over the space dimensions; 2) build tilesthat span the time dimension. Think of it as two cubes: one cube for each [xyz] loop nest. The faces of these cubes can be of different size (i.e., the iteration spaces are actually different; it's like iterating over cells first, and over edges then). First you have to fuse the cubes into a single object (not trivial, already); then you have to carve out small parallelepipeds, that go from the top face of one cube to the corresponding bottom face of the other cube. These parallelepipeds are the tiles. But, now, what the hell is that *magic box*? The magic box is something that can break tiling. I am going to elaborate on this.
+%
+%So what are the issues here? There are several:
+%1 - MAGIC BOX is a synchronisation point, like a global reduction or a call to a third party library (e.g. calling PETSC to solve a linear system). This prevents tiling at all (right?).
+%2 - MAGIC BOX includes MPI halo exchanges. How tiles are going to behave along the boundary region if halo exchanges are required? That really is challenging ! (Do not hope that polyhedral tools can handle this)
+%3 - legacy codes which have this scheme are, in practice, messy. Perhaps the loop structure is not explicit as here. Perhaps the loops are in different files. Perhaphs you don't even have those loops! It's all hidden behind several layers of abstraction (as in DOLFIN for those of you who know about it)
+%4 - unstructured codes (finite volume, finite element) are more problematic than structured ones (finite difference). The indirections A[B[i]], storing the mesh connectivity, are available only at runtime. Plus, data dependencies are now irregular. How do we build tiles here? and in which phase of the program execution? 
+%5 - code is not as memory bound as one might have thought. Hey, vectorisation is important! But not always easy to achieve. Without vectorisation, there are chances that some kernels are actually compute-bound. Also, what about "very" high order methods? plenty of flops per operator invocation...unless we do intra-kernel parallelisation (useful for reducing the working set size), we will probably end up being compute-bound. 
+%6 - tiling is a complicated optimisation that requires a profound engineering effort, difficult to produce and mantain
+%
+%And the most important issue:
+%- the combination of the above ones !
+%
+%I put all issues together, but probably some logical separation can be found
+%
+
+\subsection{Time-Tilable Codes and Possible Solutions}
+%I've been trying to solve these issues. Especially points 4, 5 and 2 (thanks Michael for simplifying my life!)
+%
+%
+%What's the solution we propose?
+%DSL and automated code generation schemes. Goal is to generate code which is a *suitable input* for other tools capable of saving us "automagically" from the burden of optimising everything by ourself
+%
+%
+%So, back to the original question: "Is non-trivial loop tiling really widely applied in real-world software ?" And I said "no" because of the aforementioned points. 
+%
+%Where are with REAL tiling? Who is actually using it in real codes? What sort of improvements did they get? How did they work around the MPI "problem"?
+%
+%And, finally:
+%
+%What do we want to say about that body of literature presenting increasingly sophisticated tiling schemes that *seem* to be rarely used in practice? What do we want to say and ask to people talking about tiling?
+%
+%I'd like to hear what you think about this.
+
+
+\section{Abstraction}
+\label{sec:tiling:lc}
+...
+
+\subsection{Programming Model}
+...
+
+\subsection{Execution Model}
+...
+
+\subsection{Loop Chains for Generality}
+...
+
+\section{Example}
+...
+% the most general case, i.e., for shared memory
+
+\section{The Tiling Algorithm}
+...
+
+\subsection{Formalization}
+...
+
+\subsection{Correctness}
+...
+
+
+\section{Automation}
+
+\subsection{SLOPE: a Library for Tiling Irregular Computations}
+...
+
+\subsection{PyOP2: a Runtime Library for Mesh Iteration}
+...
+
+\section{Performance Evaluation}
+...
+
+\subsection{Benchmarks}
+\begin{itemize}
+\item Sparse Jacobi
+\item Airfoil
+\end{itemize}
+
+\subsection{Seigen: an Elastic Wave Equation Solver for Seismological Problems}
+\label{sec:tiling:seigen}
 ...
