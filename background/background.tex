@@ -232,22 +232,49 @@ Firedrake and FEniCS
 \section{Compilers and Libraries for Code Optimization}
 \label{sec:bkg:codeopt}
 
-\subsection{Polyhedral compilers}
+\subsection{Loop Optimization - Static Analysis}
+\label{sec:bkg:poly}
+Polyhedral compilers ...
 Mention their unsuitability for tiling unstructured meshes... (use email I sent listing all issues...)
 
-\subsection{Tensor Contraction Engine}
-...
-
-\subsection{LGen}
-Why potentially useful ...
-
-\section{Loop Tiling}
+\subsubsection{Loop Tiling}
 \label{sec:bkg:tiling}
 
 \begin{itemize}
 \item Clarify difference between space and time tiling
 \item tiles are atomic blabla
+\item split vs overlapped
 \end{itemize}
+
+\subsection{Loop Optimization - Dynamic Analysis}
+\label{sec:bkg:ie}
+Inspector/Executor schemes
+
+%Sparse tiling techniques were developed to group iterations of irregular applications
+%into atomic tiles at runtime with an 
+%inspector~\citep{dimeEtna00,StroutIJHPCA,StroutPLDI03,commAvoidingSparse2009}.
+%In general, the inspector iterates over index arrays that do not change during
+%the main computation to determine data reorderings or new schedules, like
+%sparse tiling schedules.
+%The resulting tiles have either an implicit or explicit partial ordering (i.e., a task graph)
+%that exposes asynchronous parallelism~\citep{Adams99c,dimeEtna00,StroutLCPC2002}.
+%These benchmark-specific, sparse tiling executors
+%exhibited performance improvements for sparse stencil computations, 
+%%FIXME: dime?Jacobi, % FIXME:~\cite{dime?}, 
+%Gauss-Seidel~\citep{Adams99c,StroutIJHPCA}, moldyn~\cite{StroutPLDI03},
+%and sparse matrix powers kernel~\cite{commAvoidingSparse2009}.
+
+
+\subsection{Domain Specific Optimization}
+...
+
+\subsubsection{Tensor Contraction Engine}
+...
+
+\subsubsection{LGen}
+Why potentially useful ...
+
+
 
 
 \section{State-of-the-art Hardware Architectures}
