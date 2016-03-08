@@ -232,23 +232,43 @@ Firedrake and FEniCS
 \section{Compilers and Libraries for Code Optimization}
 \label{sec:bkg:codeopt}
 
+
 \subsection{Loop Optimization - Static Analysis}
 \label{sec:bkg:poly}
 Polyhedral compilers ...
+scheduling functions
 Mention their unsuitability for tiling unstructured meshes... (use email I sent listing all issues...)
 
-\subsubsection{Loop Tiling}
+
+
+
+\subsection{Loop Optimization - Dynamic Analysis}
+\label{sec:bkg:ie}
+\begin{itemize}
+\item Inspector/Executor schemes
+\item Space filling curves for unstructured meshes
+\item sparse tiling = loop fusion + loop tiling
+\end{itemize}
+
+
+\subsection{On the Dichotomy between Loop Tiling and Loop Fusion}
 \label{sec:bkg:tiling}
 
 \begin{itemize}
-\item Clarify difference between space and time tiling
+\item Tiling is for a nested loop ! 
 \item tiles are atomic blabla
 \item split vs overlapped
 \end{itemize}
 
-\subsection{Loop Optimization - Dynamic Analysis}
-\label{sec:bkg:ie}
-Inspector/Executor schemes
+
+\subsubsection{Split tiling}
+
+\subsubsection{Overlapped tiling}
+ %These techniques work by dividing a loop nest's iteration space into a number of overlapping regions called tiles. These tiles are shaped such that each of them can execute in parallel without requiring communication.  
+ 
+ \subsubsection{Fusion vs Tiling}
+ so time tiling is just fusion across the time stepping loop, then tiling
+% IDEA: time skewing is just fusion. If it's a nested loop nest, you do tiling; but across loops at the same level of a block, you always do fusion. This way, SFCs and tiling are instances of scheduling functions for a nested loop; what is called "time tiling" or "time skewing" is just a shorthand for "fuse the loops within the time stepping loop".
 
 %Sparse tiling techniques were developed to group iterations of irregular applications
 %into atomic tiles at runtime with an 
@@ -264,6 +284,8 @@ Inspector/Executor schemes
 %Gauss-Seidel~\citep{Adams99c,StroutIJHPCA}, moldyn~\cite{StroutPLDI03},
 %and sparse matrix powers kernel~\cite{commAvoidingSparse2009}.
 
+%\subsection{Space Filling Curves}
+%...
 
 \subsection{Domain Specific Optimization}
 ...
@@ -273,7 +295,6 @@ Inspector/Executor schemes
 
 \subsubsection{LGen}
 Why potentially useful ...
-
 
 
 
@@ -290,8 +311,10 @@ Why potentially useful ...
 \begin{description}
 \item[Memory pressure, Register pressure]
 \item[Arithmetic intensity]
+\item[Operational intensity] Maybe add a subsection of the roofline model ?
 \item[Flops]
 \item[Access function (for array)]
 \item[General-purpose compiler]
 \item[Communication vs computation]
+\item[CPU- vs Memory-bound]
 \end{description}

@@ -32,7 +32,7 @@ Because of the irregular memory access pattern, our approach to loop optimizatio
 \label{sec:tiling:limits}
 
 \subsection{Mesh-based Numerical Methods for PDEs}
-Loop tiling is widely studied in the literature. In spite of a notable research effort, however, it is not clear how widespread this optimization is in real-world applications. Most studies centre their experimentation on relatively simple benchmarks and single-node performance; this unfortunately does not expose the complexity and the limitations of most scientific codes. On the other hand, it has repetedly been shown that applying tiling to ``simple'' memory-bound loop nests can result in considerable speed-ups. The most striking examples are stencil codes arising in the finite difference method~\cite{stencil-tiling}, BLAS routines such as matrix multiplication~\cite{MKL}, and image processing kernels~\cite{Halide}. Since numerical methods for partial differential equations (PDEs) are often structured as sequences of parallelizable ``sweeps'' over the discretized equation domain, often implemented as memory-intensive loop nests, the following questions arise naturally: 
+Loop tiling is widely studied in the literature. In spite of a notable research effort, however, it is not clear how widespread this optimization is in real-world applications. Most studies centre their experimentation on relatively simple benchmarks and single-node performance; this unfortunately does not expose the complexity and the limitations of most scientific codes. On the other hand, it has repeatedly been shown that applying tiling to ``simple'' memory-bound loop nests can result in considerable speed-ups. The most striking examples are stencil codes arising in the finite difference method~\cite{stencil-tiling}, BLAS routines such as matrix multiplication~\cite{MKL}, and image processing kernels~\cite{Halide}. Since numerical methods for partial differential equations (PDEs) are often structured as sequences of parallelizable ``sweeps'' over the discretized equation domain, often implemented as memory-intensive loop nests, the following questions arise naturally: 
 
 \begin{description}
 \item[Applicability] Can we adopt loop tiling, whose application has traditionally been limited to simple loop nests, in real-life numerical methods for solving PDEs?
@@ -42,7 +42,7 @@ Loop tiling is widely studied in the literature. In spite of a notable research 
 
 In this chapter, we will try answering these questions. Our study focuses on a particular class of applications:
 \begin{description}
-\item[Irregular codes] Unstructured meshes are often used to discretize the computational domain, since they allow an accurate representation of complex geometries. For this type of meshes, the connectivity is usually stored by means of adjanceny lists (or any equivalent structure), which results in indirect memory accesses (e.g., \texttt{A[B[i]]}) within loop nests. Indirections break static analysis, thus making any compiler-based approach (e.g., polyhedral optimization) unsuitable for our context. Indirections also make data dependence analysis more difficult, since this must now take place at runtime, introducing additional overhead.
+\item[Irregular codes] Unstructured meshes are often used to discretize the computational domain, since they allow an accurate representation of complex geometries. For this type of meshes, the connectivity is usually stored by means of adjacency lists (or any equivalent structure), which results in indirect memory accesses (e.g., \texttt{A[B[i]]}) within loop nests. Indirections break static analysis, thus making any compiler-based approach (e.g., polyhedral optimization) unsuitable for our context. Indirections also make data dependence analysis more difficult, since this must now take place at runtime, introducing additional overhead.
 \item[Realistic dataset] Most complex simulations operate on at least gigabytes of data, requiring multi-node execution. Any tiling-based optimization we will consider must therefore cope well with MPI execution.
 \item[Automation, but no legacy code] We view tiling as an ``extreme optimization''; that is, as an optimization that should be tried at the end of the development process, once the experimental results have been validated, to improve the execution time. In our experience, however, it is extremely rare that computational scientists have the expertise to add any low level optimizations, such as loop tiling, to their codes. In addition, applying these optimizations at the source level makes the code impenetrable and, therefore, almost impossible to maintain and to extend. Our aim is a fully automated technique abstracted to the users through a simple ``switch'' (i.e., loop tiling on/off) and a tiny set of parameters to drive performance tuning (e.g., the tile size). Automation clearly comes at the price of implementation complexity; we will integrate our tiling system with a generic framework for mesh iteration. We are therefore not interested in supporting legacy code, in which key computational aspects (e.g., mesh iteration, MPI communication) are usually hidden, for modularity, underneath several layers of software.
 \end{description}
@@ -96,13 +96,14 @@ The ``bare'' structure of a scientific code solving a PDE by applying a numerica
 % Is skewing used for optimizing cross-time dependency, i.e., is the wave due to time?
 
 \subsection{Automating Loop Tiling is More Difficult than Commonly Thought}
-We identify three classes of problems that, we believe, are commonly neglected in the relevant literature. 
+We identify three classes of problems that are either neglected or treated disjointly in the relevant literature. 
 
 \begin{description}
-\item[Theoretical questions] To the best of our knowledge, the following are research questions that have not found an answer yet. 
+\item[Theoretical questions] We first of all wonder whether loop tiling really is the optimization we are looking for.
 \begin{description}
-\item[Memory-boundedness] vectorization ...
-\item[Tiling vs Space Filling Curves]
+\item[Computational Boundedness] Since most computational methods are structured as sequences of loop nests and each loop nest is characterized by its own operational intensity, the computational boundedness is a concept that does not refer to the whole application. Rather, some loop nests may be memory-bound, whereas others CPU-bound, due to the complexity of the equations being solved or the employment of high order function spaces. Clearly, if all loop nests in an application are CPU-bound, the benefits of tiling on data locality will tend to be marginal. Before applying an aggressive optimization such as loop tilling, it is therefore fundamental to study the computational behaviour of an application for: (i) determining what fraction of the execution time is due to memory-bound loop nests; (ii) understanding if CPU-boundedness can be eliminated by applying other optimizations (e.g., vectorization), or if it is instead a natural consequence of the kernels and the architecture.
+\item[Tiling vs Space Filling Curves] It is our impression that different communities have disjointedly researched solutions to the problem of relieving the memory pressure of mesh-based computations for years. We view both tiling and space filling curves (SFCs) -- and likewise sequential execution -- as instances of possible scheduling functions for a given loop nest (see Section~\ref{sec:bkg:poly}). Nevertheless, we could not find studies comparing the performance of the two approaches, denoting a lack of communication between people in two distinct yet potentially very close domains: compiler optimization and computational science.
+
 \end{description}
 
 \item[Practical issues] Loop tiling for structured meshes is widely covered in the literature. Several studies have tackled automation (e.g., polyhedral compilers), time-loop tiling (i.e., time skewing), exotic tile shapes for minimizing communication (e.g., diamond tiling), and so on. However, the following challenges tend to be neglected, or at least only marginally tackled.
@@ -113,19 +114,15 @@ We identify three classes of problems that, we believe, are commonly neglected i
 \item[Legacy code is usually impenetrable] Our experience is that real-life code for scientific simulation tends to hide the tiling opportunities that a polyhedral compiler, for example, would search for. As explained in~\cite{strout-common-problems}, common problems are: 1) finding tilable loop nests, which are usually hidden for code modularity; 2) handling of boundary conditions; 3) dist
 \end{description}
 
-\item[Limitations inherent in the model] ...
-\begin{description}
-\item[Synchronization points] Speculation: communication between worlds, change numerical method for better efficiency
-
+\item[Limitations inherent in the numerical method] Two loops cannot be fused if they are separated by a global synchronization point. This is often a global reduction, either explicit (e.g., the first loop updates a global variable that will be needed by the second loop) or implicit (i.e., within an external function invoked in between the two loops, like in many iterative solvers for linear systems). By limiting the applicability of many loop optimizations, global synchronization points pose great challenges and research questions. If strong scaling is the primary goal and memory-boundedness is the key limiting factor, then fundamental questions are: (i) can the numerical method be reformulated to relieve the constraints on low level optimization (which requires a joint effort between people in different domains); (ii) can the tools be made more sophisticated to work around these problems; (iii) most importantly, will the effort be rewarded by significant performance improvements?
 \end{description}
 
-\end{description}
-
+In this chapter, we will formulate answers to some of these problems.
 
 %
 %So what are the issues here? There are several:
 %1 - MAGIC BOX is a synchronisation point, like a global reduction or a call to a third party library (e.g. calling PETSC to solve a linear system). This prevents tiling at all (right?).
-%2 - MAGIC BOX includes MPI halo exchanges. How tiles are going to behave along the boundary region if halo exchanges are required? That really is challenging ! (Do not hope that polyhedral tools can handle this)
+
 %3 - legacy codes which have this scheme are, in practice, messy. Perhaps the loop structure is not explicit as here. Perhaps the loops are in different files. Perhaphs you don't even have those loops! It's all hidden behind several layers of abstraction (as in DOLFIN for those of you who know about it)
 %4 - unstructured codes (finite volume, finite element) are more problematic than structured ones (finite difference). The indirections A[B[i]], storing the mesh connectivity, are available only at runtime. Plus, data dependencies are now irregular. How do we build tiles here? and in which phase of the program execution? 
 %5 - code is not as memory bound as one might have thought. Hey, vectorisation is important! But not always easy to achieve. Without vectorisation, there are chances that some kernels are actually compute-bound. Also, what about "very" high order methods? plenty of flops per operator invocation...unless we do intra-kernel parallelisation (useful for reducing the working set size), we will probably end up being compute-bound. 
@@ -140,7 +137,7 @@ We identify three classes of problems that, we believe, are commonly neglected i
 
 
 
-\subsection{Time-Tilable Codes and Possible Solutions}
+%\subsection{Time-Tilable Codes and Possible Solutions}
 %I've been trying to solve these issues. Especially points 4, 5 and 2 (thanks Michael for simplifying my life!)
 %
 %
@@ -160,72 +157,32 @@ We identify three classes of problems that, we believe, are commonly neglected i
 
 \section{Related Work}
 \label{sec:tiling:relatedwork}
-The data dependence analysis that we will develop is based on an abstraction called \textit{loop chain}, which was presented in~\cite{KriegerHIPS2013}. This abstraction is sufficiently general to capture data dependency in programs structured as arbitrary sequences of loops. We will detail our loop chain abstraction in Section~\ref{sec:tiling:lc}.
 
-The loop chain is the mechanism by means of which we generalize inspector/executor schemes for unstructured codes. Inspector/executor strategies were first formalized by~\cite{Saltz91} and used to fuse and tile loops for improving data locality and providing parallelism in~\cite{dimeEtna00,StroutLCPC2002,Demmel08,KriegerIAAA2012}. Communication avoiding approaches~\cite{commAvoidingSparse2009}, which optimize a series of loops over unstructured meshes, fall in the same category. We reiterate the fact that all these works were specific to individual benchmarks. 
+\subsection*{Loop Chain}
+% Loop chain
+The data dependence analysis that we will develop is based on an abstraction called \textit{loop chain}, which was originally presented in~\cite{KriegerHIPS2013}. This abstraction is sufficiently general to capture data dependency in programs structured as arbitrary sequences of loops. We will detail our loop chain abstraction in Section~\ref{sec:tiling:lc}.
 
+\subsection*{Inspector/Executor and Sparse Tiling}
+% Inspector/Executor
+The loop chain is the mechanism by means of which we will generalize inspector/executor schemes for unstructured codes. Inspector/executor strategies were first formalized by~\cite{Saltz91} and used to fuse and tile loops for improving data locality and providing parallelism in~\cite{dimeEtna00,StroutLCPC2002,Demmel08,KriegerIAAA2012}. 
+
+Sparse tiling, which we introduced in Section~\ref{sec:bkg:ie}, is the most notable technique based upon inspection/execution. The term was coined by Strout et al.~\cite{StroutLCPC2002,StroutIJHPCA} in the context of the Gauss-Seidel algorithm and in~\cite{StroutPLDI03} in the context of the moldyn benchmark. However, the technique was initially proposed by Douglas et al.~\cite{dimeEtna00} to parallelize computations over unstructured meshes, taking the name of \textit{unstructured cache blocking}. The mesh was initially partitioned; the partitioning represented the tiling in the first sweep over the mesh. Tiles would then shrink by one layer of vertices for each iteration of the loop. This shrinking represented what parts of the mesh could be update in later iterations of the outer loop without communicating with the processes executing other tiles. The unstructured cache blocking technique also needed to execute a serial clean-up tile at the end of the computation. Mark Adams~\cite{Adams99c} also developed an algorithm very similar to sparse tiling, to parallelize Gauss-Seidel computations. The main difference between~\cite{StroutLCPC2002,StroutIJHPCA} and~\cite{dimeEtna00} was that in the former work the tiles fully covered the iteration space, so a sequential clean-up phase at the end could be avoided. 
+
+We reiterate the fact that all these approaches were either specific to individual benchmarks or general but not scheduling across loops (i.e., loop fusion). Filling this gap is one of the contributions of this chapter.
+
+\subsection*{Automated Code Generation and Optimization for Mesh-Based Computations}
+% Automated code generation and unstructured grids
 The automated code generation technique presented in \cite{Ravishankar12} examines the data affinity among loops and partitions the execution with the goal of minimizing communication between processes, while maintaining load balancing. This technique supports unstructured mesh applications (being based on an inspector/executor strategy) and targets distributed memory systems, although it does not exploit the loop chain abstraction and abstracts from loop optimization.
 
-Automated code generation technique, such as those based on polyhedral compilers (reviewed in Section~\ref{sec:bkg:poly}), have been applied to structured mesh benchmarks or proxy applications. Notable examples are~\cite{pluto,polly,loopy}. There has been very little effort in providing evidence that these tools can be effective in real-world applications. Time-loop diamond tiling was applied in~\ref{cohen-timetiling} to a proxy code, but experimentation is limited to a single-node.
-%
-%In structured codes, using multiple layers of halo, or ghost, cells is
-%a common optimization~\cite{Bassetti98}, but
-%when done by hand breaks the typical software modularity in
-%large applications.
-%Structured codes can also use
-%overlapped tiling techniques that reduce communication
-%at the expense of performing redundant
-%computation~\cite{Zhou12}.
-%These techniques work by dividing a loop
-%nest's iteration space into a number of overlapping regions called
-%tiles. These tiles are shaped such that each of them can execute in
-%parallel without requiring communication.  
-%
-%Several researchers have examined using overlapped communication
-%techniques within single loop nest (often stencil)
-%computations~\cite{Meng09, Krishnamoorthy07, Chen02}.  
-%We believe that
-%an overlapped tiling optimizer 
-%could use information from the loop chaining
-%abstraction to do overlapped tiling across loops.
-%
+% Automated code generation and structured grids 
+Automated code generation techniques, such as those based on polyhedral compilers (reviewed in Section~\ref{sec:bkg:poly}), have been applied to structured mesh benchmarks or proxy applications. Notable examples are~\cite{pluto,polly,loopy}. There has been very little effort in providing evidence that these tools can be effective in real-world applications. Time-loop diamond tiling was applied in~\ref{cohen-timetiling} to a proxy code, but experimentation is limited to a single-node.
+%TODO other examples?
+
+\subsection*{Overlapped Tiling}
+% Overlapped tiling
+In structured codes, Using multiple layers of halo, or ``ghost'', elements is a common optimization in structured codes~\cite{Bassetti98}. Overlapped tilling (see Section~\ref{sec:bkg:tiling}) exploits the same principle to reduce communication at the expense of performing redundant computation along the boundary~\cite{Zhou12}. Several studies centered on overlapped tiling within single regular loop nests (mostly stencil-based computations)~\cite{Meng09,Krishnamoorthy07,Chen02}. Techniques known as ``communication avoiding''~\cite{Demmel08,commAvoidingSparse2009} also fall in this broader category. To the best of our knowledge, overlapped tiling for unstructured grids by automated code generation has been studied only analytically in~\cite{gihan-overlapped}.
 
 
-
-
-%%%%%%%%%%%%%%%%%%%%%%
-%  \item Various code transformations reschedule computation and/or reorder data to turn
-%  such data reuse into data locality as well as parallelizing the computations. [Summarize communication avoiding and sparse tiling work.  
-%  Also OSU and Purdue work.  Summarize previous work that Carlo did.  Paper that describes the benefit Hydra could achieve.]
-%Various code transformation have been developed to reschedule 
-%computation and reorder data for loop-chain-like code patterns.
-%Many of these techniques also generate parallel execution schedules for the loops. 
-%The approach in \cite{OhioStateMPICodeGen} identifies \emph{partitionable loops}, 
-%and schedules these loops for execution on a distributed memory machine. 
-%Likewise, there are approaches that take parallel loops identified by OpenMP 
-%pragmas and transform them for execution on distributed memory clusters~\cite{Basumallik2006}. 
-%NEED TO SUMMARIZE HYDRA WORK HERE AS WELL.
-
-%  \item Some of these approaches were general, but they did not schedule across the loops and
-%  therefore are throwing some possible data locality away.
-%  The techniques that schedule across loops are specific to individual loop kernels.
-%The approach presented in this paper differs from these techniques in two key ways. 
-%First, these approaches generate a schedule in which each partition or processing 
-%element executes its assigned iterations of one loop, then communicates a subset 
-%of its results to other partitions that are dependent on that data. 
-%After executing its iterations of a loop, each processing element potentially 
-%waits to receive data from other partitions. 
-%The full sparse tiling approach described here does not require any 
-%synchronization or communication during the execution of a tile due to the \emph{atomicity} 
-%of the tile. Before a tile begins execution, it waits until all necessary data is available 
-%and then executes from start to finish without further communication or synchronization. 
-%This approach can better exploit the locality available across the sequence of loops.
-
-% OK, what should we say here without harming the arguments about specializing the algorithm for OP2? Also, are we trying to contrast with Demmel's stuff or what? Does the communication avoiding work rely on the topology of the mesh? I seem to remember that it did and they had
-% specific versions for 1D, 2D, 3D. Compared to the others, we are about the same
-% in terms of loop chains vs partitionable loops vs OpenMP loops, etc-- Krieger
-
-%Secondly, the approach presented in this paper is general and only requires that the provided sequence of loops be a valid loop chain. %It does not make any assumptions about the pattern of data dependencies or the number of loops.
 
 \section{Abstraction}
 \label{sec:tiling:lc}
