@@ -2,6 +2,7 @@
 \label{ch:sparsetiling}
 
 \section{Motivation}
+\label{sec:tiling:motivation}
 %mention dichotomy tiling/fusion...
 
 %- irregular codes from pde-land are often memory bound (this however depends on the discretization)
@@ -119,22 +120,6 @@ We identify three classes of problems that are either neglected or treated disjo
 
 In this chapter, we will formulate answers to some of these problems.
 
-%
-%So what are the issues here? There are several:
-%1 - MAGIC BOX is a synchronisation point, like a global reduction or a call to a third party library (e.g. calling PETSC to solve a linear system). This prevents tiling at all (right?).
-
-%3 - legacy codes which have this scheme are, in practice, messy. Perhaps the loop structure is not explicit as here. Perhaps the loops are in different files. Perhaphs you don't even have those loops! It's all hidden behind several layers of abstraction (as in DOLFIN for those of you who know about it)
-%4 - unstructured codes (finite volume, finite element) are more problematic than structured ones (finite difference). The indirections A[B[i]], storing the mesh connectivity, are available only at runtime. Plus, data dependencies are now irregular. How do we build tiles here? and in which phase of the program execution? 
-%5 - code is not as memory bound as one might have thought. Hey, vectorisation is important! But not always easy to achieve. Without vectorisation, there are chances that some kernels are actually compute-bound. Also, what about "very" high order methods? plenty of flops per operator invocation...unless we do intra-kernel parallelisation (useful for reducing the working set size), we will probably end up being compute-bound. 
-%6 - tiling is a complicated optimisation that requires a profound engineering effort, difficult to produce and mantain
-%
-%And the most important issue:
-%- the combination of the above ones !
-%
-%I put all issues together, but probably some logical separation can be found
-%
-
-
 
 
 %\subsection{Time-Tilable Codes and Possible Solutions}
@@ -184,17 +169,83 @@ In structured codes, Using multiple layers of halo, or ``ghost'', elements is a 
 
 
 
-\section{Abstraction}
+\section{Generalized Inspector/Executor Schemes}
 \label{sec:tiling:lc}
-...
+In Section~\ref{sec:tiling:motivation} we introduced that our approach to loop tiling is based upon an \textit{inspector/executor scheme automatically generated at execution time}. In this section, we explain how to construct such an inspector/executor scheme, whereas automation will be tackled in Section~\ref{sec:tiling:automation}.
 
-\subsection{Programming Model}
-...
 
-\subsection{Execution Model}
-...
+\subsection{The Loop Chain Abstraction}
+The mechanism we build is based upon the \textit{loop chain}, an abstraction originally introduced in~\cite{KriegerHIPS2013}. Informally, a loop chain is a sequence of loops with no global synchronization points, with attached some extra information to enable run-time data dependence analysis. 
 
-\subsection{Loop Chains for Generality}
+We recall from Section~\ref{sec:tiling:limits} that the complexity -- particularly the presence of indirect memory accesses -- and the modularity of real-world unstructured mesh applications prevent most common static optimizations for data locality. The data dependence information carried by a loop chain is supposed to be used to replace compile-time with run-time optimization. The basic idea is that the user provides the loop chain; then the compiler modifies the source code adding two extra pieces of code, the inspector and the executor; finally, at run-time, the inspector will exploit the data dependence information to build a ``scheduling'', which will eventually be used by the executor. 
+
+Before diving into the description of the loop chain abstraction, we observe two notable facts:
+\begin{itemize}
+\item The run-time execution of the inspection may introduce a significant overhead. In many scientific computations, however, the data dependence information is static; or, in more informal words, ``the mesh does not change over time''. Usually, the loop chain will be located within the time loop of the application, so the inspection cost is amortized. If the mesh changes over time (e.g., in case of adaptive mesh refinement), the inspection needs be re-executed. We have devoted a significant effort in optimizing the inspection algorithm,  with the hope that its cost tends to be negligible even in the extreme case of frequent changes in the data dependence pattern. Further details will be provided in the later sections. 
+\item The loop chain is expected to be provided by the user. We reinforce the idea that, in our approach, we will have two possibilities for constructing loop chains: either explicitly, with users required to change their program by adding calls to an external library to build the inspector/executor scheme, or implicitly, with the loop chain built automatically ``behind the scenes'' through a higher level framework.
+\end{itemize}
+
+In~\cite{ST-KriegerHIPS2013,KriegerThesis}, a loop chain $L$ is defined as follows:
+\begin{itemize}
+\item $L$ defines a scope in which $n$ loops are present, $L_0, L_1, ..., L_{n-1}$. There are no global synchronization points between the various loops.
+\item $D$ is a set of disjoint $m$ data spaces, $D_0, D_1, ..., D_{m-1}$. Each loop accesses (reads from, writes to) a certain subset of these data spaces. An access can be either direct (e.g., \texttt{A[i]}) or indirect (e.g., \texttt{A[map(i)]}).
+\item $R_{L_l\rightarrow D_d}(\vec{i})$ and $W_{L_l\rightarrow D_d}(\vec{i})$, where the $R$ and $W$ access relations are defined over for each data space $D_d \in D$ and indicate which data locations in data space $D_d$ an iteration $i \in L_l$ reads from and writes to respectively (e.g., if we have \texttt{A[map(i)] = ...} in loop $L_j$, the access relation $map_{L_j\rightarrow A}(\vec{i})$ will be available). 
+\end{itemize}
+
+\subsection{Loop Chains for Unstructured Mesh Computations}
+Because of our focus on unstructured mesh computations, and inspired by the programming model of OP2 (see Section~\ref{sec:bkg:meshiteration}), we refine the loop chain definition as follows:
+\begin{itemize}
+\item $L$ defines a scope in which $n$ loops are present, $L_0, L_1, ..., L_{n-1}$. There are no global synchronization points between the various loops.
+\item $S$ is a set of disjoint $m$ sets, $S_0, S_1, ..., S_{m-1}$. Possible sets are the elements in the mesh or the degrees of freedom associated to a certain function. A loop iterates over one of these sets, or iteration spaces; a data space is associated with one of these sets. 
+\item $M$ is a set of $k$ maps, $M_0, M_1, ..., M_{k-1}$. A map of arity $a$ is a vector-valued function $M : S_i \rightarrow S_j^0 \times S_j^1 \times ... \times S_j^{a-1}$. It essentially connects each element of $S_i$ to one or more elements in $S_j$. For example, if a triangular cell $c$ is connected to three vertices $v_0, v_1, v_2$, we trivially have $M(c) = [v_0, v_1, v_2]$. 
+\item A loop $L_i$ over the iteration space $S_j$ is associated with a set $D_{L_i}$ of $d$ descriptors, $D_0, D_1, ..., D_{d-1}$. Each descriptor $D_j$ is a 2-tuple $D_j = {<}mode,\ M{>}$; $mode$ is one of $[READ,\ WRITE,\ INC]$, where $M$ is either a map from $S_j$ to some other sets or the special placeholder $\perp$, which indicates that the access is direct to some data associated with $S_j$.
+\end{itemize}
+
+The striking difference with respect to the original definition is the lack of data spaces. Essentially, we abstract data spaces to the level of sets. Each set $S_j$ is usually associated multiple data spaces, and loops often access different data spaces associated with $S_j$. The idea, which will become more clear in the next section, is to limit data dependence tracking at the sets level. This may conservatively return some ``false positives'', but it significantly improves the inspection cost since typically $|S| << |D|$. 
+
+An example of a loop chain for an unstructured mesh application is provided in Figure~\ref{code:tiling-loopchain}.
+
+\begin{algorithm}
+\scriptsize\ttfamily
+\SetAlgorithmName{LISTING}{}
+
+void kernel1 (double * x, double * tmp1, double * tmp2) $\lbrace$\\
+  *tmp1 += *x;\\
+  *tmp2 += *x;\\
+$\rbrace$\\
+~\\
+// Build the loop chain \\
+set (E, ...); set (C, ...); \\ 
+map (mapE, ...); map (mapC, ...); \\  
+loop (...); loop (...); loop (...); \\
+~\\
+// Original version of the program\\
+\KwSty{for} t = 0 \KwSty{to} T $\lbrace$\\
+~~// Loop over edges\\
+~~\KwSty{for} e = 0 \KwSty{to} E $\lbrace$\\
+~~~~x = X[e];\\
+~~~~tmp$\_$0 = tmp + mapE[e + 0]; tmp$\_$1 = tmp + mapE[e + 1]; \\
+~~~~kernel1 (x, tmp$\_0$, tmp$\_$1);\\
+~~$\rbrace$\\
+
+~~// Loop over cells\\
+~~\KwSty{for} c = 0 \KwSty{to} C $\lbrace$\\
+~~~~res = R[C];\\
+~~~~tmp$\_$0 = tmp + mapC[c + 0]; tmp$\_$1 = tmp + mapC[c + 1]; tmp$\_$2 = tmp + mapC[c + 2];\\
+~~~~kernel2 (res, tmp$\_0$, tmp$\_$1, tmp$\_$2);\\
+~~$\rbrace$\\
+
+~~// Loop over edges\\
+~~\KwSty{for} e = 0 \KwSty{to} E $\lbrace$\\
+~~~~tmp$\_$0 = tmp + mapE[e + 0]; tmp$\_$1 = tmp + mapE[e + 1]; \\
+~~~~kernel3 (tmp$\_0$, tmp$\_$1);\\
+~~$\rbrace$\\
+$\rbrace$\\
+
+\caption{Section of a toy program that is used as a running example to illustrate the loop chain abstraction and show how the tiling algorithm works.}
+\label{code:tiling-loopchain}
+\end{algorithm}
+
 
 \section{Example}
 ...
@@ -211,6 +262,7 @@ In structured codes, Using multiple layers of halo, or ``ghost'', elements is a 
 
 
 \section{Automation}
+\label{sec:tiling:automation}
 %- is automation possible ? -> DSLs !!! + lazy evaluation + inspector/executor + mpi-trick
 
 \subsection{SLOPE: a Library for Tiling Irregular Computations}
