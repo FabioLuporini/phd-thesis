@@ -227,8 +227,45 @@ Firedrake and FEniCS
 \label{sec:bkg:meshiteration}
 \begin{description}
 \item[Structured Meshes] ...
-\item[Unstructured Meshes] OP2, PyOP2, Halide
+\item[Unstructured Meshes] OP2, PyOP2, Lizst
 \end{description}
+
+\subsubsection{OP2 and PyOP2}
+\label{sec:bkg:op2}
+
+\begin{algorithm}
+\scriptsize\ttfamily
+\SetAlgorithmName{LISTING}{}
+
+void kernel1 (double * x, double * tmp1, double * tmp2) {
+  *tmp1 += *x;
+  *tmp2 += *x;
+}
+// loop over edges
+op$\_$par$\_$loop (edges, kernel1,
+  op$\_$arg$\_$dat (x, -1, OP$\_$ID, OP$\_$READ),
+  op$\_$arg$\_$dat (temp, 0, edges2vertices, OP$\_$INC),
+  op$\_$arg$\_$dat (temp, 1, edges2vertices, OP$\_$INC))
+
+// loop over cells
+op$\_$par$\_$loop (cells, kernel2,
+  op$\_$arg$\_$dat (temp, 0, cells2vertices, OP$\_$INC),
+  op$\_$arg$\_$dat (temp, 1, cells2vertices, OP$\_$INC),
+  op$\_$arg$\_$dat (temp, 2, cells2vertices, OP$\_$INC),
+  op$\_$arg$\_$dat (res, -1, OP$\_$ID, OP$\_$READ))
+
+// loop over edges
+op$\_$par$\_$loop (edges, kernel3,
+  op$\_$arg$\_$dat (temp, 0, edges2vertices, OP$\_$INC),
+  op$\_$arg$\_$dat (temp, 1, edges2vertices, OP$\_$INC))
+
+\caption{...}
+\label{code:op2program}
+\end{algorithm}
+
+%TODO : paste description from ESA report
+
+
 
 \section{Compilers and Libraries for Code Optimization}
 \label{sec:bkg:codeopt}
@@ -264,10 +301,12 @@ Mention their unsuitability for tiling unstructured meshes... (use email I sent 
 
 \subsubsection{Split tiling}
 
+
 \subsubsection{Overlapped tiling}
  %These techniques work by dividing a loop nest's iteration space into a number of overlapping regions called tiles. These tiles are shaped such that each of them can execute in parallel without requiring communication.  
  
  \subsubsection{Fusion vs Tiling}
+ \label{sec:bkg:sparsetiling}
  so time tiling is just fusion across the time stepping loop, then tiling
 % IDEA: time skewing is just fusion. If it's a nested loop nest, you do tiling; but across loops at the same level of a block, you always do fusion. This way, SFCs and tiling are instances of scheduling functions for a nested loop; what is called "time tiling" or "time skewing" is just a shorthand for "fuse the loops within the time stepping loop".
 
@@ -297,7 +336,11 @@ Mention their unsuitability for tiling unstructured meshes... (use email I sent 
 \subsubsection{LGen}
 Why potentially useful ...
 
+\subsubsection{Halide}
+...
 
+\subsubsection{Spiral}
+...
 
 \section{State-of-the-art Hardware Architectures}
 \label{sec:bkg:arch}
@@ -318,4 +361,5 @@ Why potentially useful ...
 \item[General-purpose compiler]
 \item[Communication vs computation]
 \item[CPU- vs Memory-bound]
+\item[Local vs Global reduction]
 \end{description}

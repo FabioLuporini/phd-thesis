@@ -193,17 +193,16 @@ In~\cite{ST-KriegerHIPS2013,KriegerThesis}, a loop chain $L$ is defined as follo
 \end{itemize}
 
 \subsection{Loop Chains for Unstructured Mesh Computations}
-Because of our focus on unstructured mesh computations, and inspired by the programming model of OP2 (see Section~\ref{sec:bkg:meshiteration}), we refine the loop chain definition as follows:
+Because of our focus on unstructured mesh computations, and inspired by the programming and execution models of OP2 (see Section~\ref{sec:bkg:op2}), we refine the loop chain definition as follows:
 \begin{itemize}
 \item $L$ defines a scope in which $n$ loops are present, $L_0, L_1, ..., L_{n-1}$. There are no global synchronization points between the various loops.
+\item The execution order of a loop iterations does not influence the result. This means that given $L_i$, we can choose an arbitrary scheduling of iterations because there will not be loop-carried dependencies. Clearly, in case of parallel execution, some mechanisms to avoid race conditions must be present, because of potential local reductions (see also Section~\ref{sec:bkg:terminology}). 
 \item $S$ is a set of disjoint $m$ sets, $S_0, S_1, ..., S_{m-1}$. Possible sets are the elements in the mesh or the degrees of freedom associated to a certain function. A loop iterates over one of these sets, or iteration spaces; a data space is associated with one of these sets. 
 \item $M$ is a set of $k$ maps, $M_0, M_1, ..., M_{k-1}$. A map of arity $a$ is a vector-valued function $M : S_i \rightarrow S_j^0 \times S_j^1 \times ... \times S_j^{a-1}$. It essentially connects each element of $S_i$ to one or more elements in $S_j$. For example, if a triangular cell $c$ is connected to three vertices $v_0, v_1, v_2$, we trivially have $M(c) = [v_0, v_1, v_2]$. 
 \item A loop $L_i$ over the iteration space $S_j$ is associated with a set $D_{L_i}$ of $d$ descriptors, $D_0, D_1, ..., D_{d-1}$. Each descriptor $D_j$ is a 2-tuple $D_j = {<}mode,\ M{>}$; $mode$ is one of $[READ,\ WRITE,\ INC]$, where $M$ is either a map from $S_j$ to some other sets or the special placeholder $\perp$, which indicates that the access is direct to some data associated with $S_j$.
 \end{itemize}
 
 The striking difference with respect to the original definition is the lack of data spaces. Essentially, we abstract data spaces to the level of sets. Each set $S_j$ is usually associated multiple data spaces, and loops often access different data spaces associated with $S_j$. The idea, which will become more clear in the next section, is to limit data dependence tracking at the sets level. This may conservatively return some ``false positives'', but it significantly improves the inspection cost since typically $|S| << |D|$. 
-
-An example of a loop chain for an unstructured mesh application is provided in Figure~\ref{code:tiling-loopchain}.
 
 \begin{algorithm}
 \scriptsize\ttfamily
@@ -214,9 +213,10 @@ void kernel1 (double * x, double * tmp1, double * tmp2) $\lbrace$\\
   *tmp2 += *x;\\
 $\rbrace$\\
 ~\\
-// Build the loop chain \\
-set (E, ...); set (C, ...); \\ 
-map (mapE, ...); map (mapC, ...); \\  
+// Build the loop chain: \\
+// Three sets: edges (E iters), cells (C iters), and vertices (V iters)\\
+set (E, ...); set (C, ...); set (V, ...); \\ 
+map (E, V, edges2vertices, ...); map (C, V, cells2vertices, ...); \\  
 loop (...); loop (...); loop (...); \\
 ~\\
 // Original version of the program\\
@@ -224,20 +224,24 @@ loop (...); loop (...); loop (...); \\
 ~~// Loop over edges\\
 ~~\KwSty{for} e = 0 \KwSty{to} E $\lbrace$\\
 ~~~~x = X[e];\\
-~~~~tmp$\_$0 = tmp + mapE[e + 0]; tmp$\_$1 = tmp + mapE[e + 1]; \\
+~~~~tmp$\_$0 = tmp + edges2vertices[e + 0];\\
+~~~~tmp$\_$1 = tmp + edges2vertices[e + 1]; \\
 ~~~~kernel1 (x, tmp$\_0$, tmp$\_$1);\\
 ~~$\rbrace$\\
-
+~\\
 ~~// Loop over cells\\
 ~~\KwSty{for} c = 0 \KwSty{to} C $\lbrace$\\
 ~~~~res = R[C];\\
-~~~~tmp$\_$0 = tmp + mapC[c + 0]; tmp$\_$1 = tmp + mapC[c + 1]; tmp$\_$2 = tmp + mapC[c + 2];\\
+~~~~tmp$\_$0 = tmp + cells2vertices[c + 0];\\
+~~~~tmp$\_$1 = tmp + cells2vertices[c + 1];\\
+~~~~tmp$\_$2 = tmp + cells2vertices[c + 2];\\
 ~~~~kernel2 (res, tmp$\_0$, tmp$\_$1, tmp$\_$2);\\
 ~~$\rbrace$\\
-
+~\\
 ~~// Loop over edges\\
 ~~\KwSty{for} e = 0 \KwSty{to} E $\lbrace$\\
-~~~~tmp$\_$0 = tmp + mapE[e + 0]; tmp$\_$1 = tmp + mapE[e + 1]; \\
+~~~~tmp$\_$0 = tmp + edges2vertices[e + 0];\\
+~~~~tmp$\_$1 = tmp + edges2vertices[e + 1]; \\
 ~~~~kernel3 (tmp$\_0$, tmp$\_$1);\\
 ~~$\rbrace$\\
 $\rbrace$\\
@@ -246,10 +250,28 @@ $\rbrace$\\
 \label{code:tiling-loopchain}
 \end{algorithm}
 
+An example of a loop chain for a trivial unstructured mesh application is provided in Listing~\ref{code:tiling-loopchain}. This example can be considered a plain C sequential version of the OP2 program illustrated in Listing~\ref{code:op2program}. The loop chain is constructed explicitly prior to the execution of the time-stepping loop. It is worth noting that the parallel loop specification in (Py)OP2 provides sufficient information to automate the derivation of the loop chain. In the next section, we show how to derive an inspector/executor scheme for this example given the information provided by the loop chain.
+
+\subsection{Sparse Tiling}
+In this chapter we focus on generalized inspector/executor schemes for sparse tiling. In Section~\ref{sec:bkg:sparsetiling} we explained that sparse tiling aims to exploit data reuse across consecutive loops. We recall that this optimization can be seen as the composition of three transformations: loop fusion, loop tiling, and parallelization. The loop chain abstraction can potentially be used for a variety of optimizations; however, because of our focus on real-world unstructured mesh applications, we restrict our attention to sparse tiling.
 
 \section{Example}
-...
-% the most general case, i.e., for shared memory
+Using the example in Listing~\ref{code:tiling-loopchain}, we describe the actions performed by a sparse tiling inspector. We show two variants of inspection: for shared-memory and distributed-memory parallelism. 
+
+\subsection*{Overview of the Algorithm}
+The inspector always starts with partitioning a \textit{seed loop}, for example $L_0$. Each partition $P_i$ is used to initialize a tile $T_i$: the edges in $P_i$ are iterations of $L_0$ assigned to $T_i$. In the later stages of the inspection, $T_i$ is populated with iterations from $L_1$ and $L_2$, as detailed in the upcoming sections. When all tiles have been constructed, the executor assigns a single thread/process to each $T_i$. $T_i$ is then executed ``atomically''; that is, without the need for communication with other tiles. When executing $T_i$, first all iterations from $L_0$ are executed, then all iterations from $L_1$ and finally those from $L_2$. 
+
+\subsection*{Building Tiles for Shared-Memory Parallelism}
+Figure~\ref{fig:st-initial-part-sm} displays the situation after the initial partitioning of $L_0$. 
+
+There are four partitions, two of which are not connected through any edge or cell. These four partitions correspond to four tiles, $[T_0,\ T_1,\ T_2, T_3]$. Similarly to OP2, for shared-memory parallelism we adopt the following approach: (i) we serialize the execution of the elements inside a partition by scheduling them to a single thread; (ii) we color the partitions such that partitions assigned the same color can be executed in parallel by different threads. Two partitions can have the same color if they are not connected, because this ensures the absence of race conditions due to local reductions through indirect memory accesses. In the example we can use three colors: red (R), green (G), and blue (B). As the two partitions at the top right and bottom left are not connected, they are assigned the same color (green). In the following, with the notation $T_i^c$ we mean that the $i$-th tile has color $c$.
+
+In order to populate the tiles with iterations from $L_1$ and $L_2$, we first have to establish a total ordering for the execution of partitions with different colors. Here, we assume the following order: green (G), blue (B), and red (R). This means, for instance, that \textit{all iterations} assigned to $T_1^B$ must be executed \textit{before all iterations} assigned to $T_2^R$. By ``all iterations'' we mean the iterations from $L_0$, as established by the seed partitioning, as well as the iterations that will later be assigned from $L_1$ and $L_2$. We assign integer positive numbers to colors to reflect their ordering, where a smaller number means higher execution priority. In this case, we can assign 0 to green, 1 to blue, and 2 to red.
+
+To schedule the iterations of $L_1$ to $[T_0^G,\ T_1^B,\ T_2^R, T_3^G$, we now need to compute a \textit{projection} of any write or local reduction performed within $L_0$.  A projection for $L_0$ is a triple ${<}V,\ \mathbb{T},\ \mathbb{C}{>}$, where $\mathbb{T}$ and $\mathbb{C}$ represent, respectively, a tiling and a coloring functions for all vertices. We recall, indeed, that the vertices are indirectly incremented by each iteration (edge) in $L_0$. 
+
+\subsection*{Building Tiles for Distributed-Memory Parallelism}
+
 
 \section{The Tiling Algorithm}
 ...
