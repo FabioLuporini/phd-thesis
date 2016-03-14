@@ -302,11 +302,30 @@ We make two key observations concerning the correctness and the efficiency of th
 
 %The main difference with respect to frameworks such as OP2 (see Section~\ref{sec:bkg:op2}) is that here, for reasons that will be more evident next, two regions, \textit{owned} and \textit{exec}, have been merged into a single one, \textit{boundary}. In essence, 
 
-%
 
-\section{The Tiling Algorithm}
+\section{The Tiling Algorithms}
 \label{sec:tiling:algo}
-...
+We begin with formalizing the inspector algorithm. The version we show supports mixed distributed/shared memory parallelism.
+
+A major constraint of the algorithm is that only the first loop of the chain, $L_0$, can be chosen as seed loop, or $L_{seed}$. Any loop in the chain could theoretically be picked as seed, but this would make supporting distributed memory parallelism cumbersome because of the coordination required along the boundary. If only shared memory parallelism were requested, the seed loop could be chosen arbitrarily: in~\cite{st-paper}, we propose two ``symmetric'' algorithms to populate tiles, \textit{forward tiling} and \textit{backward tiling}, where the latter uses the $MIN$ function in place of $MAX$. The fact that $L_{seed} = L_0$ means that tiles only grow ``in one direction'', with the scheduling of $L_i$ being based upon that of $[L_0,\ L_1,\ ...,\ L_{i-1}]$. In Algorithm~\ref{algo:st-inspector}, therefore, we limit ourselves to show the \textit{forward} variant of the sparse tiling inspector. 
+
+\begin{Algo}[Sparse Tiling Inspector]
+\label{algo:st-inspector}
+\normalfont 
+~
+\begin{enumerate}
+\item 
+\end{enumerate}
+\end{Algo}
+
+\begin{Algo}[Sparse Tiling Executor]
+\label{algo:st-executor}
+\normalfont 
+~
+\begin{enumerate}
+\item 
+\end{enumerate}
+\end{Algo}
 
 \subsection{Formalization}
 ...
@@ -318,6 +337,7 @@ We make two key observations concerning the correctness and the efficiency of th
 \section{Automation}
 \label{sec:tiling:automation}
 %- is automation possible ? -> DSLs !!! + lazy evaluation + inspector/executor + mpi-trick
+% subsets ! seed loop cannot be subset
 
 \subsection{SLOPE: a Library for Tiling Irregular Computations}
 ...
