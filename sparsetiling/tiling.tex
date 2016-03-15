@@ -12,31 +12,31 @@
 
 
 
-Many numerical methods for partial differential equations (PDEs) are structured as sequences of parallel loops, often interleaved by sparse linear algebra operations. This exposes parallelism well, but often does not convert data reuse between loops into data locality, since very large datasets are usually accessed. In Section~\ref{sec:bkg:poly} we have explained that loop fusion and loop tiling may be used to retain a significant fraction of this potential data locality. However, as elaborated in Section~\ref{sec:tiling:limits}, the complexity inherent in real-world applications make it challenging to adopt such optimizations in practice. 
+Many numerical methods for partial differential equations (PDEs) are structured as sequences of parallel loops, often interleaved by sparse linear algebra operations. This exposes parallelism well, but often does not convert data reuse between loops into data locality, since very large datasets are usually accessed. In Section~\ref{sec:bkg:poly} we have explained that loop fusion and loop tiling may be used to retain a significant fraction of this potential data locality. However, as elaborated in Section~\ref{sec:tiling:limits}, the complexity inherent in real-world applications makes it challenging to adopt such optimizations in practice. 
 
-Our focus in on unstructured mesh PDE solvers, such as those based on the finite volume or the finite element methods. Here, the  loop-to-loop dependence structure is data-dependent due to
+Our focus is on unstructured mesh PDE solvers, such as those based on the finite volume or the finite element methods. Here, the  loop-to-loop dependence structure is data-dependent due to
 indirect references such as \texttt{A[map[i]]}; the \texttt{map} array stores connectivity information, for example from elements in the mesh to degrees of freedom. A similar pattern occurs in molecular dynamics simulations and graph processing, so both the theory and the tools that we will develop in this chapter are generalizable to these domains. 
 
-% Compressed version of the History of sparse tiling subsection: we see potential
-Because of the irregular memory access pattern, our approach to loop optimization will be based on dynamic analysis, particularly on \textit{inspector/executor schemes automatically generated at execution time}. Our hypothesis, backed by the studies reviewed in Section~\ref{sec:bkg:ie}, is that dynamic loop optimization has strong potentials for the applications in which we are interested. The three main issues that we attack in this chapter are as follows:
+Because of the irregular memory access pattern, our approach to loop optimization must be based on dynamic analysis, particularly on \textit{inspector/executor schemes}. Our hypothesis, backed by the studies reviewed in Section~\ref{sec:bkg:ie}, is that dynamic loop optimization through inspector/executor schemes can improve the performance of the applications in which we are interested. Among the various dynamic loop optimizations, we target \textit{sparse tiling}. In Section~\ref{sec:bkg:sparsetiling} we explained that sparse tiling aims to exploit data reuse across consecutive loops. We recall that this optimization can be seen as the composition of three transformations: loop fusion, loop tiling, and automatic parallelization. 
+
+To summarize, the three main issues that we attack in this chapter are as follows:
 
 \begin{itemize}
-\item Previous approaches to irregular loop tiling/fusion are all based upon ``ad-hoc'' inspector/executor strategies; that is, developed ``by hand'', per application. We seek for a generalized technique, applicable to arbitrary computations on unstructured meshes.
+\item Previous approaches to sparse tiling are all based upon ``ad-hoc'' inspector/executor strategies; that is, developed ``by hand'', per application. We seek for a generalized technique, applicable to arbitrary computations on unstructured meshes.
 \item For this research to be successful, we believe we need a fully automated system capable of optimizing real-world applications. Automation is essential because computational scientists must abstract from low level optimization. We aim for a mixed compiler/library based approach, to be integrated with a framework for solving PDEs.
-\item There are only very few studies tackling loop fusion and inter-node parallelization. We are aware of none in presence of irregular memory accesses. Our technique must support MPI parallelization, because scientific simulations almost always run on at least hundreds of nodes.
+\item There are only very few studies tackling loop fusion and inter-node parallelization. We are aware of none in presence of irregular memory accesses. We describe a technique that can co-exist with distributed-memory parallelism. This is essential because most scientific simulations run on at least hundreds of nodes.
 \end{itemize}
 
 
 
-
-\section{Limitations in Real-World Applications}
+\section{Tackling Real-World Applications}
 \label{sec:tiling:limits}
 
 \subsection{Mesh-based Numerical Methods for PDEs}
-Loop tiling is widely studied in the literature. In spite of a notable research effort, however, it is not clear how widespread this optimization is in real-world applications. Most studies centre their experimentation on relatively simple benchmarks and single-node performance; this unfortunately does not expose the complexity and the limitations of most scientific codes. On the other hand, it has repeatedly been shown that applying tiling to ``simple'' memory-bound loop nests can result in considerable speed-ups. The most striking examples are stencil codes arising in the finite difference method~\cite{stencil-tiling}, BLAS routines such as matrix multiplication~\cite{MKL}, and image processing kernels~\cite{Halide}. Since numerical methods for partial differential equations (PDEs) are often structured as sequences of parallelizable ``sweeps'' over the discretized equation domain, often implemented as memory-intensive loop nests, the following questions arise naturally: 
+Loop fusion and loop tiling are widely studied in the literature. In spite of a notable research effort, however, it is not clear how widespread these optimizations are in real-world applications. Most studies centre their experimentation on relatively simple benchmarks and single-node performance; this unfortunately does not expose the complexity and the limitations of most scientific codes. On the other hand, it has repeatedly been shown that applying tiling to ``simple'' memory-bound loop nests can result in considerable speed-ups. The most striking examples are stencil codes arising in the finite difference method~\cite{stencil-tiling}, BLAS routines such as matrix multiplication~\cite{MKL}, and image processing kernels~\cite{Halide}. Since numerical methods for partial differential equations (PDEs) are often structured as sequences of parallelizable ``sweeps'' over the discretized equation domain, often implemented as memory-intensive loop nests, the following questions arise naturally: 
 
 \begin{description}
-\item[Applicability] Can we adopt loop tiling, whose application has traditionally been limited to simple loop nests, in real-life numerical methods for solving PDEs?
+\item[Applicability] Can we adopt sparse tiling (i.e., loop fusion composed with loop tiling), whose application has traditionally been limited to simple loop nests, in real-life numerical methods for solving PDEs?
 \item[Lack of evidence] Why, despite decades of research, is it so difficult to find successful examples of integration of loop tiling with production code? 
 \item[Challenges] What are the theoretical and technical challenges that we have to overcome to automate this optimization, such that an entire community of computational scientists can benefit from it?
 \end{description}
@@ -171,7 +171,7 @@ In structured codes, Using multiple layers of halo, or ``ghost'', elements is a 
 
 \section{Generalized Inspector/Executor Schemes}
 \label{sec:tiling:lc}
-In Section~\ref{sec:tiling:motivation} we introduced that our approach to loop tiling is based upon an \textit{inspector/executor scheme automatically generated at execution time}. In this section, we explain how to construct such an inspector/executor scheme, whereas automation will be tackled in Section~\ref{sec:tiling:automation}.
+In Section~\ref{sec:tiling:motivation} we introduced that our approach to sparse tiling is based upon an \textit{inspector/executor scheme automatically generated at execution time}. In this section, we explain what is required to to construct such an inspector/executor scheme. The automation of this process will be tackled in Section~\ref{sec:tiling:automation}.
 
 
 \subsection{The Loop Chain Abstraction}
@@ -198,28 +198,18 @@ Because of our focus on unstructured mesh computations, and inspired by the prog
 \item $L$ defines a scope in which $n$ loops are present, $L_0, L_1, ..., L_{n-1}$. There are no global synchronization points between the various loops.
 \item The execution order of a loop iterations does not influence the result. This means that given $L_i$, we can choose an arbitrary scheduling of iterations because there will not be loop-carried dependencies. Clearly, in case of parallel execution, some mechanisms to avoid race conditions must be present, because of potential local reductions (see also Section~\ref{sec:bkg:terminology}). 
 \item $S$ is a set of disjoint $m$ sets, $S_0, S_1, ..., S_{m-1}$. Possible sets are the elements in the mesh or the degrees of freedom associated to a certain function. A loop iterates over one of these sets, or iteration spaces; a data space is associated with one of these sets. 
-\item $M$ is a set of $k$ maps, $M_0, M_1, ..., M_{k-1}$. A map of arity $a$ is a vector-valued function $M : S_i \rightarrow S_j^0 \times S_j^1 \times ... \times S_j^{a-1}$. It essentially connects each element of $S_i$ to one or more elements in $S_j$. For example, if a triangular cell $c$ is connected to three vertices $v_0, v_1, v_2$, we trivially have $M(c) = [v_0, v_1, v_2]$. 
-\item A loop $L_i$ over the iteration space $S_j$ is associated with a set $D_{L_i}$ of $d$ descriptors, $D_0, D_1, ..., D_{d-1}$. Each descriptor $D_j$ is a 2-tuple $D_j = {<}mode,\ M{>}$; $mode$ is one of $[READ,\ WRITE,\ INC]$, where $M$ is either a map from $S_j$ to some other sets or the special placeholder $\perp$, which indicates that the access is direct to some data associated with $S_j$.
+\item $M$ is a set of $k$ maps, $M_0, M_1, ..., M_{k-1}$. A map of arity $a$ is a vector-valued function $M : S_i \rightarrow S_j^0 \times S_j^1 \times ... \times S_j^{a-1}$. It connects each element of $S_i$ to one or more elements in $S_j$. For example, if a triangular cell $c$ is connected to three vertices $v_0, v_1, v_2$, we have $M(c) = [v_0, v_1, v_2]$. 
+\item A loop $L_i$ over the iteration space $S$ is associated with $d$ descriptors, $D_0, D_1, ..., D_{d-1}$. Each descriptor $D_j$ is a 2-tuple $D_j = {<}M,\ mode{>}$; $M$ is either a map from $S_j$ to some other sets or the special placeholder $\perp$, which indicates that the access is direct to some data associated with $S_j$, whereas $mode$ is one of $[READ,\ WRITE,\ INC]$.
 \end{itemize}
 
 The striking difference with respect to the original definition is the lack of data spaces. Essentially, we abstract data spaces to the level of sets. Each set $S_j$ is usually associated multiple data spaces, and loops often access different data spaces associated with $S_j$. The idea, which will become more clear in the next section, is to limit data dependence tracking at the sets level. This may conservatively return some ``false positives'', but it significantly improves the inspection cost since typically $|S| << |D|$. 
+
+
 
 \begin{algorithm}
 \scriptsize\ttfamily
 \SetAlgorithmName{LISTING}{}
 
-void kernel1 (double * x, double * tmp1, double * tmp2) $\lbrace$\\
-  *tmp1 += *x;\\
-  *tmp2 += *x;\\
-$\rbrace$\\
-~\\
-// Build the loop chain: \\
-// Three sets: edges (E iters), cells (C iters), and vertices (V iters)\\
-set (E, ...); set (C, ...); set (V, ...); \\ 
-map (E, V, edges2vertices, ...); map (C, V, cells2vertices, ...); \\  
-loop (...); loop (...); loop (...); \\
-~\\
-// Original version of the program\\
 \KwSty{for} t = 0 \KwSty{to} T $\lbrace$\\
 ~~// Loop over edges\\
 ~~\KwSty{for} e = 0 \KwSty{to} E $\lbrace$\\
@@ -250,22 +240,48 @@ $\rbrace$\\
 \label{code:tiling-loopchain}
 \end{algorithm}
 
-An example of a loop chain for a trivial unstructured mesh application is provided in Listing~\ref{code:tiling-loopchain}. This example can be considered a plain C sequential version of the OP2 program illustrated in Listing~\ref{code:op2program}. The loop chain is constructed explicitly prior to the execution of the time-stepping loop. It is worth noting that the parallel loop specification in (Py)OP2 provides sufficient information to automate the derivation of the loop chain. In the next section, we show how to derive an inspector/executor scheme for this example given the information provided by the loop chain.
 
-\subsection{Sparse Tiling}
-In this chapter we focus on generalized inspector/executor schemes for sparse tiling. In Section~\ref{sec:bkg:sparsetiling} we explained that sparse tiling aims to exploit data reuse across consecutive loops. We recall that this optimization can be seen as the composition of three transformations: loop fusion, loop tiling, and parallelization. The loop chain abstraction can potentially be used for a variety of optimizations; however, because of our focus on real-world unstructured mesh applications, we restrict our attention to sparse tiling.
+\begin{algorithm}
+\scriptsize\ttfamily
+\SetAlgorithmName{LISTING}{}
+inspector = init$\_$inspector (...);\\
+~\\
+// Three sets, edges, cells, and vertices\\
+E = set (inspector, nedges, ...);\\
+C = set (inspector, ncells, ...);\\
+V = set (inspector, nvertices, ...);\\ 
+~\\
+// Two maps: from edges to vertices and from cells to vertices\\
+e2vMap = map (inspector, E, V, edges2vertices, ...);\\
+c2vMap = map (inspector, C, V, cells2vertices, ...);\\
+~\\
+// The loop chain comprises three loops; each loop has a set of descriptors\\
+loop (inspector, E, $\lbrace \perp$, READ$\rbrace$, $\lbrace$e2vMap, INC$\rbrace$);\\
+loop (inspector, C, $\lbrace \perp$, READ$\rbrace$, $\lbrace$c2vMap, INC$\rbrace$);\\
+loop (inspector, E, $\lbrace$e2vMap, INC$\rbrace$); \\
+~\\
+// Now can run the inspector\\
+inspection = run$\_$inspection (inspector, tile$\_$size, ...)\\
+~\\
+\caption{Building the loop chain for inspection.}
+\label{code:tiling-inspector}
+\end{algorithm}
 
-\section{Example}
+
+Listing~\ref{code:tiling-loopchain} shows a plain C implementation of the unstructured mesh OP2 program illustrated in Listing~\ref{code:op2program}. A loop chain for this program is constructed in Listing~\ref{code:tiling-inspector}. The inspection output is stored in the data structure \texttt{inspection}. This is used (Listing~\ref{code:tiling-executor}) to execute a ``tiled'' version of the original program. In the next section, we show through examples how the inspector exploits the information captured by the loop chain to construct tiles.
+
+
+\section{Sparse Tiling Examples}
 Using the example in Listing~\ref{code:tiling-loopchain}, we describe the actions performed by a sparse tiling inspector. We show two variants of inspection: for shared-memory and distributed-memory parallelism. 
 
 \subsection{Overview of the Algorithm}
 The inspector starts with partitioning the iteration space of a \textit{seed loop}, for example $L_0$. Partitions are used to initialize tiles: the edges in partition $P_i$ -- or, equivalently, the iterations of $L_0$ falling in $P_i$ -- are assigned to tile $T_i$. In the later stages of the inspection,  as detailed in the upcoming sections, $T_i$ will be populated with iterations from $L_1$ and $L_2$. The executor will assign a single thread/process to each $T_i$. $T_i$ is executed ``atomically''; that is, without the need for communication with other tiles. When executing $T_i$, first all iterations from $L_0$ are executed, then all iterations from $L_1$ and finally those from $L_2$. The challenge in scheduling iterations from $L_j$ to $T_i$, therefore, is to guarantee that all data dependencies -- read after write, write after read, write after write -- are preserved. 
 
-\subsection{Building Tiles for Shared-Memory Parallelism}
+\subsection{Shared-Memory Parallelism}
 \label{sec:tiling:ex-sm}
 Figure~\ref{fig:st-initial-part-sm} displays the situation after the initial partitioning of $L_0$. 
 
-There are four partitions, two of which are not connected through any edge or cell. These four partitions correspond to four tiles, $[T_0,\ T_1,\ T_2, T_3]$. Similarly to OP2, for shared-memory parallelism we adopt the following approach: (i) we serialize the execution of the elements inside a partition by scheduling them to a single thread; (ii) we color the partitions such that partitions assigned the same color can be executed in parallel by different threads. Two partitions can have the same color if they are not connected, because this ensures the absence of race conditions through indirect memory accesses. In the example we can use three colors: red (R), green (G), and blue (B). The two partitions at the top right and bottom left are not connected, so they are assigned the same color (green). In the following, with the notation $T_i^c$ we mean that the $i$-th tile has color $c$.
+There are four partitions, two of which are not connected through any edge or cell. These four partitions correspond to four tiles, $[T_0,\ T_1,\ T_2,\ T_3]$. Similarly to OP2, for shared-memory parallelism we adopt the following approach: (i) we serialize the execution of the elements inside a partition by scheduling them to a single thread; (ii) we color the partitions such that partitions assigned the same color can be executed in parallel by different threads. Two partitions can have the same color if they are not connected, because this ensures the absence of race conditions through indirect memory accesses. In the example we can use three colors: red (R), green (G), and blue (B). The two partitions at the top right and bottom left are not connected, so they are assigned the same color (green). In the following, with the notation $T_i^c$ we mean that the $i$-th tile has color $c$.
 
 In order to populate the tiles with iterations from $L_1$ and $L_2$, we first have to establish a total ordering for the execution of partitions with different colors. Here, we assume the following order: green (G), blue (B), and red (R). This means, for instance, that \textit{all iterations} assigned to $T_1^B$ must be executed \textit{before all iterations} assigned to $T_2^R$. By ``all iterations'' we mean the iterations from $L_0$, as established by the seed partitioning, as well as the iterations that will later be assigned from $L_1$ and $L_2$. We assign integer positive numbers to colors to reflect their ordering, where a smaller number means higher execution priority. In this case, we can assign 0 to green, 1 to blue, and 2 to red.
 
@@ -273,12 +289,12 @@ To schedule the iterations of $L_1$ to $[T_0^G,\ T_1^B,\ T_2^R, T_3^G]$, we firs
 
 We now use $\rho$ to schedule $L_1$, a loop over cells, to the tiles. Consider again $v_0$ and the adjacent cells $[c_0,\ c_1,\ c_2]$. These three cells have in common the fact that they are adjacent to both green and blue vertices. For $c_1$, and similarly with the other cells, we compute $MAX(\rho(v_0),\ \rho(v_1),\ \rho(v_2)) = MAX(B, G, G) = B = 1$. This establishes that $c_1$ must be assigned to $T_1^B$, because otherwise ($c_1$ assigned instead to $T_0^G$) a read to $v_0$ would occur before the last increment from $T_1^B$ took place. We indeed reiterate once more that the execution order is ``all iterations from $[L_0, L_1, L_2]$ in the green tiles before all iterations from $[L_0, L_1, L_2]$ in the blue tiles''.
 
-In order to schedule $L_2$ to $[T_0^G,\ T_1^B,\ T_2^R, T_3^G]$ we employ a similar process. Vertices are again written by $L_1$, so a new projection over $V$ will be computed and will be used in place of $\rho$ to schedule the edges in $L_2$. Figure~\ref{fig:st-final} shows the result of this last phase. 
+In order to schedule $L_2$ to $[T_0^G,\ T_1^B,\ T_2^R,\ T_3^G]$ we employ a similar process. Vertices are again written by $L_1$, so a new projection over $V$ will be computed and will be used in place of $\rho$ to schedule the edges in $L_2$. Figure~\ref{fig:st-final} shows the result of this last phase. 
 
 \subsubsection*{Conflicting Colors}
 It is worth noting how $T_2^R$ ``consumed'' the frontier elements of all other tiles every time a new loop was scheduled. Tiling a loop chain consisting of $k$ loops had the effect of expanding the frontier of a tile of at most $k$ vertices. With this in mind, we re-inspect the loop chain of the running example, although this time with a different execution order: blue (B), red (R), and green (G). We recall that the total ordering of colors is arbitrary, so this situation is legal. By applying the same inspection procedure that we just described, $T_0^G$ and $T_3^G$ will eventually become connected (see Figure~\ref{fig:st-conflicts}), thus violating the precondition ``tiles/partitions with the same color can run in parallel''. Indeed, race conditions during the execution of iterations belonging to $L_2$ are now theoretically possible. We will explain how to handle this problem in Section~\ref{sec:tiling:algo}.
 
-\subsection{Building Tiles for Distributed-Memory Parallelism}
+\subsection{Distributed-Memory Parallelism}
 If parallelism is achieved through message-passing, the mesh and all datasets defined over it are distributed to different processes. Similarly to the example in Listing~\ref{code:tiling-struct}, MPI calls now separate the execution of two consecutive loops in the chain. This means that our inspector/executor scheme will have to take extra care of data dependencies along the mesh partition boundaries.
 
 We logically split sets into three regions, \textit{core}, \textit{boundary}, and \textit{non-exec}. The boundary region includes all iterations that cannot be executed until the MPI communications have successfully terminated. We pick $L_0$ as seed loop and we initialize the tiles as follows:
@@ -303,11 +319,45 @@ We make two key observations concerning the correctness and the efficiency of th
 %The main difference with respect to frameworks such as OP2 (see Section~\ref{sec:bkg:op2}) is that here, for reasons that will be more evident next, two regions, \textit{owned} and \textit{exec}, have been merged into a single one, \textit{boundary}. In essence, 
 
 
-\section{The Tiling Algorithms}
+\section{Formalization}
 \label{sec:tiling:algo}
-We begin with formalizing the inspector algorithm. The version we show supports mixed distributed/shared memory parallelism.
 
-A major constraint of the algorithm is that only the first loop of the chain, $L_0$, can be chosen as seed loop, or $L_{seed}$. Any loop in the chain could theoretically be picked as seed, but this would make supporting distributed memory parallelism cumbersome because of the coordination required along the boundary. If only shared memory parallelism were requested, the seed loop could be chosen arbitrarily: in~\cite{st-paper}, we propose two ``symmetric'' algorithms to populate tiles, \textit{forward tiling} and \textit{backward tiling}, where the latter uses the $MIN$ function in place of $MAX$. The fact that $L_{seed} = L_0$ means that tiles only grow ``in one direction'', with the scheduling of $L_i$ being based upon that of $[L_0,\ L_1,\ ...,\ L_{i-1}]$. In Algorithm~\ref{algo:st-inspector}, therefore, we limit ourselves to show the \textit{forward} variant of the sparse tiling inspector. 
+\subsection{Data Dependency Analysis for Loop Chains}
+
+As with all loop optimizations that reschedule the iterations in a sequence of loops, any sparse tiling must satisfy the data dependencies. The loop chain abstraction, which we have described in Section~\ref{sec:tiling:lc}, provides enough information to construct an inspector which analyzes all of the dependencies in a computation and builds a legal sparse tiling. We recall that one of the main assumptions in a loop chain is that each loop is fully parallel, equivalently, that there are no loop carried dependencies.
+
+The descriptors in the loop chain abstraction enable a general derivation of the storage-related dependencies between loops in a loop chain. The storage related dependencies between loops can be described as either flow (read after write), anti (write after read), or output (write after write) dependencies. In the following, assume that loop $L_x$, with iteration space $S_x$, always comes before loop $L_y$, with iteration space $S_y$, in the loop chain. With an abuse of notation, let us identify a descriptor of a loop $L$ with $m_{S_i \rightarrow S_j}^{mode}$: this simply indicates that the loop $L_i$ over the iteration space $S_i$ uses a map $m$ to write/read/increment elements (respectively, $mode \in \lbrace w, r, i\rbrace$) in the space $S_j$.
+
+The flow dependencies can then be enumerated by considering pairs of points ($\vec{i}$ and $\vec{j}$) in the iteration spaces of the two loops $L_x$ and $L_y$:
+\[
+	\{ \vec{i} \rightarrow \vec{j} \; | \; \vec{i} \in S_x \wedge \vec{j} \in S_y \wedge 
+	m_{S_x\rightarrow S_z}^{w}(\vec{i}) \cap m_{S_y \rightarrow S_z}^{r}(\vec{j}) \ne \emptyset \}.
+\]
+Anti and output dependencies are defined in a similar way. The anti dependencies for all pairs of loops $L_x$ and $L_y$ are:
+\[
+	\{ \vec{i} \rightarrow \vec{j} \; | \; \vec{i} \in S_x \wedge \vec{j} \in S_y \wedge 
+	m_{S_x\rightarrow S_z}^{r}(\vec{i}) \cap m_{S_y \rightarrow S_z}^{w}(\vec{j}) \ne \emptyset \}.
+\]
+While the output dependencies between loops $L_x$ and $L_y$ are:
+\[
+	\{ \vec{i} \rightarrow \vec{j} \; | \; \vec{i} \in S_x \wedge \vec{j} \in S_y \wedge 
+	m_{S_x\rightarrow S_z}^{w}(\vec{i}) \cap m_{S_y \rightarrow S_z}^{w}(\vec{j}) \ne \emptyset \}.
+\]
+In essence, there is a storage-related data dependence between two iterations from different loops (and therefore between the tiles they are placed in) when one of those iterations writes to a data element and the other iteration reads from or writes to the same data element.
+
+There are local reductions, or ``reduction dependencies'' between two or more iterations of the same loop when those iterations ``increment'' the same location(s); that is, when they read, modify with a commutative and associative operator, and write to the same location(s). The reduction dependencies in loop $L_x$ are:
+\[
+	\{ \vec{i} \rightarrow \vec{j} \; | \; \vec{i} \in S_x \wedge \vec{j} \in S_x \wedge m_{S_x\rightarrow S_z}^{i}(\vec{i}) \cap m_{S_x \rightarrow S_z}^{i}(\vec{j}) \ne \emptyset \}.
+\]
+The reduction dependencies between two iterations within the same loop indicates that those two iterations must be executed atomically with respect to each other.
+
+Dependencies between non-adjacent loops are also possible. Our algorithm takes care of them by inspecting \textit{projections}, which we have already illustrated in the examples of the previous section. We will see that when distributing the iterations of $L_i$ to tiles, the most up-to-date projections for each space $S$ accessed by $L_i$ must be available. $S$ may have been lastly written in $L_{i-1}$ or even in $L_0$; in any case, each time $S$ is modified a new projection is computed, and this is inspected when tiling $L_i$.
+
+
+\subsection{The Generalized Sparse Tiling Algorithms}
+Algorithm~\ref{algo:st-inspector} shows a procedure to derive an inspector for a loop chain. The inspector produces a schedule which supports mixed distributed/shared memory parallelism.
+
+A major constraint of the inspector is that only the first loop of the chain, $L_0$, can be chosen as seed loop, or $L_{seed}$. Any loop in the chain could theoretically be picked as seed, but this would make supporting distributed memory parallelism cumbersome because of the coordination required along the boundary. If only shared memory parallelism were requested, the seed loop could be chosen arbitrarily: in~\cite{st-paper}, we propose two ``symmetric'' algorithms to populate tiles, \textit{forward tiling} and \textit{backward tiling}, where the latter uses the $MIN$ function in place of $MAX$. The fact that $L_{seed} = L_0$ means that tiles only grow ``in one direction'', with the scheduling of $L_i$ being based upon that of $[L_0,\ L_1,\ ...,\ L_{i-1}]$. We therefore limit ourselves to show the \textit{forward} variant of the sparse tiling inspector. 
 
 \begin{Algo}[Sparse Tiling Inspector]
 \label{algo:st-inspector}
@@ -327,12 +377,12 @@ A major constraint of the algorithm is that only the first loop of the chain, $L
 \end{enumerate}
 \end{Algo}
 
-\subsection{Formalization}
+
+\subsection{Correctness of Inspection}
 ...
 
-\subsection{Correctness}
+\subsection{Computational Complexity of Inspection}
 ...
-
 
 \section{Automation}
 \label{sec:tiling:automation}
