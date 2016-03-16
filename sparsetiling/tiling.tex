@@ -193,6 +193,7 @@ In~\cite{ST-KriegerHIPS2013,KriegerThesis}, a loop chain $L$ is defined as follo
 \end{itemize}
 
 \subsection{Loop Chains for Unstructured Mesh Computations}
+\section{sec:tiling:lc-unstruct}
 Because of our focus on unstructured mesh computations, and inspired by the programming and execution models of OP2 (see Section~\ref{sec:bkg:op2}), we refine the loop chain definition as follows:
 \begin{itemize}
 \item $L$ defines a scope in which $n$ loops are present, $L_0, L_1, ..., L_{n-1}$. There are no global synchronization points between the various loops.
@@ -324,9 +325,9 @@ We make two key observations concerning the correctness and the efficiency of th
 
 \subsection{Data Dependency Analysis for Loop Chains}
 
-As with all loop optimizations that reschedule the iterations in a sequence of loops, any sparse tiling must satisfy the data dependencies. The loop chain abstraction, which we have described in Section~\ref{sec:tiling:lc}, provides enough information to construct an inspector which analyzes all of the dependencies in a computation and builds a legal sparse tiling. We recall that one of the main assumptions in a loop chain is that each loop is fully parallel, equivalently, that there are no loop carried dependencies.
+As with all loop optimizations that reschedule the iterations in a sequence of loops, any sparse tiling must satisfy the data dependencies. The loop chain abstraction, which we have described in Section~\ref{sec:tiling:lc}, provides enough information to construct an inspector which analyzes all of the dependencies in a computation and builds a legal sparse tiling. We recall that one of the main assumptions in a loop chain is that each loop is fully parallel or, equivalently, that there are no loop carried dependencies.
 
-The descriptors in the loop chain abstraction enable a general derivation of the storage-related dependencies between loops in a loop chain. The storage related dependencies between loops can be described as either flow (read after write), anti (write after read), or output (write after write) dependencies. In the following, assume that loop $L_x$, with iteration space $S_x$, always comes before loop $L_y$, with iteration space $S_y$, in the loop chain. With an abuse of notation, let us identify a descriptor of a loop $L$ with $m_{S_i \rightarrow S_j}^{mode}$: this simply indicates that the loop $L_i$ over the iteration space $S_i$ uses a map $m$ to write/read/increment elements (respectively, $mode \in \lbrace w, r, i\rbrace$) in the space $S_j$.
+The descriptors in the loop chain abstraction enable a general derivation of the storage-related dependencies between loops in a loop chain. The storage related dependencies between loops can be described as either flow (read after write), anti (write after read), or output (write after write) dependencies. In the following, assume that loop $L_x$, having iteration space $S_x$, always comes before loop $L_y$, having iteration space $S_y$, in the loop chain. Let us identify a descriptor of a loop $L$ with $m_{S_i \rightarrow S_j}^{mode}$: this simply indicates that the loop $L_i$ has iteration space $S_i$ and uses a map $m$ to write/read/increment elements (respectively, $mode \in \lbrace w, r, i\rbrace$) in the space $S_j$.
 
 The flow dependencies can then be enumerated by considering pairs of points ($\vec{i}$ and $\vec{j}$) in the iteration spaces of the two loops $L_x$ and $L_y$:
 \[
@@ -345,28 +346,64 @@ While the output dependencies between loops $L_x$ and $L_y$ are:
 \]
 In essence, there is a storage-related data dependence between two iterations from different loops (and therefore between the tiles they are placed in) when one of those iterations writes to a data element and the other iteration reads from or writes to the same data element.
 
-There are local reductions, or ``reduction dependencies'' between two or more iterations of the same loop when those iterations ``increment'' the same location(s); that is, when they read, modify with a commutative and associative operator, and write to the same location(s). The reduction dependencies in loop $L_x$ are:
+There are local reductions, or ``reduction dependencies'' between two or more iterations of the same loop when those iterations ``increment'' the same location(s); that is, when they read, modify with a commutative and associative operator, and write to the same location(s). The reduction dependencies in $L_x$ are:
 \[
 	\{ \vec{i} \rightarrow \vec{j} \; | \; \vec{i} \in S_x \wedge \vec{j} \in S_x \wedge m_{S_x\rightarrow S_z}^{i}(\vec{i}) \cap m_{S_x \rightarrow S_z}^{i}(\vec{j}) \ne \emptyset \}.
 \]
 The reduction dependencies between two iterations within the same loop indicates that those two iterations must be executed atomically with respect to each other.
 
-Dependencies between non-adjacent loops are also possible. Our algorithm takes care of them by inspecting \textit{projections}, which we have already illustrated in the examples of the previous section. We will see that when distributing the iterations of $L_i$ to tiles, the most up-to-date projections for each space $S$ accessed by $L_i$ must be available. $S$ may have been lastly written in $L_{i-1}$ or even in $L_0$; in any case, each time $S$ is modified a new projection is computed, and this is inspected when tiling $L_i$.
+Dependencies between non-adjacent loops are also possible. Our algorithm takes care of them by inspecting \textit{projections}. In order to schedule $L$ to tiles, the ``most recent'' projection for each space accessed by $L$ must be available. For example, assume that the space $S$ is read by $L_k$ and is written by both $L_i$ and $L_j$, with the loop chain being such that $L_i \prec ... \prec L_j \prec ... \prec L_k$. Let us denote by $\rho_S$ the projection for $S$. Each time that a loop accessing $S$ in write mode is inspected for scheduling, $\rho_S$ must be updated. When eventually scheduling $L_k$, therefore, an up-to-date snapshot of $\rho_S$ (i.e., the one produced right after tiling $L_j$) will be used to compute a legal tiling.
 
 
 \subsection{The Generalized Sparse Tiling Algorithms}
 Algorithm~\ref{algo:st-inspector} shows a procedure to derive an inspector for a loop chain. The inspector produces a schedule which supports mixed distributed/shared memory parallelism.
 
-A major constraint of the inspector is that only the first loop of the chain, $L_0$, can be chosen as seed loop, or $L_{seed}$. Any loop in the chain could theoretically be picked as seed, but this would make supporting distributed memory parallelism cumbersome because of the coordination required along the boundary. If only shared memory parallelism were requested, the seed loop could be chosen arbitrarily: in~\cite{st-paper}, we propose two ``symmetric'' algorithms to populate tiles, \textit{forward tiling} and \textit{backward tiling}, where the latter uses the $MIN$ function in place of $MAX$. The fact that $L_{seed} = L_0$ means that tiles only grow ``in one direction'', with the scheduling of $L_i$ being based upon that of $[L_0,\ L_1,\ ...,\ L_{i-1}]$. We therefore limit ourselves to show the \textit{forward} variant of the sparse tiling inspector. 
+A major constraint of the inspector is that only the first loop of the chain, $L_0$, can be chosen as seed loop, or $L_{seed}$. Any loop in the chain could theoretically be picked as seed, but this would make supporting distributed memory parallelism cumbersome because of the non-trivial coordination that would be required between core and boundary tiles. If only shared memory parallelism is requested, the seed loop can be chosen arbitrarily. If we have $L_0 \prec ... \prec L_{seed}$, then we need a mechanism for propagating tiling ``backwards'', that is, from $L_{seed}$ towards $L_0$. In~\cite{st-paper}, we propose two ``symmetric'' algorithms to solve this problem, \textit{forward tiling} and \textit{backward tiling}, where the latter simply uses the $MIN$ function in place of $MAX$. In the algorithm we present here, the fact that $L_{seed} = L_0$ means that tiles only grow ``in one direction'' (i.e., only projections for $[L_0,\ L_1,\ ...,\ L_{i-1}]$ may be required), so we do not need this distinction\footnote{The algorithm that is implemented in the SLOPE library, however, is more general and supports backwards tiling as well.}. 
 
 \begin{Algo}[Sparse Tiling Inspector]
 \label{algo:st-inspector}
+\normalfont 
+The input are a loop chain $\mathbb{L}$, as described in Section~\ref{sec:tiling:lc-unstruct}, an average tile size $ts$, and an execution mode $mode$.
+\begin{enumerate}
+\item Pick $L_{seed}$. If $mode$ indicates a pure shared memory execution, then we heuristically select the loop in the middle of the loop chain. otherwise $L_{seed} = L_0$. Let $S_{seed}$ be the iteration space of $L_{seed}$.\\
+\textit{Note: in real applications loops over ``subsets'' are possible; for instance, a loop over the exterior facets of the mesh. If one such loop is picked as seed, then the inspection is aborted.}
+
+\item Partition the core region of $L_{seed}$ into $\lbrace P_0, P_1, ..., P_{m-1}\rbrace$ such that $P_i \cap P_j = \emptyset$ and $\cup_{i = 0}^{m-1} P_i = S_{seed}$. The partitioning is sequential: $S_{seed}$ is ``chunked'' every $ts$ iterations, with $P_{m-1}$ that may be smaller. Similarly, partition the boundary region of $L_{seed}$ into $k$ subsets.
+
+\item Create $m+k+1$ tiles, one for each partition, plus one extra tile for the non-exec region of $L_{seed}$; $\mathbb{T} = [T_0, ..., T_{m+k}]$. Each tile $T_i$ has four fields: a region (where possible values are core, boundary and non-exec); a color; for each loop $L$, a list of iterations $T_i^L$ (initially empty, to be populated by the inspection algorithm); for each loop, a list of ``local maps'', whose role will become clear next. This structuring is illustrated in Figure~\ref{fig:tile-structure}. $T_i$ is forthwith initialized with the iterations in $P_i$; that is, $T_i^{L_{seed}} = P_i$.
+
+\item Assign colors to tiles. If $mode$ requests shared memory parallelism, color the tiles such that adjacent tiles are not given the same color. Otherwise, assign increasing colors to tiles (i.e., $T_i$ given color $i$). The boundary tiles are always given colors higher than that of core tiles; the non-exec tile has highest color. In essence, this is to provide the executor with sufficient information to schedule all core tiles first, then all boundary ones, and finally the non-exec tile.\\
+\textit{The adjacency relation is determined through the maps available through the descriptors of the loop chain.}
+
+\item Initialize $\rho$, a data structure that keeps projections for each space in the loop chain. Then, for each loop $L_i$ in $[L_1, L_2, ..., L_{m-1}]$:
+\begin{itemize}
+\item Update $\rho$ using the descriptors in $L_{i-1}$, as explained in Algorithm~\ref{algo:st-projection}. Along with $\rho$, the projection algorithm returns a piece of information indicating whether two different tiles having the same color will become adjacent after tiling. Let $C \in \mathbb{N}^{m \times m}$ be a matrix tracking conflicting colors, with $C[i,j] = 1$ indicating that $T_i$ and $T_j$ have the same color and will eventually become adjacent.
+\item Use $\rho$ to schedule the iteration of $L_i$ to tiles. The tiling algorithm is given in Algorithm~\ref{algo:st-tiling} 
+\end{itemize}
+
+\item If $C$ indicates the presence of at least one conflict, say between $T_i$ and $T_j$, add a ``fake'' connection between $T_i$ and $T_j$ and loop back at step (4); the coloring phase now will interpret $T_i$ and $T_j$ as being connected, thus assigning different colors. Otherwise, a legal tiling has been computed and the inspection phase can be terminated. 
+
+\end{enumerate}
+\end{Algo}
+
+\begin{Algo}[Projection]
+\label{algo:st-projection}
 \normalfont 
 ~
 \begin{enumerate}
 \item 
 \end{enumerate}
 \end{Algo}
+
+\begin{Algo}[Tiling]
+\label{algo:st-tiling}
+\normalfont 
+~
+\begin{enumerate}
+\item 
+\end{enumerate}
+\end{Algo}
+
 
 \begin{Algo}[Sparse Tiling Executor]
 \label{algo:st-executor}
