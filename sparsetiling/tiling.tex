@@ -187,20 +187,28 @@ Before diving into the description of the loop chain abstraction, we observe two
 
 In~\cite{ST-KriegerHIPS2013,KriegerThesis}, a loop chain $L$ is defined as follows:
 \begin{itemize}
-\item $L$ defines a scope in which $n$ loops are present, $L_0, L_1, ..., L_{n-1}$. There are no global synchronization points between the various loops.
-\item $D$ is a set of disjoint $m$ data spaces, $D_0, D_1, ..., D_{m-1}$. Each loop accesses (reads from, writes to) a certain subset of these data spaces. An access can be either direct (e.g., \texttt{A[i]}) or indirect (e.g., \texttt{A[map(i)]}).
+\item $\mathbb{L}$ defines a scope consisting of $n$ loops, $L_0, L_1, ..., L_{n-1}$. There are no global synchronization points between the loops.
+\item $\mathbb{D}$ is a set of disjoint $m$ data spaces, $D_0, D_1, ..., D_{m-1}$. Each loop accesses (reads from, writes to) a certain subset of these data spaces. An access can be either direct (e.g., \texttt{A[i]}) or indirect (e.g., \texttt{A[map(i)]}).
 \item $R_{L_l\rightarrow D_d}(\vec{i})$ and $W_{L_l\rightarrow D_d}(\vec{i})$, where the $R$ and $W$ access relations are defined over for each data space $D_d \in D$ and indicate which data locations in data space $D_d$ an iteration $i \in L_l$ reads from and writes to respectively (e.g., if we have \texttt{A[map(i)] = ...} in loop $L_j$, the access relation $map_{L_j\rightarrow A}(\vec{i})$ will be available). 
 \end{itemize}
 
 \subsection{Loop Chains for Unstructured Mesh Computations}
-\section{sec:tiling:lc-unstruct}
+\label{sec:tiling:lc-unstruct}
 Because of our focus on unstructured mesh computations, and inspired by the programming and execution models of OP2 (see Section~\ref{sec:bkg:op2}), we refine the loop chain definition as follows:
 \begin{itemize}
-\item $L$ defines a scope in which $n$ loops are present, $L_0, L_1, ..., L_{n-1}$. There are no global synchronization points between the various loops.
-\item The execution order of a loop iterations does not influence the result. This means that given $L_i$, we can choose an arbitrary scheduling of iterations because there will not be loop-carried dependencies. Clearly, in case of parallel execution, some mechanisms to avoid race conditions must be present, because of potential local reductions (see also Section~\ref{sec:bkg:terminology}). 
-\item $S$ is a set of disjoint $m$ sets, $S_0, S_1, ..., S_{m-1}$. Possible sets are the elements in the mesh or the degrees of freedom associated to a certain function. A loop iterates over one of these sets, or iteration spaces; a data space is associated with one of these sets. 
+\item $\mathbb{L}$ defines a scope consisting of $n$, $L_0, L_1, ..., L_{n-1}$. There are no global synchronization points between the loops.
+
+\item The execution order of a loop iterations does not influence the result. This means that given $L_i$, we can choose an arbitrary scheduling of iterations because there will not be loop-carried dependencies. 
+
+\item $\mathbb{S}$ is a set of disjoint $m$ sets, $S_0, S_1, ..., S_{m-1}$. Possible sets are the elements in the mesh or the degrees of freedom associated to a certain function. A loop iterates over a set, or iteration space. A dataset is logically associated with one set (i.e., each value in the dataset is associated with a set element). 
+
+\item A set is logically split into three contiguous regions: core, boundary, and non-exec. 
+%We therefore have $S = S^{core} \frown S^{bound} \frown S^{nexec}$. 
+%TODO explain them
+
 \item $M$ is a set of $k$ maps, $M_0, M_1, ..., M_{k-1}$. A map of arity $a$ is a vector-valued function $M : S_i \rightarrow S_j^0 \times S_j^1 \times ... \times S_j^{a-1}$. It connects each element of $S_i$ to one or more elements in $S_j$. For example, if a triangular cell $c$ is connected to three vertices $v_0, v_1, v_2$, we have $M(c) = [v_0, v_1, v_2]$. 
-\item A loop $L_i$ over the iteration space $S$ is associated with $d$ descriptors, $D_0, D_1, ..., D_{d-1}$. Each descriptor $D_j$ is a 2-tuple $D_j = {<}M,\ mode{>}$; $M$ is either a map from $S_j$ to some other sets or the special placeholder $\perp$, which indicates that the access is direct to some data associated with $S_j$, whereas $mode$ is one of $[READ,\ WRITE,\ INC]$.
+
+\item A loop $L_i$ over the iteration space $S$ is associated with $d$ descriptors, $D_0, D_1, ..., D_{d-1}$. Each descriptor $D_j$ is a 2-tuple $D_j = {<}M,\ \operatorname{mode}{>}$; $M$ is either a map from $S_j$ to some other sets or the special placeholder $\perp$, which indicates that the access is direct to some data associated with $S_j$, whereas $\operatorname{mode}$ is one of $[r,\ w,\ i]$, respectively read, write and increment.
 \end{itemize}
 
 The striking difference with respect to the original definition is the lack of data spaces. Essentially, we abstract data spaces to the level of sets. Each set $S_j$ is usually associated multiple data spaces, and loops often access different data spaces associated with $S_j$. The idea, which will become more clear in the next section, is to limit data dependence tracking at the sets level. This may conservatively return some ``false positives'', but it significantly improves the inspection cost since typically $|S| << |D|$. 
@@ -286,16 +294,17 @@ There are four partitions, two of which are not connected through any edge or ce
 
 In order to populate the tiles with iterations from $L_1$ and $L_2$, we first have to establish a total ordering for the execution of partitions with different colors. Here, we assume the following order: green (G), blue (B), and red (R). This means, for instance, that \textit{all iterations} assigned to $T_1^B$ must be executed \textit{before all iterations} assigned to $T_2^R$. By ``all iterations'' we mean the iterations from $L_0$, as established by the seed partitioning, as well as the iterations that will later be assigned from $L_1$ and $L_2$. We assign integer positive numbers to colors to reflect their ordering, where a smaller number means higher execution priority. In this case, we can assign 0 to green, 1 to blue, and 2 to red.
 
-To schedule the iterations of $L_1$ to $[T_0^G,\ T_1^B,\ T_2^R, T_3^G]$, we first need to compute a \textit{projection} of any write or local reduction performed within $L_0$.  A projection for $L_0$ is a function $\rho : V \rightarrow \mathbb{T}$ mapping a vertex (indirectly) incremented during the execution of $L_0$ to a tile.  Consider the vertex $v_0$ in Figure~\ref{fig:st-proj-1}. $v_0$ has 7 incident edges, 2 of which belong to $T_0^G$, while the remaining 5 to $T_1^B$. Since we established that $G \prec B$, $v_0$ can only be read after $T_1^B$ has finished executing the iterations from $L_0$ (i.e., the 5 incident blue edges). We express this condition by setting $\rho(v_0) = T_1^B$. Observe that we can compute $\rho$ by iterating over $V$ and, for each vertex, applying the maximum function ($MAX$) to the color of the adjacent edges. 
+To schedule the iterations of $L_1$ to $[T_0^G,\ T_1^B,\ T_2^R,\ T_3^G]$, we first need to compute a \textit{projection} of any write or local reduction performed within $L_0$.  A projection for $L_0$ is a function $\phi : V \rightarrow \mathbb{T}$ mapping a vertex (indirectly) incremented during the execution of $L_0$ to a tile.  Consider the vertex $v_0$ in Figure~\ref{fig:st-proj-1}. $v_0$ has 7 incident edges, 2 of which belong to $T_0^G$, while the remaining 5 to $T_1^B$. Since we established that $G \prec B$, $v_0$ can only be read after $T_1^B$ has finished executing the iterations from $L_0$ (i.e., the 5 incident blue edges). We express this condition by setting $\phi(v_0) = T_1^B$. Observe that we can compute $\phi$ by iterating over $V$ and, for each vertex, applying the maximum function ($MAX$) to the color of the adjacent edges. 
 
-We now use $\rho$ to schedule $L_1$, a loop over cells, to the tiles. Consider again $v_0$ and the adjacent cells $[c_0,\ c_1,\ c_2]$. These three cells have in common the fact that they are adjacent to both green and blue vertices. For $c_1$, and similarly with the other cells, we compute $MAX(\rho(v_0),\ \rho(v_1),\ \rho(v_2)) = MAX(B, G, G) = B = 1$. This establishes that $c_1$ must be assigned to $T_1^B$, because otherwise ($c_1$ assigned instead to $T_0^G$) a read to $v_0$ would occur before the last increment from $T_1^B$ took place. We indeed reiterate once more that the execution order is ``all iterations from $[L_0, L_1, L_2]$ in the green tiles before all iterations from $[L_0, L_1, L_2]$ in the blue tiles''.
+We now use $\phi$ to schedule $L_1$, a loop over cells, to the tiles. Consider again $v_0$ and the adjacent cells $[c_0,\ c_1,\ c_2]$. These three cells have in common the fact that they are adjacent to both green and blue vertices. For $c_1$, and similarly with the other cells, we compute $MAX(\phi(v_0),\ \phi(v_1),\ \phi(v_2)) = MAX(B, G, G) = B = 1$. This establishes that $c_1$ must be assigned to $T_1^B$, because otherwise ($c_1$ assigned instead to $T_0^G$) a read to $v_0$ would occur before the last increment from $T_1^B$ took place. We indeed reiterate once more that the execution order is ``all iterations from $[L_0, L_1, L_2]$ in the green tiles before all iterations from $[L_0, L_1, L_2]$ in the blue tiles''.
 
-In order to schedule $L_2$ to $[T_0^G,\ T_1^B,\ T_2^R,\ T_3^G]$ we employ a similar process. Vertices are again written by $L_1$, so a new projection over $V$ will be computed and will be used in place of $\rho$ to schedule the edges in $L_2$. Figure~\ref{fig:st-final} shows the result of this last phase. 
+In order to schedule $L_2$ to $[T_0^G,\ T_1^B,\ T_2^R,\ T_3^G]$ we employ a similar process. Vertices are again written by $L_1$, so a new projection over $V$ will be computed and will be used in place of $\phi$ to schedule the edges in $L_2$. Figure~\ref{fig:st-final} shows the result of this last phase. 
 
 \subsubsection*{Conflicting Colors}
 It is worth noting how $T_2^R$ ``consumed'' the frontier elements of all other tiles every time a new loop was scheduled. Tiling a loop chain consisting of $k$ loops had the effect of expanding the frontier of a tile of at most $k$ vertices. With this in mind, we re-inspect the loop chain of the running example, although this time with a different execution order: blue (B), red (R), and green (G). We recall that the total ordering of colors is arbitrary, so this situation is legal. By applying the same inspection procedure that we just described, $T_0^G$ and $T_3^G$ will eventually become connected (see Figure~\ref{fig:st-conflicts}), thus violating the precondition ``tiles/partitions with the same color can run in parallel''. Indeed, race conditions during the execution of iterations belonging to $L_2$ are now theoretically possible. We will explain how to handle this problem in Section~\ref{sec:tiling:algo}.
 
 \subsection{Distributed-Memory Parallelism}
+\label{sec:tiling:ex-dist}
 If parallelism is achieved through message-passing, the mesh and all datasets defined over it are distributed to different processes. Similarly to the example in Listing~\ref{code:tiling-struct}, MPI calls now separate the execution of two consecutive loops in the chain. This means that our inspector/executor scheme will have to take extra care of data dependencies along the mesh partition boundaries.
 
 We logically split sets into three regions, \textit{core}, \textit{boundary}, and \textit{non-exec}. The boundary region includes all iterations that cannot be executed until the MPI communications have successfully terminated. We pick $L_0$ as seed loop and we initialize the tiles as follows:
@@ -327,7 +336,7 @@ We make two key observations concerning the correctness and the efficiency of th
 
 As with all loop optimizations that reschedule the iterations in a sequence of loops, any sparse tiling must satisfy the data dependencies. The loop chain abstraction, which we have described in Section~\ref{sec:tiling:lc}, provides enough information to construct an inspector which analyzes all of the dependencies in a computation and builds a legal sparse tiling. We recall that one of the main assumptions in a loop chain is that each loop is fully parallel or, equivalently, that there are no loop carried dependencies.
 
-The descriptors in the loop chain abstraction enable a general derivation of the storage-related dependencies between loops in a loop chain. The storage related dependencies between loops can be described as either flow (read after write), anti (write after read), or output (write after write) dependencies. In the following, assume that loop $L_x$, having iteration space $S_x$, always comes before loop $L_y$, having iteration space $S_y$, in the loop chain. Let us identify a descriptor of a loop $L$ with $m_{S_i \rightarrow S_j}^{mode}$: this simply indicates that the loop $L_i$ has iteration space $S_i$ and uses a map $m$ to write/read/increment elements (respectively, $mode \in \lbrace w, r, i\rbrace$) in the space $S_j$.
+The descriptors in the loop chain abstraction enable a general derivation of the storage-related dependencies between loops in a loop chain. The storage related dependencies between loops can be described as either flow (read after write), anti (write after read), or output (write after write) dependencies. In the following, assume that loop $L_x$, having iteration space $S_x$, always comes before loop $L_y$, having iteration space $S_y$, in the loop chain. Let us identify a descriptor of a loop $L$ with $m_{S_i \rightarrow S_j}^{mode}$: this simply indicates that the loop $L_i$ has iteration space $S_i$ and uses a map $m$ to write/read/increment elements (respectively, $\operatorname{mode} \in \lbrace w, r, i\rbrace$) in the space $S_j$.
 
 The flow dependencies can then be enumerated by considering pairs of points ($\vec{i}$ and $\vec{j}$) in the iteration spaces of the two loops $L_x$ and $L_y$:
 \[
@@ -352,47 +361,92 @@ There are local reductions, or ``reduction dependencies'' between two or more it
 \]
 The reduction dependencies between two iterations within the same loop indicates that those two iterations must be executed atomically with respect to each other.
 
-Dependencies between non-adjacent loops are also possible. Our algorithm takes care of them by inspecting \textit{projections}. In order to schedule $L$ to tiles, the ``most recent'' projection for each space accessed by $L$ must be available. For example, assume that the space $S$ is read by $L_k$ and is written by both $L_i$ and $L_j$, with the loop chain being such that $L_i \prec ... \prec L_j \prec ... \prec L_k$. Let us denote by $\rho_S$ the projection for $S$. Each time that a loop accessing $S$ in write mode is inspected for scheduling, $\rho_S$ must be updated. When eventually scheduling $L_k$, therefore, an up-to-date snapshot of $\rho_S$ (i.e., the one produced right after tiling $L_j$) will be used to compute a legal tiling.
+Dependencies between non-adjacent loops are also possible. Our algorithm takes care of them by inspecting \textit{projections}. In order to schedule $L$ to tiles, the ``most recent'' projection for each space accessed by $L$ must be available. For example, assume that the space $S$ is read by $L_k$ and is written by both $L_i$ and $L_j$, with the loop chain being such that $L_i \prec ... \prec L_j \prec ... \prec L_k$. Let us denote by $\phi_S$ the projection for $S$. Each time that a loop accessing $S$ in write mode is inspected for scheduling, $\phi_S$ must be updated. When eventually scheduling $L_k$, therefore, an up-to-date snapshot of $\phi_S$ (i.e., the one produced right after tiling $L_j$) will be used to compute a legal tiling.
 
 
 \subsection{The Generalized Sparse Tiling Algorithms}
-Algorithm~\ref{algo:st-inspector} shows a procedure to derive an inspector for a loop chain. The inspector produces a schedule which supports mixed distributed/shared memory parallelism.
+Algorithm~\ref{algo:st-inspector} shows a procedure for inspecting generic loop chains. The inspector produces a schedule that supports mixed distributed/shared memory parallelism.
 
-A major constraint of the inspector is that only the first loop of the chain, $L_0$, can be chosen as seed loop, or $L_{seed}$. Any loop in the chain could theoretically be picked as seed, but this would make supporting distributed memory parallelism cumbersome because of the non-trivial coordination that would be required between core and boundary tiles. If only shared memory parallelism is requested, the seed loop can be chosen arbitrarily. If we have $L_0 \prec ... \prec L_{seed}$, then we need a mechanism for propagating tiling ``backwards'', that is, from $L_{seed}$ towards $L_0$. In~\cite{st-paper}, we propose two ``symmetric'' algorithms to solve this problem, \textit{forward tiling} and \textit{backward tiling}, where the latter simply uses the $MIN$ function in place of $MAX$. In the algorithm we present here, the fact that $L_{seed} = L_0$ means that tiles only grow ``in one direction'' (i.e., only projections for $[L_0,\ L_1,\ ...,\ L_{i-1}]$ may be required), so we do not need this distinction\footnote{The algorithm that is implemented in the SLOPE library, however, is more general and supports backwards tiling as well.}. 
+A major constraint of the inspector is that only the first loop of the chain, $L_0$, can be chosen as seed loop, or $L_{seed}$. Any loop in the chain could theoretically be picked as seed, but this would make supporting distributed memory parallelism cumbersome because of the non-trivial coordination required between core and boundary tiles. 
+
+In the special case in which only shared memory parallelism is requested (i.e., no need to distinguish between core and boundary tiles any more), the seed loop can be chosen arbitrarily. If we however choose $L_{seed}$ such that $L_0 \prec ... \prec L_{seed} \prec ...$, then a mechanism for constructing tiles in the reverse direction (``backwards''), from $L_{seed}$ towards $L_0$, is needed. In~\cite{st-paper}, we propose two ``symmetric'' algorithms to solve this problem, \textit{forward tiling} and \textit{backward tiling}, with the latter using the $MIN$ function in place of $MAX$. For ease of exposition, and since in the fundamental case of distributed memory parallelism we always have $L_{seed} = L_0$, we here neglect this distinction\footnote{The algorithm that is implemented in the SLOPE library, however, is more general and supports backwards tiling as well for the case in which distributed memory parallelism is not required.}. 
+
+
+\begin{algorithm}[H]
+ \KwData{this text}
+ \KwResult{how to write algorithm with \LaTeX2e }
+ initialization\;
+ \While{not at end of this document}{
+  read current\;
+  \eIf{understand}{
+   go to next section\;
+   current section becomes this one\;
+   }{
+   go back to the beginning of current section\;
+  }
+ }
+ \caption{How to write algorithms}
+\end{algorithm}
 
 \begin{Algo}[Sparse Tiling Inspector]
 \label{algo:st-inspector}
 \normalfont 
-The input are a loop chain $\mathbb{L}$, as described in Section~\ref{sec:tiling:lc-unstruct}, an average tile size $ts$, and an execution mode $mode$.
+The input are:
+\begin{itemize}
+\item the loop chain ,$\mathbb{L} = [L_0,\ L_1,\ ...,\ L_{n-1}]$ (as described in Section~\ref{sec:tiling:lc-unstruct});
+\item the tile size, $ts$;
+\end{itemize}
+The output is a set of tiles $\mathbb{T}$, each tile owning a subset of iterations for each $L_i \in \mathbb{L}$. 
 \begin{enumerate}
-\item Pick $L_{seed}$. If $mode$ indicates a pure shared memory execution, then we heuristically select the loop in the middle of the loop chain. otherwise $L_{seed} = L_0$. Let $S_{seed}$ be the iteration space of $L_{seed}$.\\
+\item Select as seed loop $L_{seed} = L_0$. Let $S_{seed}$ be the iteration space of $L_{seed}$.\\
 \textit{Note: in real applications loops over ``subsets'' are possible; for instance, a loop over the exterior facets of the mesh. If one such loop is picked as seed, then the inspection is aborted.}
 
-\item Partition the core region of $L_{seed}$ into $\lbrace P_0, P_1, ..., P_{m-1}\rbrace$ such that $P_i \cap P_j = \emptyset$ and $\cup_{i = 0}^{m-1} P_i = S_{seed}$. The partitioning is sequential: $S_{seed}$ is ``chunked'' every $ts$ iterations, with $P_{m-1}$ that may be smaller. Similarly, partition the boundary region of $L_{seed}$ into $k$ subsets.
+\item Partition $S_{seed}^{core}$, the core region of $S_{seed}$, into $\lbrace P_0, P_1, ..., P_{m-1}\rbrace$, such that $P_i \cap P_j = \emptyset$ and $\cup_{i = 0}^{m-1} P_i = S_{core}$. The partitioning is sequential: $S_{seed}$ is ``chunked'' every $ts$ iterations, with $P_{m-1}$ that may be smaller than all other partitions. Similarly, we partition $S_{seed}^{bound}$ into $k$ subsets.
 
-\item Create $m+k+1$ tiles, one for each partition, plus one extra tile for the non-exec region of $L_{seed}$; $\mathbb{T} = [T_0, ..., T_{m+k}]$. Each tile $T_i$ has four fields: a region (where possible values are core, boundary and non-exec); a color; for each loop $L$, a list of iterations $T_i^L$ (initially empty, to be populated by the inspection algorithm); for each loop, a list of ``local maps'', whose role will become clear next. This structuring is illustrated in Figure~\ref{fig:tile-structure}. $T_i$ is forthwith initialized with the iterations in $P_i$; that is, $T_i^{L_{seed}} = P_i$.
+\item Create $m+k+1$ tiles, $\mathbb{T} = \lbrace T_0, ..., T_{m+k} \rbrace$, one for each partition originating from step (2) and one extra tile for $S_{seed}^{nexec}$. Each tile $T_i$ has four fields: a region (where possible values are core, boundary and non-exec); a color; for each loop $L$, a list of iterations $T_i^L$ (initially empty, to be populated by the inspection algorithm); for each loop, a list of ``local maps'', whose role will become clear next. This structuring is illustrated in Figure~\ref{fig:tile-structure}. At this point we have, for each $T_i \in \mathbb{T}$, $T_i^{L_{seed}} = P_i$. 
 
-\item Assign colors to tiles. If $mode$ requests shared memory parallelism, color the tiles such that adjacent tiles are not given the same color. Otherwise, assign increasing colors to tiles (i.e., $T_i$ given color $i$). The boundary tiles are always given colors higher than that of core tiles; the non-exec tile has highest color. In essence, this is to provide the executor with sufficient information to schedule all core tiles first, then all boundary ones, and finally the non-exec tile.\\
-\textit{The adjacency relation is determined through the maps available through the descriptors of the loop chain.}
+\item Assign colors to tiles. If shared memory parallelism is requested, color the tiles such that adjacent tiles are not given the same color. Otherwise, assign increasing colors to tiles (i.e., $T_i$ given color $i$). The boundary tiles are always given colors higher than that of core tiles; the non-exec tile has highest color. In essence, this is to provide the executor with sufficient information to schedule all core tiles first, then all boundary ones, and finally the non-exec tile.\\
+\textit{Note: the adjacency relation is determined through the maps available through the descriptors of the loop chain.}
 
-\item Initialize $\rho$, a data structure that keeps projections for each space in the loop chain. Then, for each loop $L_i$ in $[L_1, L_2, ..., L_{m-1}]$:
+\item Let $\phi$ be the data structure tracking projections for each space in the loop chain. Let $\sigma_{seed} : S_{seed} \rightarrow \mathbb{T}$ be the tiling function for $L_{seed}$, which maps iterations to tiles as determined at step (3). Then, for each loop $L_i$ in $[L_1, L_2, ..., L_{n-1}]$:
 \begin{itemize}
-\item Update $\rho$ using the descriptors in $L_{i-1}$, as explained in Algorithm~\ref{algo:st-projection}. Along with $\rho$, the projection algorithm returns a piece of information indicating whether two different tiles having the same color will become adjacent after tiling. Let $C \in \mathbb{N}^{m \times m}$ be a matrix tracking conflicting colors, with $C[i,j] = 1$ indicating that $T_i$ and $T_j$ have the same color and will eventually become adjacent.
-\item Use $\rho$ to schedule the iteration of $L_i$ to tiles. The tiling algorithm is given in Algorithm~\ref{algo:st-tiling} 
+\item Using $\sigma_{i-1}$ and the descriptors of $L_{i-1}$ as input to Algorithm~\ref{algo:st-projection}, update $\phi$. Besides updating $\phi$, the algorithm returns a piece of information indicating whether two different tiles having the same color will become adjacent after tiling $L_i$. Let $C \in \mathbb{N}^{m \times m}$ be a matrix tracking conflicting colors, with $C[i,j] = 1$ indicating that $T_i$ and $T_j$ have the same color and will eventually become adjacent.
+\item Using $\phi$, compute $\sigma_i$ as described in Algorithm~\ref{algo:st-tiling}.
+\item Invert $\sigma_i$ and assign iterations to tiles. 
 \end{itemize}
 
-\item If $C$ indicates the presence of at least one conflict, say between $T_i$ and $T_j$, add a ``fake'' connection between $T_i$ and $T_j$ and loop back at step (4); the coloring phase now will interpret $T_i$ and $T_j$ as being connected, thus assigning different colors. Otherwise, a legal tiling has been computed and the inspection phase can be terminated. 
+\item If $C$ indicates the presence of at least one conflict, say between $T_i$ and $T_j$, add a ``fake'' connection between $T_i$ and $T_j$ and loop back at step (4). Since $T_i$ and $T_j$ are now connected, the coloring phase will assign them different colors. Otherwise, a legal tiling has now been computed. 
 
+\item Finally, for each $T_i \in \mathbb{T}$, for each $L_j \in \mathbb{L}$, for each map used in $L_j$, create a local map. Local maps are used during execution in place of the global maps provided by the loop chain, allowing sequential loops without the need for double indirections.
 \end{enumerate}
 \end{Algo}
+
+The projection algorithm is used to propagate data dependencies as iterations are scheduled to tiles. A projection is a function $\phi : S \rightarrow \mathbb{T}$. 
 
 \begin{Algo}[Projection]
 \label{algo:st-projection}
 \normalfont 
-~
+The input are:
 \begin{enumerate}
-\item 
+\item A loop $L_{i-1}$;
+\item A tiling function for $L_{i-1}$, $\sigma_{i-1}$;
+\item A set of projections, $\Phi$.
 \end{enumerate}
+The algorithm returns:
+\begin{itemize}
+\item A new set of projections, $\Phi'$;
+\item The conflicts matrix, $C$.
+\end{itemize}
+
+For each descriptor ${<}M$, $\operatorname{mode}{>}$ in $L_{i-1}$, there are three possibilities:
+\begin{itemize}
+\item The access mode is of type read ($\operatorname{mode} ==\ r$); skip.
+
+\item The map is direct ($M ==\ \perp$); update $\Phi' = \Phi \cup \sigma_{i-1}$.
+
+\item The access mode is of type write ($\operatorname{mode} \in \lbrace w, i \rbrace$) an $M$ is indirect. Let $M$ be a mapping for the iteration space of $L_{i-1}$ to another set $S_j$; that is, $M : S_{i-1} \rightarrow S_j^0 \times S_j^1 \times ... \times S_j^{a-1}$.
+\end{itemize}
+
 \end{Algo}
 
 \begin{Algo}[Tiling]
