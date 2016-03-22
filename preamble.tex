@@ -48,7 +48,11 @@
 \usepackage[ruled, longend, linesnumbered]{algorithm2e}
 \SetKwInput{kwInput}{Input}
 \SetKwInput{kwOutput}{Output}
-
+\SetKw{Not}{not}
+\SetKwRepeat{Do}{do}{while}
+\SetKwComment{Comment}{// }{}
+\let\oldnl\nl% Store \nl in \oldnl
+\newcommand{\nonl}{\renewcommand{\nl}{\let\nl\oldnl}}% Remove line number for one line
 
 \renewcommand{\algorithmcfname}{ALGORITHM}
 \SetAlFnt{\small}

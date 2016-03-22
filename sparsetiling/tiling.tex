@@ -185,35 +185,37 @@ Before diving into the description of the loop chain abstraction, we observe two
 \item The loop chain is expected to be provided by the user. We reinforce the idea that, in our approach, we will have two possibilities for constructing loop chains: either explicitly, with users required to change their program by adding calls to an external library to build the inspector/executor scheme, or implicitly, with the loop chain built automatically ``behind the scenes'' through a higher level framework.
 \end{itemize}
 
-In~\cite{ST-KriegerHIPS2013,KriegerThesis}, a loop chain $L$ is defined as follows:
+In~\cite{ST-KriegerHIPS2013,KriegerThesis}, a loop chain $\mathbb{L}$ is defined as follows:
 \begin{itemize}
-\item $\mathbb{L}$ defines a scope consisting of $n$ loops, $L_0, L_1, ..., L_{n-1}$. There are no global synchronization points between the loops.
+\item $\mathbb{L}$ consists of $n$ loops, $L_0, L_1, ..., L_{n-1}$. There are no global synchronization points between the loops.
 \item $\mathbb{D}$ is a set of disjoint $m$ data spaces, $D_0, D_1, ..., D_{m-1}$. Each loop accesses (reads from, writes to) a certain subset of these data spaces. An access can be either direct (e.g., \texttt{A[i]}) or indirect (e.g., \texttt{A[map(i)]}).
 \item $R_{L_l\rightarrow D_d}(\vec{i})$ and $W_{L_l\rightarrow D_d}(\vec{i})$, where the $R$ and $W$ access relations are defined over for each data space $D_d \in D$ and indicate which data locations in data space $D_d$ an iteration $i \in L_l$ reads from and writes to respectively (e.g., if we have \texttt{A[map(i)] = ...} in loop $L_j$, the access relation $map_{L_j\rightarrow A}(\vec{i})$ will be available). 
 \end{itemize}
 
 \subsection{Loop Chains for Unstructured Mesh Computations}
 \label{sec:tiling:lc-unstruct}
-Because of our focus on unstructured mesh computations, and inspired by the programming and execution models of OP2 (see Section~\ref{sec:bkg:op2}), we refine the loop chain definition as follows:
+Because of our focus on unstructured mesh computations, and inspired by the programming and execution models of OP2 (see Section~\ref{sec:bkg:op2}), the definition of a loop chain $\mathbb{L}$ is refined as follows:
 \begin{itemize}
-\item $\mathbb{L}$ defines a scope consisting of $n$, $L_0, L_1, ..., L_{n-1}$. There are no global synchronization points between the loops.
+\item $\mathbb{L}$ consists of $n$ loops, $L_0, L_1, ..., L_{n-1}$. There are no global synchronization points between the loops.
 
-\item The execution order of a loop iterations does not influence the result. This means that given $L_i$, we can choose an arbitrary scheduling of iterations because there will not be loop-carried dependencies. 
+\item The execution order of a loop's iterations does not influence the result. This means that given $L_i$, we can choose an arbitrary scheduling of iterations because there will not be loop-carried dependencies. 
 
-\item $\mathbb{S}$ is a set of disjoint $m$ sets, $S_0, S_1, ..., S_{m-1}$. Possible sets are the elements in the mesh or the degrees of freedom associated to a certain function. A loop iterates over a set, or iteration space. A dataset is logically associated with one set (i.e., each value in the dataset is associated with a set element). 
+\item $\mathbb{S}$ is a set of disjoint $m$ sets, $S_0, S_1, ..., S_{m-1}$. Possible sets are the elements in the mesh or the degrees of freedom associated to a certain function. A loop iterates over a set, or iteration space. A dataset is logically associated with a set (i.e., each value in the dataset is associated with a set element). 
 
-\item A set is logically split into three contiguous regions: core, boundary, and non-exec. 
+\item A set $S$ is logically split into three contiguous regions: core ($S^{core}$), boundary ($S^{bound}$), and non-exec ($S^{nexec}$). This separation is essential for distributed memory parallelism. Given a process $P$ and a set $S$, we have that:
+\begin{description}
+ \item[$S^{core}$] The iterations of $S$ that exclusively belong to $P$.
+ \item[$S^{bound}$] The boundary region can be seen as the union of two sub-regions, $S^{owned}$ and $S^{exec}$. $S^{owned}$ are iterations that belong to $P$ which will be redundantly executed by some other processes; $S^{exec}$ are iterations from other processes which are redundantly executed by $P$. We will see that redundant execution is exploited to preserve atomic execution; that is, the fact that all tiles can execute their iterations without the need for synchronization.
+  \item[$S^{nexec}$] These are iterations of other processes that are communicated to $P$ because they need be indirectly read to correctly compute $S^{bound}$.
+ \end{description} 
 %We therefore have $S = S^{core} \frown S^{bound} \frown S^{nexec}$. 
-%TODO explain them
 
-\item $M$ is a set of $k$ maps, $M_0, M_1, ..., M_{k-1}$. A map of arity $a$ is a vector-valued function $M : S_i \rightarrow S_j^0 \times S_j^1 \times ... \times S_j^{a-1}$. It connects each element of $S_i$ to one or more elements in $S_j$. For example, if a triangular cell $c$ is connected to three vertices $v_0, v_1, v_2$, we have $M(c) = [v_0, v_1, v_2]$. 
+\item $\mathbb{M}$ is a set of $k$ maps, $M_0, M_1, ..., M_{k-1}$. A map of arity $a$ is a vector-valued function $M : S_i \rightarrow S_j^0 \times S_j^1 \times ... \times S_j^{a-1}$. It connects each element of $S_i$ to one or more elements in $S_j$. For example, if a triangular cell $c$ is connected to three vertices $v_0, v_1, v_2$, we have $M(c) = [v_0, v_1, v_2]$. 
 
 \item A loop $L_i$ over the iteration space $S$ is associated with $d$ descriptors, $D_0, D_1, ..., D_{d-1}$. Each descriptor $D_j$ is a 2-tuple $D_j = {<}M,\ \operatorname{mode}{>}$; $M$ is either a map from $S_j$ to some other sets or the special placeholder $\perp$, which indicates that the access is direct to some data associated with $S_j$, whereas $\operatorname{mode}$ is one of $[r,\ w,\ i]$, respectively read, write and increment.
 \end{itemize}
 
-The striking difference with respect to the original definition is the lack of data spaces. Essentially, we abstract data spaces to the level of sets. Each set $S_j$ is usually associated multiple data spaces, and loops often access different data spaces associated with $S_j$. The idea, which will become more clear in the next section, is to limit data dependence tracking at the sets level. This may conservatively return some ``false positives'', but it significantly improves the inspection cost since typically $|S| << |D|$. 
-
-
+With respect to the original definition, one of the most important difference is the lack of data spaces. In unstructured mesh applications, a loop tends to access a large number of data spaces associated with the same set, so the idea is to perform data dependency analysis using sets and maps, rather data sets and access relations. This can significantly improve the inspection cost, because typically $|\mathbb{S}| << |\mathbb{D}|$. The second fundamental difference is the characterization of sets into the three regions core, boundary and non-exec. 
 
 \begin{algorithm}
 \scriptsize\ttfamily
@@ -256,9 +258,9 @@ $\rbrace$\\
 inspector = init$\_$inspector (...);\\
 ~\\
 // Three sets, edges, cells, and vertices\\
-E = set (inspector, nedges, ...);\\
-C = set (inspector, ncells, ...);\\
-V = set (inspector, nvertices, ...);\\ 
+E = set (inspector, core$\_$edges, boundary$\_$edges, nonexec$\_$edges, ...);\\
+C = set (inspector, core$\_$cells, boundary$\_$cells, nonexec$\_$cells, ...);\\
+V = set (inspector, core$\_$vertices, boundary$\_$vertices, nonexec$\_$vertices, ...);\\ 
 ~\\
 // Two maps: from edges to vertices and from cells to vertices\\
 e2vMap = map (inspector, E, V, edges2vertices, ...);\\
@@ -307,7 +309,7 @@ It is worth noting how $T_2^R$ ``consumed'' the frontier elements of all other t
 \label{sec:tiling:ex-dist}
 If parallelism is achieved through message-passing, the mesh and all datasets defined over it are distributed to different processes. Similarly to the example in Listing~\ref{code:tiling-struct}, MPI calls now separate the execution of two consecutive loops in the chain. This means that our inspector/executor scheme will have to take extra care of data dependencies along the mesh partition boundaries.
 
-We logically split sets into three regions, \textit{core}, \textit{boundary}, and \textit{non-exec}. The boundary region includes all iterations that cannot be executed until the MPI communications have successfully terminated. We pick $L_0$ as seed loop and we initialize the tiles as follows:
+We logically split the sets into three regions, \textit{core}, \textit{boundary}, and \textit{non-exec}. The boundary region includes all iterations that cannot be executed until the MPI communications have successfully terminated. We pick $L_0$ as seed loop and we initialize the tiles as follows:
 \begin{enumerate}
 \item We take the core region of $L_0$ and partition it into tiles. Unless we aim for a mixed distributed/shared-memory parallelization scheme, there is no need to reassign the same color to unconnected tiles since we now have a single process executing sequentially all tiles (as opposed to the case of shared memory parallelism discussed in Section~\ref{sec:tiling:ex-sm}). We can assign colors increasingly: $T_i$ is given color $i$, so we can uniquely identify a tile with its color. As long as tiles with contiguous ID are also physically contiguous in the mesh, and assuming that colors are executed in ascending order (i.e., $T_0,\ T_1, ...$, as in the shared memory case), this assignment retains spatial locality when ``jumping'' from executing $T_i$ to $T_{i+1}$.
 \item We replicate over the boundary region of $L_0$ what we just did for core. Note that by neatly separating core and boundary, there cannot be tiles crossing the two regions. Further, all tiles within boundary have greater color than those in core, posing a constraint on the execution order: no boundary tiles can be executed until all core tiles have been scheduled.
@@ -361,58 +363,164 @@ There are local reductions, or ``reduction dependencies'' between two or more it
 \]
 The reduction dependencies between two iterations within the same loop indicates that those two iterations must be executed atomically with respect to each other.
 
-Dependencies between non-adjacent loops are also possible. Our algorithm takes care of them by inspecting \textit{projections}. In order to schedule $L$ to tiles, the ``most recent'' projection for each space accessed by $L$ must be available. For example, assume that the space $S$ is read by $L_k$ and is written by both $L_i$ and $L_j$, with the loop chain being such that $L_i \prec ... \prec L_j \prec ... \prec L_k$. Let us denote by $\phi_S$ the projection for $S$. Each time that a loop accessing $S$ in write mode is inspected for scheduling, $\phi_S$ must be updated. When eventually scheduling $L_k$, therefore, an up-to-date snapshot of $\phi_S$ (i.e., the one produced right after tiling $L_j$) will be used to compute a legal tiling.
+As seen in the example in Section~\ref{sec:tiling:ex-sm}, our inspector algorithm handles data dependencies, including those between non-adjacent loops, by tracking \textit{projections}. In the next section we explain how projections are constructed and used.
+
+%In order to schedule $L$ to tiles, an up-to-date projection for each set $S$ accessed by $L$ must be available. For example, assume that $S$ is read by $L_k$ and is written by both $L_i$ and $L_j$. In the loop chain, the loops are in the order $L_i \prec ... \prec L_j \prec ... \prec L_k$. Let us denote by $\phi_S$ the projection for $S$. Each time that a loop accessing $S$ in write mode is inspected for scheduling, $\phi_S$ must be updated. When eventually scheduling $L_k$, therefore, an up-to-date snapshot of $\phi_S$ (i.e., the one produced right after tiling $L_j$) will be used to compute a legal tiling.
 
 
-\subsection{The Generalized Sparse Tiling Algorithms}
+\subsection{The Generalized Sparse Tiling Inspector}
 
-\subsection{Inspection}
-The pseudo-code for the generalized sparse tiling inspector is showed in Algorithm~\ref{algo:st-inspector}. The output is a schedule that supports mixed distributed/shared memory parallelism. In the following, we describe the main steps of the algorithm.
+The pseudo-code for the generalized sparse tiling inspector is showed in Algorithm~\ref{algo:st-inspector}. Given a loop chain and an average tile size, the algorithm produces a schedule suitable for mixed distributed/shared memory parallelism. In the following, we elaborate on the main steps of the algorithm. The notation used throughout the section is summarized in Table~\ref{table:st-summary-notation}.
 
+\begin{table}
+\centering
+\begin{tabulary}{1.0\columnwidth}{C|C}
+\hline
+Symbol & Meaning \\\hline
+$\mathbb{L}$ & The loop chain \\
+$L_i$ & The $i$-th loop in $\mathbb{L}$ \\ 
+$S_i$ & The iteration space of $L_i$ \\
+$S$ & A generic set in $\mathbb{L}$ \\
+$S_{in}$, $S_{out}$ & The input and output sets of a map \\
+$D$ & A descriptor of a loop \\
+$r$, $w$, $i$ & Possible values for $D$.mode \\
+$\mathbb{T}$ & The set of all tiles \\
+$\mathbb{T}[i]$ & Accessing the $i$-th tile \\
+$\phi_S$ & A projection $\phi_S : S \rightarrow \mathbb{T}$ \\
+$\sigma_i$ & The tiling function $\sigma_i : S_i \rightarrow \mathbb{T}$ for $L_i$ \\
+\hline
+\end{tabulary}
+\caption{Summary of the notation used throughout the section.}
+\label{table:st-summary-notation}
+\end{table}
 
-
-\begin{algorithm}[H]
-\label{algo:st-inspector}
-\caption{The inspection algorithm}
-\kwInput{The loop chain, $\mathbb{L} = [L_0,\ L_1,\ ...,\ L_{n-1}]$}
-\kwInput{The tile size, $ts$}
+\setcounter{algocf}{0}% Modify counter of algorithm
+\begin{algorithm}[t]
+\kwInput{The loop chain $\mathbb{L} = [L_0,\ L_1,\ ...,\ L_{n-1}]$, a tile size $ts$}
 \kwOutput{A set of tiles $\mathbb{T}$, populated with iterations from $L_i \in \mathbb{L}$}
-% \KwResult{how to write algorithm with \LaTeX2e }
-% initialization\;
-% \While{not at end of this document}{
-%  read current\;
-%  \eIf{understand}{
-%   go to next section\;
-%   current section becomes this one\;
-%   }{
-%   go back to the beginning of current section\;
-%  }
-% }
-% \caption{How to write algorithms}
+\nonl ~\\
+\Comment{Initialization}
+$seed \gets 0$\;
+$\Phi \gets \emptyset$\;
+$C \gets \perp$\;
+\nonl ~\\
+\Comment{Creation of tiles}
+$\sigma_{seed}$, $\mathbb{T} \gets$ partition($S_{seed}$, $ts$)\;
+seed$\_$map $\gets$ find$\_$map($S_{seed},\ \mathbb{L}$)\;
+conflicts $\gets$ false\;
+\Do{\Not conflicts}{
+  \Comment{Schedule loops to tiles}
+  color($\mathbb{T}$, seed$\_$map)\;
+   \nonl ~\\
+  \For{$i=1$ \KwTo $n-1$}{
+    project($L_{i-1}$, $\sigma_{i-1}$, $\Phi$, $C$)\;
+    $\sigma_i \gets$ tile($L_i$, $\Phi$)\;
+    assign($\sigma_i$, $\mathbb{T}$)\;
+  }
+  \nonl ~\\
+  \If{found$\_$conflicts($C$)}{
+    conflicts $\gets$ true\;
+    add$\_$fake$\_$connection(seed$\_$map, $C$)\;
+  }
+}
+\nonl ~\\
+\Comment{Inspection successful, create local maps and return}
+create$\_$local$\_$maps($\mathbb{T}$)\;
+\Return{$\mathbb{T}$}
+\caption{The inspection algorithm}
+\label{algo:st-inspector}
 \end{algorithm}
 
 
-\paragraph{The seed loop}
-A constraint of the inspector is that only the first loop of the chain, $L_0$, can be chosen as seed loop, or $L_{seed}$. Any loop in the chain could theoretically be picked as seed, but this would make supporting distributed memory parallelism cumbersome because of the non-trivial coordination required between core and boundary tiles. 
+%LOCAL MAPS: Finally, for each $T_i \in \mathbb{T}$, for each $L_j \in \mathbb{L}$, for each map used in $L_j$, create a local map. 
 
-In the special case in which only shared memory parallelism is requested (i.e., no need to distinguish between core and boundary tiles any more), the seed loop can be chosen arbitrarily. If we however choose $L_{seed}$ such that $L_0 \prec ... \prec L_{seed} \prec ...$, then a mechanism for constructing tiles in the reverse direction (``backwards''), from $L_{seed}$ towards $L_0$, is needed. In~\cite{st-paper}, we propose two ``symmetric'' algorithms to solve this problem, \textit{forward tiling} and \textit{backward tiling}, with the latter using the $MIN$ function in place of $MAX$. For ease of exposition, and since in the fundamental case of distributed memory parallelism we always have $L_{seed} = L_0$, we here neglect this distinction\footnote{The algorithm that is implemented in the SLOPE library, however, is more general and supports backwards tiling as well for the case in which distributed memory parallelism is not required.}. 
+\paragraph{Choice of the seed loop}
+The seed loop $L_{seed}$ is used to initialize the tiles. Theoretically, any loop in the chain can be chosen as seed. Supporting distributed memory parallelism, however, is cumbersome if $L_{seed} \neq L_0$. This is because more general partitioning and coloring schemes would be needed to ensure that no iterations in $S_{seed}^{bound}$, the boundary region of $S_{seed}$, are eventually assigned to any of the core tiles. A constraint of our inspector algorithm in the case of distributed memory parallelism, therefore, is that $L_{seed} = L_0$. 
+
+In the special case in which only shared memory parallelism is requested, where there is no need to distinguish between core and boundary tiles, the seed loop can be chosen arbitrarily. If we however choose $L_{seed}$ such that $L_0 \prec ... \prec L_{seed} \prec ...$, then a mechanism for constructing tiles in the reverse direction (``backwards''), from $L_{seed}$ towards $L_0$, is necessary. In~\cite{st-paper}, we propose two ``symmetric'' algorithms to solve this problem, \textit{forward tiling} and \textit{backward tiling}, with the latter using the $MIN$ function in place of $MAX$ when computing projections. For ease of exposition, and since in the fundamental case of distributed memory parallelism we impose $L_{seed} = L_0$, we here neglect this distinction\footnote{The algorithm that is implemented in the SLOPE library, however, is more general and supports backwards tiling for the case in which distributed memory parallelism is not required.}. 
 
 %\textit{Note: in real applications loops over ``subsets'' are possible; for instance, a loop over the exterior facets of the mesh. If one such loop is picked as seed, then the inspection is aborted.}
 
-\paragraph{Creation of tiles}
+\paragraph{Initialization of tiles}
 The algorithm starts with partitioning $S_{seed}^{core}$, the core region of $S_{seed}$, into $\lbrace P_0, P_1, ..., P_{m-1}\rbrace$, such that $P_i \cap P_j = \emptyset$ and $\cup_{i = 0}^{m-1} P_i = S_{core}$. The partitioning is sequential: $S_{seed}$ is ``chunked'' every $ts$ iterations, with $P_{m-1}$ that may be smaller than all other partitions. Similarly, we partition $S_{seed}^{bound}$ into $k$ subsets.
 
-We then create $m+k+1$ tiles, $\mathbb{T} = \lbrace T_0, ..., T_{m+k} \rbrace$, one for each partition and one extra tile for $S_{seed}^{nexec}$. Each tile $T_i$ has four fields: a region (where possible values are core, boundary and non-exec); a color; for each loop $L$, a list of iterations $T_i^L$ (initially empty, to be populated by the inspection algorithm); for each loop, a list of ``local maps'', whose role will become clear next. This structuring is illustrated in Figure~\ref{fig:tile-structure}. At this point we have, for each $T_i \in \mathbb{T}$, $T_i^{L_{seed}} = P_i$. 
+We then create $m+k+1$ tiles, $\mathbb{T} = \lbrace T_0, ..., T_{m+k} \rbrace$, one for each partition and one extra tile for $S_{seed}^{nexec}$. Each tile $T_i$ has four fields: a region (where possible values are core, boundary and non-exec); a color; for each loop $L$, a list of iterations $T_i^L$ (initially empty, to be populated by the inspection algorithm); for each loop, a list of ``local maps'', whose role will become clear next. This structuring is illustrated in Figure~\ref{fig:tile-structure}. At this point, for each $T_i \in \mathbb{T}$, we have $T_i^{L_{seed}} = T_i^{L_0} = P_i$. 
 
-Each tile needs be assigned a color, which represents a scheduling priority. If shared memory parallelism is requested, color the tiles such that adjacent tiles are not given the same color. Otherwise, assign increasing colors to tiles (i.e., $T_i$ given color $i$). The boundary tiles are always given colors higher than that of core tiles; the non-exec tile has highest color. In essence, this is to provide the executor with sufficient information to schedule all core tiles first, then all boundary ones, and finally the non-exec tile. The adjacency relation is determined through the maps available through the descriptors of the loop chain.
+Each tile needs be assigned a color, which gives it a scheduling priority. If shared memory parallelism is requested, adjacent tiles are given different colors (the adjacency relation is determined through the maps available in $\mathbb{L}$). Otherwise, the colors are assigned to the tiles increasingly (i.e., $T_i$ is given color $i$). The boundary tiles are always given colors higher than that of core tiles; the non-exec tile has highest color. In essence, this will allow the executor to schedule first all core tiles and, subsequently, all boundary tiles.
 
-\paragraph{Population of tiles}
-Let $\phi$ be the data structure tracking projections for each space in the loop chain. Let $\sigma_{seed} : S_{seed} \rightarrow \mathbb{T}$ be the tiling function for $L_{seed}$, which maps iterations to tiles as determined at step (3). Then, for each loop $L_i$ in $[L_1, L_2, ..., L_{n-1}]$:
-\begin{itemize}
-\item Using $\sigma_{i-1}$ and the descriptors of $L_{i-1}$ as input to Algorithm~\ref{algo:st-projection}, update $\phi$. Besides updating $\phi$, the algorithm returns a piece of information indicating whether two different tiles having the same color will become adjacent after tiling $L_i$. Let $C \in \mathbb{N}^{m \times m}$ be a matrix tracking conflicting colors, with $C[i,j] = 1$ indicating that $T_i$ and $T_j$ have the same color and will eventually become adjacent.
-\item Using $\phi$, compute $\sigma_i$ as described in Algorithm~\ref{algo:st-tiling}.
-\item Invert $\sigma_i$ and assign iterations to tiles. 
-\end{itemize}
+\paragraph{Construction of tiles by tracking data dependencies}
+In order to schedule a loop to the tiles we use projections. A projection is a function $\phi_S : S \rightarrow \mathbb{T}$. Projections are computed and/or updated after tiling a loop. Initially, the set $\Phi$ of all projections is empty. Starting with the seed tiling $\sigma_{seed} : S_{seed} \rightarrow \mathbb{T}$, we iteratively update $\Phi$ and build tiling functions for all other loops $[L_1, L_2, ..., L_{n-1}]$. 
+
+\paragraph{Projecting tiled sets}
+Algorithm~\ref{algo:st-projection} takes as input $\sigma_{i-1}$ and (the descriptors of) $L_{i-1}$ to update $\Phi$. Further, the conflicts matrix $C \in \mathbb{N}^{m \times m}$, indicating whether two different tiles having the same color will become adjacent after tiling $L_{i-1}$, is updated. 
+
+\begin{algorithm}[h]
+\kwInput{A loop $L_{i}$, a tiling function $\sigma_{i}$, the projections set $\Phi$, the conflicts matrix $C$}
+\KwResult{Update $\Phi$ and $C$}
+\nonl ~\\
+\ForEach{$D$ in $L_i$.descriptors}{
+  \If{$D$.mode $==$ r}{
+    skip\;
+  }
+  \eIf{$D$.map $== \perp$}{
+    $\Phi = \Phi \cup \sigma_{i}$\;
+  }{
+    inverse$\_$map $\gets$ map$\_$invert($D$.map)\;
+    $S_{in}$, $S_{out}$, values, offsets $\gets$ inverse$\_$map\;
+    $\phi_{S_{in}} \gets \perp$\; 
+    \For{$e=0$ \KwTo $S_{in}$.size}{
+       $\phi_{S_{in}}[e] \gets$ -1\;
+      \For{$j=$ offsets[i] \KwTo offsets[i+1]}{
+        adjacent$\_$tile = $\mathbb{T}$[values[j]]\;
+        max$\_$color $\gets$ MAX($\phi_{S_{in}}[e]$.color, adjacent$\_$tile.color)\;
+        \If{max$\_$color $\neq$ $\phi_{S_{in}}[e]$.color}{
+          $\phi_{S_{in}}[e] \gets$ adjacent$\_$tile\;
+        }
+      }
+    }
+    update($C$, $\mathbb{T}$, $\phi_{S_{in}}$)\;
+    $\Phi = \Phi \cup \phi_{S_{in}}$\;
+  }
+}
+\caption{Projection of a tiled loop}
+\label{algo:st-projection}
+\end{algorithm}
+
+A projection tells which tile a set element belongs to at a given time instant of the tiling process. A new projection $\phi_{S_{in}}$ is needed if the elements of the set $S_{in}$ are written by $L_i$. Let us consider the challenging case, when writes or increments occur indirectly through a map. To compute $\phi_{S_{in}}$, we first determine the inverse map, as shown in Figure~\ref{fig:st-inverse-map}. Then, we iterate over all elements of $S_{out}$ -- the iteration space of $L_i$ -- that indirectly access elements in $S_{in}$. In particular, given $e \in S_{in}$, we determine the last tile (i.e., the tile with highest color) that writes to $e$, say $T_{last}$. We finally set $\phi_{S_{in}}(e) = T_{last}$. 
+
+% ($C[i,j] = 1$ implies that $T_i$ and $T_j$ have the same color and will become adjacent after tiling $L_{i-1}$).
+
+\paragraph{Scheduling loops} 
+Using $\Phi$, we compute $\sigma_i$ as described in Algorithm~\ref{algo:st-tiling}. Finally, $\sigma_i$ is inverted and the iterations of $L_i$ are scheduled to the tiles. 
+
+\begin{algorithm}[h]
+\kwInput{A loop $L_{i}$ (with iteration space $S_i$), the projections set $\Phi$}
+\kwOutput{The tiling function $\sigma_{i}$}
+\nonl ~\\
+$\sigma_i \gets \perp$\;
+\ForEach{$D$ in $L_i$.descriptors}{
+  \eIf{$D$.map $== \perp$}{
+    $\sigma_i \gets \Phi[S_i]$\;    
+  }{
+    arity $\gets D$.map.arity\;
+    $\phi_{S} \gets \Phi[D$.map.$S_{out}$]\;
+    \For{$e=0$ \KwTo $S_i$.size}{
+       $\sigma_i[e] \gets T_{\perp}$ \;
+      \For{$j=0$ \KwTo arity}{
+        adjacent$\_$tile $\gets \phi_{S}$[$D$.map.values[e*arity + j]]\;
+        max$\_$color $\gets$ MAX($\sigma_i[e]$.color, adjacent$\_$tile.color)\;
+        \If{max$\_$color $\neq$ $\sigma_i[e]$.color}{
+          $\sigma_i[e] \gets$ adjacent$\_$tile\;
+        }
+      }
+    }
+  }
+}
+\Return{$\sigma_i$}
+\caption{Building a tiling function}
+\label{algo:st-tiling}
+\end{algorithm}
+
 
 \paragraph{Detection of conflicts}
 If $C$ indicates the presence of at least one conflict, say between $T_i$ and $T_j$, we add a ``fake connection'' between $T_i$ and $T_j$ and loop back to the coloring stage. $T_i$ and $T_j$ are now connected, so they will receive different colors. 
@@ -424,58 +532,32 @@ Local maps are used during execution in place of the global maps provided by the
 
 
 
-%LOCAL MAPS: Finally, for each $T_i \in \mathbb{T}$, for each $L_j \in \mathbb{L}$, for each map used in $L_j$, create a local map. 
+\subsection{The Generalized Sparse Tiling Executor}
 
-
-%The projection algorithm is used to propagate data dependencies as iterations are scheduled to tiles. A projection is a function $\phi : S \rightarrow \mathbb{T}$. 
-%
-%\begin{Algo}[Projection]
-%\label{algo:st-projection}
-%\normalfont 
-%The input are:
-%\begin{enumerate}
-%\item A loop $L_{i-1}$;
-%\item A tiling function for $L_{i-1}$, $\sigma_{i-1}$;
-%\item A set of projections, $\Phi$.
-%\end{enumerate}
-%The algorithm returns:
-%\begin{itemize}
-%\item A new set of projections, $\Phi'$;
-%\item The conflicts matrix, $C$.
-%\end{itemize}
-%
-%For each descriptor ${<}M$, $\operatorname{mode}{>}$ in $L_{i-1}$, there are three possibilities:
-%\begin{itemize}
-%\item The access mode is of type read ($\operatorname{mode} ==\ r$); skip.
-%
-%\item The map is direct ($M ==\ \perp$); update $\Phi' = \Phi \cup \sigma_{i-1}$.
-%
-%\item The access mode is of type write ($\operatorname{mode} \in \lbrace w, i \rbrace$) an $M$ is indirect. Let $M$ be a mapping for the iteration space of $L_{i-1}$ to another set $S_j$; that is, $M : S_{i-1} \rightarrow S_j^0 \times S_j^1 \times ... \times S_j^{a-1}$.
-%\end{itemize}
-%
-%\end{Algo}
-
-\begin{Algo}[Tiling]
-\label{algo:st-tiling}
-\normalfont 
-~
-\begin{enumerate}
-\item 
-\end{enumerate}
-\end{Algo}
-
-
-\subsection{Execution}
-
-
-\begin{Algo}[Sparse Tiling Executor]
+\begin{algorithm}
+\kwInput{A set of populated tiles $\mathbb{T}$}
+\KwResult{Execute the loop chain, thus modifying the data sets written or incremented within $\mathbb{L}$}
+\nonl ~\\
+$\mathbb{T}^{core}$, $\mathbb{T}^{bound}$ $\gets$ group$\_$tiles$\_$byregion($\mathbb{T}$)\;
+\nonl ~\\
+start$\_$MPI$\_$communications()\;
+\nonl ~\\
+\ForEach{available color $c$}{
+  \ForEach{$T \in \mathbb{T}^{core}$ s.t. $T$.color $== c$}{
+    execute$\_$tile($T$)\;
+  }
+}
+\nonl ~\\
+end$\_$MPI$\_$communications()\;
+\nonl ~\\
+\ForEach{available color $c$}{
+  \ForEach{$T \in \mathbb{T}^{bound}$ s.t. $T$.color $== c$}{
+    execute$\_$tile($T$)\;
+  }
+}
+\caption{The executor algorithm}
 \label{algo:st-executor}
-\normalfont 
-~
-\begin{enumerate}
-\item 
-\end{enumerate}
-\end{Algo}
+\end{algorithm}
 
 
 \subsection{Correctness of Inspection}
@@ -484,7 +566,7 @@ Local maps are used during execution in place of the global maps provided by the
 \subsection{Computational Complexity of Inspection}
 ...
 
-\section{Automation}
+\section{Implementation}
 \label{sec:tiling:automation}
 %- is automation possible ? -> DSLs !!! + lazy evaluation + inspector/executor + mpi-trick
 % subsets ! seed loop cannot be subset
