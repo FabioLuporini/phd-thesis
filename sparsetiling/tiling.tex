@@ -200,20 +200,26 @@ Because of our focus on unstructured mesh computations, and inspired by the prog
 
 \item $\mathbb{S}$ is a set of disjoint $m$ sets, $S_0, S_1, ..., S_{m-1}$. Possible sets are the elements in the mesh or the degrees of freedom associated to a certain function. A loop iterates over a set, or iteration space. A dataset is logically associated with a set (i.e., each value in the dataset is associated with a set element). 
 
-\item A set $S$ is logically split into three contiguous regions: core ($S^{c}$), boundary ($S^{b}$), and non-exec ($S^{n}$). This separation is essential for distributed memory parallelism. Given a process $P$ and a set $S$, we have that:
+A set $S$ is logically split into three contiguous regions: core ($S^{c}$), boundary ($S^{b}$), and non-exec ($S^{ne}$). Given a process $P$ and a set $S$, we have that:
 \begin{description}
  \item[$S^{c}$] The iterations of $S$ that exclusively belong to $P$.
- \item[$S^{b}$] The boundary region can be seen as the union of two sub-regions, $S^{owned}$ and $S^{exec}$. $S^{owned}$ are iterations that belong to $P$ which will be redundantly executed by some other processes; $S^{exec}$ are iterations from other processes which are redundantly executed by $P$. We will see that redundant execution is exploited to preserve atomic execution; that is, the fact that all tiles can execute their iterations without the need for synchronization.
-  \item[$S^{n}$] These are iterations of other processes that are communicated to $P$ because they need be indirectly read to correctly compute $S^{b}$.
+ \item[$S^{b}$] The boundary region can be seen as the union of two sub-regions, owned ($S^{owned}$) and exec ($S^{exec}$). $S^{owned}$ are iterations that belong to $P$ which will be redundantly executed by some other processes; $S^{exec}$ are iterations from other processes which are redundantly executed by $P$. We will see that redundant execution is exploited to preserve atomic execution; that is, the fact that all tiles can execute their iterations without the need for synchronization.
+  \item[$S^{ne}$] These are iterations of other processes that are communicated to $P$ because they need be indirectly read to correctly compute $S^{b}$.
  \end{description} 
-%We therefore have $S = S^{c} \frown S^{b} \frown S^{n}$. 
+ 
+A set is uniquely identified by a name and the sizes of its three regions. For example, the notation $S = (\operatorname{vertices}, C, B, N)$ defines the $\operatorname{vertices}$ set, which comprises $C$ elements in the core region (iterations $0$ to $C-1$), $B$ elements in the boundary region (iterations $C$ to $C+B-1$), and $N$ elements in the non-exec region (iterations $C+B$ to $C+B+N-1$).
+%We therefore have $S = S^{c} \frown S^{b} \frown S^{ne}$. 
+
+\item The {\em depth} is an integer indicating the extent of the boundary region of a set. This constant is the same for all sets. 
 
 \item $\mathbb{M}$ is a set of $k$ maps, $M_0, M_1, ..., M_{k-1}$. A map of arity $a$ is a vector-valued function $M : S_i \rightarrow S_j^0 \times S_j^1 \times ... \times S_j^{a-1}$. It connects each element of $S_i$ to one or more elements in $S_j$. For example, if a triangular cell $c$ is connected to three vertices $v_0, v_1, v_2$, we have $M(c) = [v_0, v_1, v_2]$. 
 
 \item A loop $L_i$ over the iteration space $S$ is associated with $d$ descriptors, $D_0, D_1, ..., D_{d-1}$. Each descriptor $D_j$ is a 2-tuple $D_j = {<}M,\ \operatorname{mode}{>}$; $M$ is either a map from $S_j$ to some other sets or the special placeholder $\perp$, which indicates that the access is direct to some data associated with $S_j$, whereas $\operatorname{mode}$ is one of $[r,\ w,\ i]$, respectively read, write and increment.
 \end{itemize}
 
-With respect to the original definition, one of the most important differences is the lack of data spaces. In unstructured mesh applications, loops tend to access multiple data spaces associated with the same set, so the idea is to rather rely on the latter to perform data dependency analysis. This can significantly improve the inspection cost, because typically $|\mathbb{S}| << |\mathbb{D}|$. The second fundamental difference is the characterization of sets into the three regions core, boundary and non-exec. 
+With respect to the original definition, one of the most important differences is the lack of data spaces. In unstructured mesh applications, loops tend to access multiple data spaces associated with the same set, so the idea is to rather rely on the latter to perform data dependency analysis. This can significantly improve the inspection cost, because typically $|\mathbb{S}| << |\mathbb{D}|$. 
+
+The second fundamental difference is the characterization of sets into the three regions core, boundary and non-exec. This separation is essential for distributed memory parallelism, whereas we have  $S^{b} = S^{ne} = \emptyset$ in the case of pure shared memory execution. The extent of the boundary regions is captured by the {\em depth} of the loop chain, whose meaning will become more clear in Section~\ref{algo:st-executor}. 
 
 \begin{algorithm}
 \scriptsize\ttfamily
@@ -435,7 +441,6 @@ create$\_$local$\_$maps($\mathbb{T}$)\;
 \end{algorithm}
 
 
-%LOCAL MAPS: Finally, for each $T_i \in \mathbb{T}$, for each $L_j \in \mathbb{L}$, for each map used in $L_j$, create a local map. 
 
 
 \paragraph{Choice of the seed loop}
@@ -453,7 +458,7 @@ We then create $m+k+1$ tiles, $\mathbb{T} = \lbrace T_0^c, ..., T_{m-1}^c, T_m^{
 A tile $T_i$ has four fields, as summarized in Table~\ref{table:st-tile-structure}. The region is used by the executor to schedule tiles in a certain order. The value of this field is determined right after the seed partitioning, since a tile is exclusively in one of $\lbrace S_{seed}^c, S_{seed}^b, S_{seed}^n \rbrace$. The iterations lists represent the iterations in $\mathbb{L}$ belonging to $T_i$. For each $L_j \in \mathbb{L}$, there is one iterations list $T_i^{L_j}$. At the beginning, for each $T_i \in \mathbb{T}$ we have $T_i^{L_{seed}} = T_i^{L_0} = P_i$, whereas all other lists are empty. Local maps are used by the executor in place of the global maps provided by the loop chain; we will see that this allows avoiding double indirections.
 
 
-\begin{table}[h]
+\begin{table}
 \centering
 \begin{tabulary}{1.0\columnwidth}{P{2.7cm} | P{8.5cm}}
 \hline
@@ -475,11 +480,8 @@ Each tile needs be assigned a color, which gives it a scheduling priority. If sh
 In order to schedule a loop to tiles we use projections. A projection is a function $\phi_S : S \rightarrow \mathbb{T}$. Projections are computed and/or updated after tiling a loop. Initially, the set $\Phi$ of all projections is empty. Starting with the seed tiling $\sigma_{seed} : S_{seed} \rightarrow \mathbb{T}$, we iteratively update $\Phi$ and build tiling functions for all other loops $[L_1, L_2, ..., L_{n-1}]$. 
 
 \paragraph{Projecting tiled sets}
-Algorithm~\ref{algo:st-projection} takes as input $\sigma_{i-1}$ and (the descriptors of) $L_{i-1}$ to update $\Phi$. Further, the conflicts matrix $C \in \mathbb{N}^{m \times m}$, indicating whether two different tiles having the same color will become adjacent after tiling $L_{i-1}$, is updated. 
 
-A projection tells what tile a set element logically belongs to at a given point of the tiling process. A new projection $\phi_{S}$ is needed if the elements of $S$ are written by $L_i$. Let us consider the non-trivial case in which writes or increments occur indirectly through a map $M : S_i \rightarrow S_j^0 \times S_j^1 \times ... \times S_j^{a-1}$. To compute $\phi_{S_{j}}$, we first determine the inverse map (an example is shown in Figure~\ref{fig:st-inverse-map}). Then, we iterate over all elements of $S_i$ that indirectly access elements in $S_j$. In particular, given $e \in S_j$, we determine the last tile that writes to $e$, say $T_{last}$, through the application of the $\operatorname{MAX}$ function to tile colors. We then simply set $\phi_{S_{j}}[e] = T_{last}$. 
-
-\begin{algorithm}[h]
+\begin{algorithm}[t]
 \kwInput{A loop $L_{i}$, a tiling function $\sigma_{i}$, the projections set $\Phi$, the conflicts matrix $C$}
 \KwResult{Update $\Phi$ and $C$}
 \nonl ~\\
@@ -510,12 +512,16 @@ A projection tells what tile a set element logically belongs to at a given point
 \label{algo:st-projection}
 \end{algorithm}
 
+Algorithm~\ref{algo:st-projection} takes as input $\sigma_{i-1}$ and (the descriptors of) $L_{i-1}$ to update $\Phi$. Further, the conflicts matrix $C \in \mathbb{N}^{m \times m}$, indicating whether two different tiles having the same color will become adjacent after tiling $L_{i-1}$, is updated. 
+
+A projection tells what tile a set element logically belongs to at a given point of the tiling process. A new projection $\phi_{S}$ is needed if the elements of $S$ are written by $L_i$. Let us consider the non-trivial case in which writes or increments occur indirectly through a map $M : S_i \rightarrow S_j^0 \times S_j^1 \times ... \times S_j^{a-1}$. To compute $\phi_{S_{j}}$, we first determine the inverse map (an example is shown in Figure~\ref{fig:st-inverse-map}). Then, we iterate over all elements of $S_i$ that indirectly access elements in $S_j$. In particular, given $e \in S_j$, we determine the last tile that writes to $e$, say $T_{last}$, through the application of the $\operatorname{MAX}$ function to tile colors. We then simply set $\phi_{S_{j}}[e] = T_{last}$. 
+
+
 % ($C[i,j] = 1$ implies that $T_i$ and $T_j$ have the same color and will become adjacent after tiling $L_{i-1}$).
 
 \paragraph{Scheduling loops} 
-Using $\Phi$, we compute $\sigma_i$ as described in Algorithm~\ref{algo:st-tiling}. The algorithm is similar to the projection of a tiled loop, with the main difference being that now we use $\Phi$ to schedule iterations correctly. Finally, $\sigma_i$ is inverted and the iterations added to the corresponding iteration lists $T_j^{L_i}$ of all $T_j \in \mathbb{T}$. 
 
-\begin{algorithm}[h]
+\begin{algorithm}[t]
 \kwInput{A loop $L_{i}$ (with iteration space $S_i$), the projections set $\Phi$}
 \kwOutput{The tiling function $\sigma_{i}$}
 \nonl ~\\
@@ -543,6 +549,8 @@ $\sigma_i \gets \perp$\;
 \label{algo:st-tiling}
 \end{algorithm}
 
+Using $\Phi$, we compute $\sigma_i$ as described in Algorithm~\ref{algo:st-tiling}. The algorithm is similar to the projection of a tiled loop, with the main difference being that now we use $\Phi$ to schedule iterations correctly. Finally, $\sigma_i$ is inverted and the iterations added to the corresponding iteration lists $T_j^{L_i}$ of all $T_j \in \mathbb{T}$. 
+
 
 \paragraph{Detection of conflicts}
 If $C$ indicates the presence of at least one conflict, say between $T_i$ and $T_j$, we add a ``fake connection'' between $T_i$ and $T_j$ and loop back to the coloring stage. $T_i$ and $T_j$ are now connected, so they will receive different colors. 
@@ -552,11 +560,7 @@ If $C$ indicates the presence of at least one conflict, say between $T_i$ and $T
 
 \subsection{The Generalized Sparse Tiling Executor}
 
-The sparse tiling executor is illustrated in Algorithm~\ref{algo:st-executor}. It consists of four main phases: triggering of MPI communications; execution of core tiles (in overlap with communication); waiting for the termination of all MPI communications; execution of boundary tiles.
-
-As seen in the example in Section~\ref{sec:tiling:ex-dist} and based on the explanation in Section~\ref{sec:tiling:inspector}, we know that the core tiles do not require any off-process information to execute as long as the boundary regions are (i) up-to-date and (ii) ``sufficiently deep''. If both conditions hold, the execution is semantically correct and it is safe to overlap computation of core tiles with the communication of boundary data. 
-
-\begin{algorithm}
+\begin{algorithm}[t]
 \kwInput{A set of tiles $\mathbb{T}$}
 \KwResult{Execute the loop chain, thus modifying the data sets written or incremented within $\mathbb{L}$}
 \nonl ~\\
@@ -581,23 +585,48 @@ end$\_$MPI$\_$communications()\;
 \label{algo:st-executor}
 \end{algorithm}
 
+
+The sparse tiling executor is illustrated in Algorithm~\ref{algo:st-executor}. It consists of four main phases: triggering of MPI communications; execution of core tiles (in overlap with communication); waiting for the termination of all MPI communications; execution of boundary tiles.
+
+As seen in the example in Section~\ref{sec:tiling:ex-dist} and based on the explanation in Section~\ref{sec:tiling:inspector}, we know that the core tiles do not require any off-process information to execute as long as the boundary regions are (i) up-to-date and (ii) ``sufficiently deep''. If both conditions hold, the execution is semantically correct and it is safe to overlap computation of core tiles with the communication of boundary data. 
+
+
 \paragraph{The depth of the boundary region}
 In $\mathbb{L}$ we have $n$ loops. A tile ``crosses'' all of these loops and is executed atomically; that is, once it starts executing its iterations, it reaches the end without the need for synchronization with other processes. With this execution model, the boundary region must include a sufficient amount of off-process iterations for a correct computation of the tiles along the border with the core region. 
 
-In the extreme case $n=1$, a single ``strip'' of iterations belonging to adjacent processes need be redundantly executed. As $n$ increases, more off-process data is required. If $n=3$, as in the example in Figure~\ref{fig:tiling:mpi-n3}, we need three ``strips'' of off-process iterations to be computed in order for the datasets over $X$ to be correctly evaluated when executing iterations belonging to $L_3$.
+In the extreme case $n=1$, a single ``strip'' of iterations belonging to adjacent processes need be redundantly executed. As $n$ increases, more off-process data is required. If $n=3$, as in the example in Figure~\ref{fig:tiling:mpi-n3}, we need three ``strips'' of off-process iterations to be computed in order for the datasets over $X$ to be correctly updated when executing iterations belonging to $L_3$.
 
-The $\operatorname{S-depth}$ is a constant provided through the loop chain abstraction that informs the inspector about the extent of the boundary region. For correctness, we cannot tile more than $\operatorname{S-depth}$ loops, so if $n > \operatorname{S-depth}$ the loop chain is split into smaller sequences of loops, which are eventually inspected and executed separately. 
+The {\em depth} is a constant provided through the loop chain abstraction that informs the inspector about the extent of the boundary region. For correctness, we cannot tile more than {\em depth} loops, so if $n >$ {\em depth} the loop chain must first be split into smaller sequences of loops, to be individually inspected and executed. 
 
 %For ease of explanation, this aspect has been neglected in the inspector algorithms described in the previous section. 
 
 %Our inspector/executor strategy, therefore, works correctly as long as the loop chain has been ``dimensioned'' properly, with sufficient information in all $S^{b}$ regions 
 
-\paragraph{The execution of a tile}
-...
+%\paragraph{The execution of a tile}
 
 
 \subsection{Computational Complexity of Inspection}
-...
+Let $N$ be the maximum size of a set in $\mathbb{L} = [L_0, L_1, ..., L_{n-1}]$ and let $M$ be the maximum number of sets accessed in a loop. If $a$ is the maximum arity of a map, then $K = a N$ is the maximum cost for iterating over a map. $K$ is also the worst-case cost for inverting a map. Let $p < 1$ be the probability that a conflict arises during inspection in the case of shared memory parallelism; thus, the expected number of inspection rounds is $R = \frac{1}{1-p}$. Hence, the worst-case computational costs of the main inspection phases are as in Table~\ref{table:st-comp-cost}.
+
+\begin{table}[h]
+\centering
+\begin{tabulary}{1.0\columnwidth}{P{2.7cm} | c | c}
+\hline
+Phase & Cost shared memory & Cost distributed memory \\
+\hline
+Partitioning & $N$ & $N$ \\
+Coloring & $R K $ & $N$ \\ 
+Projection & $R (n M N K^2) $ & $n M N K^2 $ \\ 
+Tiling & $R (n M N K) $ & $n M N K $ \\
+Local maps & $n M$ & $n M$\\
+\hline
+\end{tabulary}
+\caption{Worst-case costs of inspection.}
+\label{table:st-comp-cost}
+\end{table}
+
+
+%LOCAL MAPS: Finally, for each $T_i \in \mathbb{T}$, for each $L_j \in \mathbb{L}$, for each map used in $L_j$, create a local map. 
 
 \section{Implementation}
 \label{sec:tiling:automation}
