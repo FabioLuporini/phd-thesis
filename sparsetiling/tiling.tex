@@ -757,19 +757,37 @@ The $\operatorname{loop\_chain}$ interface is used to identify the sub-sequence 
 
 \subsection{Firedrake/DMPlex: the S-depth mechanism for MPI}
 \label{sec:tiling:impl-firedrake}
+Firedrake uses DMPlex~\cite{dmplex} to handle meshes. In particular, DMPlex is responsible for partitioning, distributing over multiple processes, and locally reordering a mesh. The MPI parallelization, therefore, must completely be handled by Firedrake.
+
+During the start-up phase, each MPI process receives a contiguous partition of the original mesh from DMPlex. It then creates various PyOP2 sets, representing either mesh components (e.g., cells, vertices) or function spaces. As seen in Section~\ref{sec:bkg:op2}, PyOP2 sets distinguish between different regions: core, owned, exec, and non-exec. Firedrake is directly responsible for setting the halo regions and creating data structures describing the communication pattern among different processes.
+
+For supporting our loop chain abstraction, Firedrake must be able to allocate arbitrarily deep halo regions. Firedrake and DMPlex have been made more flexible to support this feature\footnote{Michael Lange carried out the bulk of the implementation.}. An additional parameter, called {\em S-depth} for historical reasons~\cite{s-depth-paper}, is now accepted when initializing a mesh. A value $s-depth = n$ indicates the presence of $n$ strips of off-process data elements; the default value is $s-depth = 1$, which implements the standard execution model in Firedrake/PyOP2 (i.e., no tiling, but a small amount of redundant computation along partition boundaries to overlap communication with computation).
 
 \subsection{Limitations}
-... aggressive mode of firedrake, automatic tiling ?
+%1) ... aggressive mode of firedrake, automatic tiling ?
+%2) ...larger chunks communciated in the whole app if sdepth greater than 1, even outside of loop chain
 
 \section{Performance Evaluation}
-...
+To evaluate the performance improvements of our technique, the experimentation was divided into two phases:
+\begin{enumerate}
+\item Generalized sparse tiling was initially applied to two benchmarks: a sparse Jacobi kernel and a proxy unstructured mesh application, originally developed as a demo for the OP2 framework. 
+\item Then, we have applied the optimization to a real-world application developed in Firedrake, Seigen, an Elastic Wave Equation Solver for Seismological Problems. 
+\end{enumerate}
+
+%note: tile size independent of mesh size !!!! but actually dependent on the application...!
+
 
 \subsection{Benchmarks}
-\begin{itemize}
-\item Sparse Jacobi (don't forget to just use tables or words instead of plots...)
-\item Airfoil
-\item Wave Explicit
-\end{itemize}
+These codes are written in C and they only support shared memory parallelism via OpenMP. A previous version of the inspector algorithms presented in this chapter, described in~\cite{st-paper}, was used. As detailed next, one of the major drawbacks of this older inspector was its cost, which grew very rapidly with the number of loops in the chain and the number of distinct datasets accessed. 
+
+\subsubsection{Sparse Jacobi}
+... (don't forget to just use tables or words instead of plots...)
+
+\subsubsection{Airfoil}
+...
+
+\subsubsection{Conclusions}
+One of the most important outcomes of this first set of experiments concerns the inspection cost, which we found to significantly impact the overall execution time. To effectively support real applications like Seigen, typically characterized by a number of parallel loops larger than that of these benchmarks, we had to rework the original inspector algorithms as explained in Section~\ref{sec:tiling:inspector}. The most notable differences are: (i) data dependency analysis abstracted to the level of sets, rather than datasets; (ii) optimistic coloring with backtracking in case of conflicts; (iii) fully parallel projection and tiling phases, through the use of inverse maps. 
 
 \subsection{Seigen: an Elastic Wave Equation Solver for Seismological Problems}
 \label{sec:tiling:seigen}
