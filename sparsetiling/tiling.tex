@@ -298,38 +298,38 @@ Figure~\ref{fig:st-initial-part-sm} displays the situation after the initial par
 
 \begin{figure}[h]
 \centering
-\includegraphics[width=\textwidth]{sparsetiling/figures/partiotioned.pdf}
+\includegraphics[scale=0.7]{sparsetiling/figures/partiotioned.pdf}
 \caption{Partitioning of the seed loop.}
 \label{fig:st-initial-part-sm}
 \end{figure}
 
-\begin{figure}[h]
+There are four partitions, two of which are not connected through any edge or cell. These four partitions correspond to four tiles, $[T_0,\ T_1,\ T_2,\ T_3]$. Similarly to OP2, for shared-memory parallelism we adopt the following approach: (i) we serialize the execution of the elements inside a partition by scheduling them to a single thread; (ii) we color the partitions such that partitions assigned the same color can be executed in parallel by different threads. Two tiles can have the same color if they are not connected, because this ensures the absence of race conditions through indirect memory accesses. In the example we can use three colors: red (R), green (G), and blue (B). The two tiles at the top right and bottom left are not connected, so they are assigned the same color (green). The colored tiles are shown in Figure~\ref{fig:st-loop-0}. In the following, with the notation $T_i^c$ we mean that the $i$-th tile has color $c$. 
+
+\begin{figure}[b]
 \centering
-\includegraphics[width=\textwidth]{sparsetiling/figures/loop_0.pdf}
+\includegraphics[scale=0.7]{sparsetiling/figures/loop_0.pdf}
 \caption{Tiling $L_0$.}
 \label{fig:st-loop-0}
 \end{figure}
-
-There are four partitions, two of which are not connected through any edge or cell. These four partitions correspond to four tiles, $[T_0,\ T_1,\ T_2,\ T_3]$. Similarly to OP2, for shared-memory parallelism we adopt the following approach: (i) we serialize the execution of the elements inside a partition by scheduling them to a single thread; (ii) we color the partitions such that partitions assigned the same color can be executed in parallel by different threads. Two tiles can have the same color if they are not connected, because this ensures the absence of race conditions through indirect memory accesses. In the example we can use three colors: red (R), green (G), and blue (B). The two tiles at the top right and bottom left are not connected, so they are assigned the same color (green). The colored tiles are shown in Figure~\ref{fig:st-loop-0}. In the following, with the notation $T_i^c$ we mean that the $i$-th tile has color $c$. 
 
 In order to populate the tiles with iterations from $L_1$ and $L_2$, we first have to establish a total ordering for the execution of partitions with different colors. Here, we assume the following order: green (G), blue (B), and red (R). This means, for instance, that \textit{all iterations} assigned to $T_1^B$ must be executed \textit{before all iterations} assigned to $T_2^R$. By ``all iterations'' we mean the iterations from $L_0$, as established by the seed partitioning, as well as the iterations that will later be assigned from $L_1$ and $L_2$. We assign integer positive numbers to colors to reflect their ordering, where a smaller number means higher execution priority. In this case, we can assign 0 to green, 1 to blue, and 2 to red.
 
 
 \begin{figure}[h]
 \centering
-\includegraphics[width=\textwidth]{sparsetiling/figures/loop_0_with_vertices.pdf}
+\includegraphics[scale=0.7]{sparsetiling/figures/loop_0_with_vertices.pdf}
 \caption{Projection of $L_0$ to $L_1$.}
 \label{fig:st-loop-0-proj}
 \end{figure}
 
-To schedule the iterations of $L_1$ to $[T_0^G,\ T_1^B,\ T_2^R,\ T_3^G]$, we first need to compute a \textit{projection} of any write or local reduction performed within $L_0$.  A projection for $L_0$ is a function $\phi : V \rightarrow \mathbb{T}$ mapping a vertex (indirectly) incremented during the execution of $L_0$ to a tile. Consider the vertex $v_0$ in Figure~\ref{fig:st-loop-0-proj}. $v_0$ has 7 incident edges, 2 of which belong to $T_0^G$, while the remaining 5 to $T_1^B$. Since we established that $G \prec B$, $v_0$ can only be read after $T_1^B$ has finished executing the iterations from $L_0$ (i.e., the 5 incident blue edges). We express this condition by setting $\phi(v_0) = T_1^B$. Observe that we can compute $\phi$ by iterating over $V$ and, for each vertex, applying the maximum function ($MAX$) to the color of the adjacent edges. 
-
 \begin{figure}[h]
 \centering
-\includegraphics[width=\textwidth]{sparsetiling/figures/loop_1.pdf}
+\includegraphics[scale=0.7]{sparsetiling/figures/loop_1.pdf}
 \caption{Tiling $L_1$.}
 \label{fig:st-loop-1}
 \end{figure}
+
+To schedule the iterations of $L_1$ to $[T_0^G,\ T_1^B,\ T_2^R,\ T_3^G]$, we first need to compute a \textit{projection} of any write or local reduction performed within $L_0$.  A projection for $L_0$ is a function $\phi : V \rightarrow \mathbb{T}$ mapping a vertex (indirectly) incremented during the execution of $L_0$ to a tile. Consider the vertex $v_0$ in Figure~\ref{fig:st-loop-0-proj}. $v_0$ has 7 incident edges, 2 of which belong to $T_0^G$, while the remaining 5 to $T_1^B$. Since we established that $G \prec B$, $v_0$ can only be read after $T_1^B$ has finished executing the iterations from $L_0$ (i.e., the 5 incident blue edges). We express this condition by setting $\phi(v_0) = T_1^B$. Observe that we can compute $\phi$ by iterating over $V$ and, for each vertex, applying the maximum function ($MAX$) to the color of the adjacent edges. 
 
 We now use $\phi$ to schedule $L_1$, a loop over cells, to the tiles. Consider again $v_0$ and the adjacent cells $[c_0,\ c_1,\ c_2]$. These three cells have in common the fact that they are adjacent to both green and blue vertices. For $c_1$, and similarly with the other cells, we compute $MAX(\phi(v_0),\ \phi(v_1),\ \phi(v_2)) = MAX(B, G, G) = B = 1$. This establishes that $c_1$ must be assigned to $T_1^B$, because otherwise ($c_1$ assigned instead to $T_0^G$) a read to $v_0$ would occur before the last increment from $T_1^B$ took place. We indeed reiterate once more that the execution order is ``all iterations from $[L_0, L_1, L_2]$ in the green tiles before all iterations from $[L_0, L_1, L_2]$ in the blue tiles''. The result of scheduling $L_1$ to tiles is displayed in Figure~\ref{fig:st-loop-1}.
 
@@ -337,7 +337,7 @@ In order to schedule $L_2$ to $[T_0^G,\ T_1^B,\ T_2^R,\ T_3^G]$ we employ a simi
 
 \begin{figure}[h]
 \centering
-\includegraphics[width=\textwidth]{sparsetiling/figures/loop_2.pdf}
+\includegraphics[scale=0.7]{sparsetiling/figures/loop_2.pdf}
 \caption{Tiling $L_2$.}
 \label{fig:st-loop-2}
 \end{figure}
@@ -565,7 +565,7 @@ In order to schedule a loop to tiles we use projections. A projection is a funct
     inverse$\_$map $\gets$ map$\_$invert($D$.map)\;
     $S_{j}$, $S_{i}$, values, offsets $\gets$ inverse$\_$map\;
     $\phi_{S_{j}} \gets \perp$\; 
-    \For{$e=0$ \KwTo $S_j$.size}{
+    \For{$e=0$ \KwTo $S_j$.size}{ \label{algo:st-projection-parallel}
       \For{$k=$ offsets[e] \KwTo offsets[e+1]}{
         adjacent$\_$tile = $\mathbb{T}$[values[k]]\;
         max$\_$color $\gets$ MAX($\phi_{S_{j}}[e]$.color, adjacent$\_$tile.color)\;
@@ -602,7 +602,7 @@ $\sigma_i \gets \perp$\;
   }{
     arity $\gets D$.map.arity\;
     $\phi_{S} \gets \Phi[D$.map.$S_{j}$]\;
-    \For{$e=0$ \KwTo $S_i$.size}{
+    \For{$e=0$ \KwTo $S_i$.size}{ \label{algo:st-tiling-parallel}
        $\sigma_i[e] \gets T_{\perp}$ \;
       \For{$k=0$ \KwTo arity}{
         adjacent$\_$tile $\gets \phi_{S}$[$D$.map.values[e*arity + k]]\;
@@ -639,7 +639,7 @@ $\mathbb{T}^{c}$, $\mathbb{T}^{b}$ $\gets$ group$\_$tiles$\_$byregion($\mathbb{T
 start$\_$MPI$\_$communications()\;
 \nonl ~\\
 \ForEach{available color $c$}{
-  \ForEach{$T \in \mathbb{T}^{c}$ s.t. $T$.color $== c$}{
+  \ForEach{$T \in \mathbb{T}^{c}$ s.t. $T$.color $== c$}{ \label{algo:st-executor:parallel1}
     execute$\_$tile($T$)\;
   }
 }
@@ -647,7 +647,7 @@ start$\_$MPI$\_$communications()\;
 end$\_$MPI$\_$communications()\;
 \nonl ~\\
 \ForEach{available color $c$}{
-  \ForEach{$T \in \mathbb{T}^{b}$ s.t. $T$.color $== c$}{
+  \ForEach{$T \in \mathbb{T}^{b}$ s.t. $T$.color $== c$}{ \label{algo:st-executor:parallel2}
     execute$\_$tile($T$)\;
   }
 }
@@ -676,9 +676,8 @@ The {\em depth} is a constant provided through the loop chain abstraction that i
 
 
 \subsection{Computational Complexity of Inspection}
-Let $N$ be the maximum size of a set in $\mathbb{L} = [L_0, L_1, ..., L_{n-1}]$ and let $M$ be the maximum number of sets accessed in a loop. If $a$ is the maximum arity of a map, then $K = a N$ is the maximum cost for iterating over a map. $K$ is also the worst-case cost for inverting a map. Let $p < 1$ be the probability that a conflict arises during inspection in the case of shared memory parallelism; thus, the expected number of inspection rounds is $R = \frac{1}{1-p}$. Hence, the worst-case computational costs of the main inspection phases are as in Table~\ref{table:st-comp-cost}.
 
-\begin{table}[h]
+\begin{table}[t]
 \centering
 \begin{tabulary}{1.0\columnwidth}{P{2.7cm} | c | c}
 \hline
@@ -695,23 +694,72 @@ Local maps & $n M$ & $n M$\\
 \label{table:st-comp-cost}
 \end{table}
 
+Let $N$ be the maximum size of a set in $\mathbb{L} = [L_0, L_1, ..., L_{n-1}]$ and let $M$ be the maximum number of sets accessed in a loop. If $a$ is the maximum arity of a map, then $K = a N$ is the maximum cost for iterating over a map. $K$ is also the worst-case cost for inverting a map. Let $p < 1$ be the probability that a conflict arises during inspection in the case of shared memory parallelism; thus, the expected number of inspection rounds is $R = \frac{1}{1-p}$. Hence, the worst-case computational costs of the main inspection phases are as in Table~\ref{table:st-comp-cost}.
+
+
 
 %LOCAL MAPS: Finally, for each $T_i \in \mathbb{T}$, for each $L_j \in \mathbb{L}$, for each map used in $L_j$, create a local map. 
 
 \section{Implementation}
 \label{sec:tiling:automation}
+Our implementation of generalized sparse tiling is distributed across three software modules. 
+\begin{description}
+\item[Firedrake] This is a framework for the automated solution of finite element methods, already described in Section~\ref{sec:bkg:firedrake}.
+\item[PyOP2] Firedrake produces numerical kernels to be applied over sets of mesh components. The parallel iteration over the mesh is handled by PyOP2.
+\item[SLOPE] A library for writing generalized inspector/executor schemes, with primary focus on sparse tiling. PyOP2 uses SLOPE for tiling loop chains.
+\end{description}
+The interactions between these modules is illustrated in Figure~\ref{fig:st-implementation}.
+
+In essence, users that want to adopt sparse tiling in their code only have to decorate a sequence of loops through a minimalistic interface exposed by PyOP2, which we refer to as the $\operatorname{loop\_chain}$ interface. In the case of a Firedrake program, in which loops are automatically generated from the mathematical notation (rather than written explicitly as in pure PyOP2 program), the same result can be achieved by wrapping a critical piece of code (e.g., a time-stepping loop, in which loops will be produced) again with the $\operatorname{loop\_chain}$ interface. The use of the $\operatorname{loop\_chain}$ interface is exemplified in Listing~\ref{code:loop-chain-interface} in two of the programs that we also employ for performance evaluation.
+
+To overcome most of the limitations described in Section~\ref{sec:tiling:limits} and to achieve full automation -- a feature of fundamental importance for the optimization to be actually exploited -- the following strategic choices were made:
+\begin{description}
+\item[Domain Specific Languages] Our implementation is fully integrated in a system that relies on a stack of DSLs (e.g., Firedrake and PyOP2). The abstractions provided by the DSLs extremely simplifies the analysis phase. For example, from the parallel loop construct in PyOP2 we can derive sufficient information to build a loop chain as described in Section~\ref{sec:tiling:lc-unstruct}.
+\item[Frameworks with user base] We wish generalized sparse tiling to be used in real scientific software, so we had to target a system with a significant, in steady expansion, user base. This obviously increases the implementation complexity, but also maximizes the chances of seeing sparse tiling at work in multiple applications.
+\item[Multi-layer structuring] We offer a trade-off between flexibility and implementation complexity. Adopting sparse tiling in Firedrake is the simplest option, because both the generation of inspector/executor schemes and MPI support, as explained in Section~\ref{sec:tiling:impl-firedrake}, are automated. If we have a pure PyOP2 program, or we are using a DSL other than Firedrake that exploits PyOP2, the generation of inspector/executor schemes for shared memory parallelism is automated, but MPI support must be coded explicitly (in particular, the separation of a set into the core, boundary and non-exec regions). Users could also apply sparse tiling to their own legacy code adding direct calls to the SLOPE library and providing explicit MPI support, but clearly this is the most complex option.
+\end{description}
 %- is automation possible ? -> DSLs !!! + lazy evaluation + inspector/executor + mpi-trick
 % subsets ! seed loop cannot be subset
 
-\subsection{SLOPE: a Library for Tiling Irregular Computations}
-...
+In the next sections, we describe the main mechanisms available in these three frameworks that make automation possible.
 
-\subsection{PyOP2: a Runtime Library for Mesh Iteration}
-...
+\subsection{SLOPE: a Library for Tiling Irregular Computations}
+SLOPE is an open source software available at \url{https://github.com/coneoproject/SLOPE}. It provides a set of functions to build a loop chain and to write an inspector/executor scheme for applying sparse tiling. 
+
+The loop chain abstraction supported by SLOPE was already described in Section~\ref{sec:tiling:lc-unstruct}. In essence, users provide the sets (including the separation into core, boundary, and non-exec regions), the relationship between them (maps), and the loops composing the loop chain. Each loop has a set of descriptors describing how the kernel accesses the values associated with some sets. The inspection is executed providing, in addition to the loop chain description, the tile size for the seed partitioning. The example in Listing~\ref{code:tiling-loopchain}, despite using a slightly different syntax than the original one, accurately illustrates the SLOPE's interface for inspection.
+
+For inspection, SLOPE implements all of the algorithms in Section~\ref{sec:tiling:inspector}. It also provides features to verify the effectiveness and the correctness of sparse tiling, namely:
+\begin{description}
+\item[VTK file generator] For each tiled loop, a file suitable for visualization in Paraview~\cite{paraview} can be produced, showing the mesh and the repartition into colored tiles.
+\item[The summary routine] Once a loop chain has been inspected, useful information are generated: the number and the average tile size, the total number of colors used (which can give an indication of how effective a shared memory parallelization will be), times for each of the inspection phases. 
+\end{description}
+
+In the case of shared memory parallelism, the following sections of code are parallelized through OpenMP:
+\begin{itemize}
+\item The projection and tiling algorithms; in particular, the loop at line~\ref{algo:st-projection-parallel} of Algorithm~\ref{algo:st-projection} and the loop at line~\ref{algo:st-tiling-parallel} of Algorithm~\ref{algo:st-tiling}).
+\item The execution of tiles having the same color; that is, the loops at lines~\ref{algo:st-executor:parallel1} and~\ref{algo:st-executor:parallel2} of Algorithm~\ref{algo:st-executor}.
+\end{itemize}
+
+
+\subsection{PyOP2: a Runtime Library for Mesh Iteration based on Lazy Evaluation}
+PyOP2 has already been detailed in Section~\ref{sec:bkg:op2}, so in this section we rather focus on two complementary aspects: the lazy evaluation mechanism and the interface with SLOPE.
+
+PyOP2 can lazily evaluate parallel loops. Parallel loops encountered in the code or generated through Firedrake are pushed into a queue rather than promptly executed. The sequence of parallel loops in the queue is called {\em trace}. If a field $f$ needs be read, for example because a user wants to inspect its values or a global linear algebra operation is about to be performed, the trace is traversed -- from the most recently pushed parallel loop to the oldest one -- and a new sub-trace produced. The sub-trace includes all parallel loops that need be executed for correctly updating $f$. 
+
+The $\operatorname{loop\_chain}$ interface is used to identify the sub-sequence of loops in the trace that will be sparse tiled. In particular, to create an inspector/executor scheme, SLOPE acts as follows:
+\begin{enumerate}
+\item As seen in the examples in Listing~\ref{code:loop-chain-interface}, the $\operatorname{loop\_chain}$ defines a new scope. As this scope is entered, a stamp $s_1$ of the loop chain is generated. This happens ``behind the scenes'', because the $\operatorname{loop\_chain}$ is a Python context manager, which invokes pre-specified routines prior and after the execution of the body. As the $\operatorname{loop\_chain}$ is exited, a new stamp $s_2$ of the trace is computed, and all parallel loops generated between $s_1$ and $s_2$ are placed into a list for pre-processing.
+\item The pre-processing of the extracted list of loops consists of two main phases: ``simple'' fusion of all consecutive parallel loops iterating over the same iteration space that do not present read-after-write or write-after-read dependencies through indirections/maps; generation of a loop chain suitable for SLOPE.
+\item SLOPE provides a thin Python interface to ease integration with other frameworks. PyOP2 inspects the sequence of loops and traduces data structures (sets, maps, loops) into a format suitable for the SLOPE's Python interface, which finally returns a string of C code. This code implements an inspector for the provided loop chain. PyOP2 just-in-time compile the code and runs it, obtaining the {\em inspection} data structure.
+\item A ``software cache'' mapping $\operatorname{loop\_chain}$s to {\em inspection} data structures is used. This process is therefore executed only once, because each time (e.g., in a time-stepping loop) the same $\operatorname{loop\_chain}$ is encountered, the corresponding {\em inspection} is retrieved.
+\item The executor is built analogously, and invoked each time $\operatorname{loop\_chain}$ is encountered.
+\end{enumerate}
 
 \subsection{Firedrake/DMPlex: the S-depth mechanism for MPI}
-...
+\label{sec:tiling:impl-firedrake}
 
+\subsection{Limitations}
+... aggressive mode of firedrake, automatic tiling ?
 
 \section{Performance Evaluation}
 ...
