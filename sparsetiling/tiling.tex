@@ -48,7 +48,7 @@ In this chapter, we will try answering these questions. Our study focuses on a p
 \item[Automation, but no legacy code] We view tiling as an ``extreme optimization''; that is, as an optimization that should be tried at the end of the development process, once the experimental results have been validated, to improve the execution time. In our experience, however, it is extremely rare that computational scientists have the expertise to add any low level optimizations, such as loop tiling, to their codes. In addition, applying these optimizations at the source level makes the code impenetrable and, therefore, almost impossible to maintain and to extend. Our aim is a fully automated technique abstracted to the users through a simple ``switch'' (i.e., loop tiling on/off) and a tiny set of parameters to drive performance tuning (e.g., the tile size). Automation clearly comes at the price of implementation complexity; we will integrate our tiling system with a generic framework for mesh iteration. We are therefore not interested in supporting legacy code, in which key computational aspects (e.g., mesh iteration, MPI communication) are usually hidden, for modularity, underneath several layers of software.
 \end{description}
 
-To support this class of applications and in order to maximize the chances that our work can be used in a variety of simulations in the years to come, our approach builds on two pillars:
+To support this class of applications and to maximize the chances of seeing our work integrated in a variety of simulations, our approach stands on two pillars:
 \begin{itemize}
 \item a library for writing inspector/executor schemes (\cite{IEscheme}) for tiling arbitrary computations on unstructured meshes (or graphs);
 \item a multilayer framework based on DSLs and runtime code generation that uses such a library to automate the applciation of loop tiling.
@@ -312,7 +312,7 @@ There are four partitions, two of which are not connected through any edge or ce
 \label{fig:st-loop-0}
 \end{figure}
 
-In order to populate the tiles with iterations from $L_1$ and $L_2$, we first have to establish a total ordering for the execution of partitions with different colors. Here, we assume the following order: green (G), blue (B), and red (R). This means, for instance, that \textit{all iterations} assigned to $T_1^B$ must be executed \textit{before all iterations} assigned to $T_2^R$. By ``all iterations'' we mean the iterations from $L_0$, as established by the seed partitioning, as well as the iterations that will later be assigned from $L_1$ and $L_2$. We assign integer positive numbers to colors to reflect their ordering, where a smaller number means higher execution priority. In this case, we can assign 0 to green, 1 to blue, and 2 to red.
+To populate the tiles with iterations from $L_1$ and $L_2$, we first have to establish a total ordering for the execution of partitions with different colors. Here, we assume the following order: green (G), blue (B), and red (R). This means, for instance, that \textit{all iterations} assigned to $T_1^B$ must be executed \textit{before all iterations} assigned to $T_2^R$. By ``all iterations'' we mean the iterations from $L_0$, as established by the seed partitioning, as well as the iterations that will later be assigned from $L_1$ and $L_2$. We assign integer positive numbers to colors to reflect their ordering, where a smaller number means higher execution priority. In this case, we can assign 0 to green, 1 to blue, and 2 to red.
 
 
 \begin{figure}[h]
@@ -333,7 +333,7 @@ To schedule the iterations of $L_1$ to $[T_0^G,\ T_1^B,\ T_2^R,\ T_3^G]$, we fir
 
 We now use $\phi$ to schedule $L_1$, a loop over cells, to the tiles. Consider again $v_0$ and the adjacent cells $[c_0,\ c_1,\ c_2]$. These three cells have in common the fact that they are adjacent to both green and blue vertices. For $c_1$, and similarly with the other cells, we compute $MAX(\phi(v_0),\ \phi(v_1),\ \phi(v_2)) = MAX(B, G, G) = B = 1$. This establishes that $c_1$ must be assigned to $T_1^B$, because otherwise ($c_1$ assigned instead to $T_0^G$) a read to $v_0$ would occur before the last increment from $T_1^B$ took place. We indeed reiterate once more that the execution order is ``all iterations from $[L_0, L_1, L_2]$ in the green tiles before all iterations from $[L_0, L_1, L_2]$ in the blue tiles''. The result of scheduling $L_1$ to tiles is displayed in Figure~\ref{fig:st-loop-1}.
 
-In order to schedule $L_2$ to $[T_0^G,\ T_1^B,\ T_2^R,\ T_3^G]$ we employ a similar process. Vertices are again written by $L_1$, so a new projection over $V$ will be computed and will be used in place of $\phi$ to schedule the edges in $L_2$. Figure~\ref{fig:st-loop-2} shows the result of this last phase. 
+To schedule $L_2$ to $[T_0^G,\ T_1^B,\ T_2^R,\ T_3^G]$ we employ a similar process. Vertices are again written by $L_1$, so a new projection over $V$ will be computed and will be used in place of $\phi$ to schedule the edges in $L_2$. Figure~\ref{fig:st-loop-2} shows the result of this last phase. 
 
 \begin{figure}[h]
 \centering
@@ -350,21 +350,21 @@ It is worth noting how $T_2^R$ ``consumed'' the frontier elements of all other t
 \centering
 \begin{subfigure}[b]{0.33\textwidth}
 \includegraphics[width=\textwidth]{sparsetiling/figures/loop_0_conflicts.pdf}
-\caption{After tiling loop 1}
+\caption{After tiling $L_0$}
 \label{fig:st-conflicts-a}
 \end{subfigure}%
 ~ 
 \begin{subfigure}[b]{0.33\textwidth}
 \centering
 \includegraphics[width=\textwidth]{sparsetiling/figures/loop_1_conflicts.pdf}
-\caption{After tiling loop 2}
+\caption{After tiling $L_1$}
 \label{fig:st-conflicts-b}
 \end{subfigure}%
 ~
 \begin{subfigure}[b]{0.34\textwidth}
 \centering
 \includegraphics[width=\textwidth]{sparsetiling/figures/loop_2_conflicts.pdf}
-\caption{After tiling loop 3}
+\caption{After tiling $L_2$}
 \label{fig:st-conflicts-c}
 \end{subfigure}%
 
@@ -547,7 +547,7 @@ local maps & one list of local maps for each $L_j \in \mathbb{L}$; one local map
 Each tile needs be assigned a color, which gives it a scheduling priority. If shared memory parallelism is requested, adjacent tiles are given different colors (the adjacency relation is determined through the maps available in $\mathbb{L}$). Otherwise, the colors are assigned to the tiles in increasing order (i.e., $T_i$ is given color $i$). The boundary tiles are always given colors higher than that of core tiles; the non-exec tile has highest color. In essence, this will allow the executor to schedule all core tiles first and all boundary tiles afterwards. 
 
 \paragraph{Construction of tiles by tracking data dependencies}
-In order to schedule a loop to tiles we use projections. A projection is a function $\phi_S : S \rightarrow \mathbb{T}$. Projections are computed and/or updated after tiling a loop. Initially, the set $\Phi$ of all projections is empty. Starting with the seed tiling $\sigma_{seed} : S_{seed} \rightarrow \mathbb{T}$, we iteratively update $\Phi$ and build tiling functions for all other loops $[L_1, L_2, ..., L_{n-1}]$. 
+To schedule a loop to tiles we use projections. A projection is a function $\phi_S : S \rightarrow \mathbb{T}$. Projections are computed and/or updated after tiling a loop. Initially, the set $\Phi$ of all projections is empty. Starting with the seed tiling $\sigma_{seed} : S_{seed} \rightarrow \mathbb{T}$, we iteratively update $\Phi$ and build tiling functions for all other loops $[L_1, L_2, ..., L_{n-1}]$. 
 
 \paragraph{Projecting tiled sets}
 
@@ -761,34 +761,107 @@ Firedrake uses DMPlex~\cite{dmplex} to handle meshes. In particular, DMPlex is r
 
 During the start-up phase, each MPI process receives a contiguous partition of the original mesh from DMPlex. It then creates various PyOP2 sets, representing either mesh components (e.g., cells, vertices) or function spaces. As seen in Section~\ref{sec:bkg:op2}, PyOP2 sets distinguish between different regions: core, owned, exec, and non-exec. Firedrake is directly responsible for setting the halo regions and creating data structures describing the communication pattern among different processes.
 
-For supporting our loop chain abstraction, Firedrake must be able to allocate arbitrarily deep halo regions. Firedrake and DMPlex have been made more flexible to support this feature\footnote{Michael Lange carried out the bulk of the implementation.}. An additional parameter, called {\em S-depth} for historical reasons~\cite{s-depth-paper}, is now accepted when initializing a mesh. A value $s-depth = n$ indicates the presence of $n$ strips of off-process data elements; the default value is $s-depth = 1$, which implements the standard execution model in Firedrake/PyOP2 (i.e., no tiling, but a small amount of redundant computation along partition boundaries to overlap communication with computation).
+For supporting our loop chain abstraction, Firedrake must be able to allocate arbitrarily deep halo regions. Firedrake and DMPlex have been made more flexible to support this feature\footnote{Michael Lange carried out the bulk of the implementation.}. An additional parameter, called {\em S-depth} for historical reasons~\cite{s-depth-paper}, is now accepted when initializing a mesh. A value {\em S-depth} $= n$ indicates the presence of $n$ strips of off-process data elements; the default value is {\em S-depth} $ = 1$, which implements the standard execution model in Firedrake/PyOP2 (i.e., no tiling, but a small amount of redundant computation along partition boundaries to overlap communication with computation).
 
-\subsection{Limitations}
-%1) ... aggressive mode of firedrake, automatic tiling ?
-%2) ...larger chunks communciated in the whole app if sdepth greater than 1, even outside of loop chain
 
 \section{Performance Evaluation}
-To evaluate the performance improvements of our technique, the experimentation was divided into two phases:
+The experimentation was divided into two phases:
+
 \begin{enumerate}
-\item Generalized sparse tiling was initially applied to two benchmarks: a sparse Jacobi kernel and a proxy unstructured mesh application, originally developed as a demo for the OP2 framework. 
-\item Then, we have applied the optimization to a real-world application developed in Firedrake, Seigen, an Elastic Wave Equation Solver for Seismological Problems. 
+\item Generalized sparse tiling was initially applied to two benchmarks: a sparse Jacobi kernel and a proxy unstructured mesh application, originally developed as a demo for the OP2 framework. This was especially useful to identify strengths and limitations of the technique.
+\item Then, it was used in an application developed in Firedrake, Seigen, an Elastic Wave Equation Solver for Seismological Problems\footnote{Seigen has been developed by Christian Jacobs.}. The aim of this phase was to evaluate the performance improvements in a real-world simulation.
 \end{enumerate}
 
 %note: tile size independent of mesh size !!!! but actually dependent on the application...!
 
 
 \subsection{Benchmarks}
-These codes are written in C and they only support shared memory parallelism via OpenMP. A previous version of the inspector algorithms presented in this chapter, described in~\cite{st-paper}, was used. As detailed next, one of the major drawbacks of this older inspector was its cost, which grew very rapidly with the number of loops in the chain and the number of distinct datasets accessed. 
+In this section, our objective is to explore the impact of generalized sparse tiling on performance, to characterize the circumstances where the approach is profitable, to identify the major limitations to a widespread adoption of the technique, and to justify some of the design choices made in the previous sections.
+
+All benchmarks are written in C. The sparse tiled implementations only support shared memory parallelism via OpenMP. A previous version of the inspector algorithms presented in this chapter, described in~\cite{st-paper}, was used. As detailed next, one of the major drawbacks of this older inspector was its cost, which grew very rapidly with the number of loops in the chain and the number of distinct datasets accessed. 
+
+In all the experiments presented in this section, the optimal tile size (i.e. the one leading to the best execution time) was determined empirically, for each combination of architecture and application. 
 
 \subsubsection{Sparse Jacobi}
-... (don't forget to just use tables or words instead of plots...)
+
+\begin{table}[t]
+\centering
+\begin{tabulary}{1.0\columnwidth}{c | c | c}
+\hline
+Matrix name & Execution time reduction & Speed-up  \\
+\hline
+{\em ldoor} & 40.34 & 12.11 \\
+{\em pwtk} & 38.42 & 11.98 \\
+{\em thermal2} & 25.78 & 11.08 \\
+{\em xenon2} & 20.15 & 9.53 \\
+{\em audikw$\_$1} & 13.42 & 8.70 \\
+{\em nd24k} & -151.72 & 3.06 \\
+\hline
+\end{tabulary}
+\caption{Execution time reductions over the original implementation (in percentage) and speed-ups over the single-threaded tiled implementation for the sparse Jacobi solver with 15 threads.}
+\label{table:st-jacobi}
+\end{table}
+
+The first experiment was the full sparse tiling of a Jacobi sparse matrix solver\footnote{This section is partly extracted from~\cite{st-paper}, and the results were obtained from experiments conducted by Christopher D. Krieger, Catherine Olschanowsky, and Michelle Mills Strout}. Given a sparse matrix $A$, and a vector $\vec{f}$, related by $A\vec{u}=\vec{f}$, each iteration of the sparse Jacobi method produces an approximation to the unknown vector $\vec{u}$. In our experiments, the Jacobi convergence iteration loop is unrolled by a factor of two and the resulting two loops are chained together (1000 iterations of the loop chain was executed). Using a ping-pong strategy, each loop reads from one copy of the $\vec{u}$ vector and writes to the other copy. This experiment was run on an Intel Westmere (dual-socket 8-core Intel Xeon E7-4830 2.13 GHz, 24MB shared L3 cache per socket). The code was compiled using {\tt gcc-4.7.0} with options {\tt -O3 -fopenmp}.
+
+The Jacobi recurrence equation includes a sparse matrix vector multiplication and is representative of a broad class of sparse linear algebra applications. It is also an effective test-bed because different data dependency patterns can be examined simply by using different input matrices. In these experiments, a set of 6 input matrices, drawn from the University of Florida Sparse Matrix Collection~\cite{MatrixMarket}, was used. The matrices were selected so that they would vary in overall data footprint, from 45 MB to 892 MB, and in percentage of non-zeros, from very sparse at 0.0006\% to much more dense at 0.5539\% non-zeros. % values.
+
+Table~\ref{table:st-jacobi} compares the performance of the tiled Jacobi solver to that of a simple blocked version. Both codes use OpenMP \texttt{parallel for} directives to achieve parallelism. The execution time reduction varied from 13$\%$ to 47$\%$ with the exception of the {\em nd24k} matrix, which showed as much as a 1.52x slowdown when sparse tiled. This matrix is highly connected, thus limiting the number of tiles that can be scheduled in parallel. The greater parallelism available under a blocked approach provides more benefit in this case than the performance improvements due to improved locality from full sparse tiling. Overall, speed-ups of between 8 and 12 times over the single-threaded tiled implementation were observed when using 15 threads; a clear outlier is again the {\em nd24k} matrix that did not scale past 3.2 times the single thread performance.
+
+%and typically decreased as threads were added. We believe that this reduction is also related to the parallelism available in the task graph and are investigating methods to mitigate its impact.
+
+The values in Table~\ref{table:st-jacobi} do not include the inspection time necessary to full sparse tile the loop chain. To break even when this cost is considered, the inspector time must be amortized over between 1000 and 3000 iterations of the executor, depending on the specific matrix being solved. We will further elaborate on this aspect in Section~\ref{sec:tiling:bench:conc}.
+
+
 
 \subsubsection{Airfoil}
-...
 
-\subsubsection{Conclusions}
-One of the most important outcomes of this first set of experiments concerns the inspection cost, which we found to significantly impact the overall execution time. To effectively support real applications like Seigen, typically characterized by a number of parallel loops larger than that of these benchmarks, we had to rework the original inspector algorithms as explained in Section~\ref{sec:tiling:inspector}. The most notable differences are: (i) data dependency analysis abstracted to the level of sets, rather than datasets; (ii) optimistic coloring with backtracking in case of conflicts; (iii) fully parallel projection and tiling phases, through the use of inverse maps. 
+
+\begin{table}[t]
+\centering
+\begin{tabulary}{1.0\columnwidth}{c | c | c}
+\hline
+Implementation & Execution time & Speed-up \\
+\hline
+Westmere {\em omp} & 36.87 & 6.43\\
+Westmere {\em mpi} & 31.0 & 7.66 \\
+Westmere {\em tiled} & 26.49 & 8.96 \\
+\hline \hline
+Sandy Bridge {\em omp} & 30.01 & 6.65 \\
+Sandy Bridge {\em mpi} & 24.42 & 8.17 \\
+Sandy Bridge {\em tiled} & 20.63 & 9.67 \\
+\hline
+\end{tabulary}
+\caption{Execution time (in seconds) and speed-ups over the slowest single-threaded implementation for the Airfoil benchmark. The values are obtained from simulations with fully-loaded machines (16 and 24 threads/processes on the Sandy Bridge and the Westmere architectures, respectively).}
+\label{table:st-airfoil}
+\end{table}
+
+Airfoil is a representative unstructured mesh application~\cite{AIRFOIL}. Three implementations of Airfoil, {\em omp}, {\em mpi} and {\em tiled}, were compared on two shared-memory machines, an Intel Westmere (dual-socket 6-core Intel Xeon X5650 2.66 GHz, 12MB of shared L3 cache per socket) and an Intel Sandy Bridge (dual-socket 8-core Intel Xeon E5-2680 2.00Ghz, 20MB of shared L3 cache per socket). The code was compiled using the Intel \texttt{icc 2013} compiler with optimizations enabled (\texttt{-O3}, \texttt{-xSSE4.2/-xAVX}).
+
+The Airfoil code consists of a main time loop with 2000 iterations. This loop contains a sequence of four parallel loops that carry out the computation. In this sequence, the first two loops, called $adt$-$calc$ and $res$-$calc$, constitute the bulk of the computation. $Adt$-$calc$ iterates over cells, reads from adjacent vertices and write to a local dataset, whereas $res$-$calc$ iterates over edges and exploits indirect mappings to vertices and cells for incrementing indirect datasets associated to cells. These loops share datasets associated with cells and vertices. Datasets are composed of doubles.
+%-precision floating-point values.
+
+In the {\em omp} and {\em mpi} implementations of Airfoil, the OpenMP and the MPI back-ends of OP2, were used. The effectiveness of these parallelization schemes has been demonstrated in~\cite{op2-main}. The {\em tiled} implementation uses an early version of the SLOPE library (the differences with the inspector algorithms shown in Section~\ref{sec:tiling:inspector} are discussed later) for tiling a loop chain. We manually unrolled the time loop by a factor of two to be able to tile over 6 loops in total. 
+
+%The OP2 gFST library uses $METIS$~\cite{METIS} for computing a seed partitioning of the mesh vertices.
+
+Table~\ref{table:st-airfoil} shows the scalability and runtime reduction achieved by sparse tiling the loop chain on the Westmere and Sandy Bridge architectures. The input unstructured mesh was composed of 1.5 million edges. It is worth noticing that both the {\em omp} and {\em tiled} versions suffer from the well-known NUMA effect as threads are always equally spread across the two sockets. Nevertheless, compared to {\em mpi}, the {\em tiled} version exhibits a peak runtime reduction of 15\% on the Westmere and of 16\% on the Sandy Bridge. 
+
+Results shown for {\em tiled} do not include, however, the inspector overhead. By also including it, the aforementioned improvements over {\em mpi} reduce to roughly 10\% on both platforms. Similarly to the sparse Jacobi solver, the slow-downs when including the inspection overhead are significant.
+
+
+\subsubsection{Observations}
+\label{sec:tiling:bench:conc}
+One of the most important outcomes of this first set of experiments concerns the inspection cost, which we found to significantly impact the overall execution time. To effectively support real applications like Seigen, typically characterized by a number of parallel loops larger than that of these benchmarks, we had to rework the original inspector algorithms into the versions described in Section~\ref{sec:tiling:inspector}. The most notable differences are: (i) data dependency analysis abstracted to the level of sets, rather than datasets; (ii) optimistic coloring with backtracking in case of conflicts; (iii) fully parallel projection and tiling phases, through the use of inverse maps. 
+
+A second observation is about the importance of automation. Writing the inspector as a sequence of calls to SLOPE is relatively simple, although tedious and error-prone. Much more complicated is integrating the executor, because this essentially means rewriting entire sequences of loops -- a severe limitation when using SLOPE in plain C (perhaps legacy) code. These considerations on the implementation complexity led to the multilayer framework detailed in Section~\ref{sec:tiling:automation} for automating the generation of inspector/executor schemes. 
+
+The Airfoil experiments highlighted that shared memory parallelism over multi-socket architectures is considerably affected by the NUMA issue. The difference in execution time between the OP2 OpenMP and MPI versions is indeed remarkable. As discussed in~\cite{hydra-op2}, the irregular nature of the computation makes it hard to find systematic solutions to the NUMA problem when relying on OpenMP. The MPI and the hybrid OpenMP/MPI execution models are simply better candidates for unstructured mesh computations. The sparse tiled implementation, which in these experiments is also purely based on OpenMP, suffers from the NUMA issue as well, although it manages to outperform the OP2 MPI version thanks to the relieved memory pressure. We wondered, however, what the gain would be if we managed to integrate MPI with sparse tiling. This led to the definition of more general loop chain abstraction (Section~\ref{sec:tiling:lc-unstruct}) and inspector algorithms (Section~\ref{sec:tiling:inspector}), for supporting MPI-based executors.
 
 \subsection{Seigen: an Elastic Wave Equation Solver for Seismological Problems}
 \label{sec:tiling:seigen}
 ...
+
+\section{Conclusions and Future Work}
+%1) ... aggressive mode of firedrake, automatic tiling ?
+%2) ...larger chunks communciated in the whole app if sdepth greater than 1, even outside of loop chain
