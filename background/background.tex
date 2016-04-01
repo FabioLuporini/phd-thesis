@@ -2,19 +2,171 @@
 
 \section{The Finite Element Method}
 \label{sec:bkg:fem}
-...
+Computational methods based upon finite elements are used to approximate the solution of partial differential equations (henceforth, PDEs) in a wide variety of domains. The mathematical abstraction used in finite element methods (or FEMs) is extremely powerful: not only does it help reasoning about the problem, but also provides systematic ways of deriving effective computer implementations. In~\cite{brenner-and-scott}, it is usefully suggested to consider an FEM as a black box that, given a differential equation, returns a discrete algorithm capable of approximating the equation solution. Unveiling the whole magic of such a black box is clearly out of the scope of this chapter. We rather limit ourselves to review the mathematical properties and the computational aspects that are essential for understanding the contributions in Chapters~\ref{ch:optimality} and~\ref{ch:lowlevelopt}. The content and the notation used in this section are inspired from~\cite{florian-thesis,kirby-and-logg,olgaard-and-wells}. For a complete treatment of the subject, the reader is invited to refer to~\cite{brenner-and-scott}.
+
+
 
 \subsection{Variational Formulation}
 \label{sec:bkg:coffee-var-problems}
-...
+We consider the weak formulation of a {\em linear variational problem}
+
+\begin{equation}
+\begin{split}
+\text{Find}\ u \in U\ \text{such that} \\
+a(u, v) = L(v), \forall v \in V
+\end{split}
+\end{equation}
+
+where $a$ and $L$ are, respectively, a bilinear form and a linear form. The term ``variational'' stems from the fact that the function $v$ can vary arbitrarily. The unfamiliar reader may find this expression unusual. Understanding the actual meaning of this formulation is far beyond the goals of this review, since an entire course in functional analysis would be needed. Informally, we can think of $V$ as a ``very nice'' space, in which functions have desirable properties. The underlying idea of the variational formulation is then to ``transfer'' certain requirements (e.g., differentiability) on the unknown $u$ to $v$.
+
+The sets $U$ and $V$ and called, respectively, trial and test functions. The variational problem is discretized by using discrete test and trial spaces
+
+\begin{equation}
+\label{sec:bkg:eq:disc-var}
+\begin{split}
+\text{Find}\ u_h \in U_h \subset U\ \text{such that} \\
+a(u_h, v_h) = L(v_h), \forall v_h \in V_h \subset V
+\end{split}
+\end{equation}
+
+Let $\lbrace \psi_i \rbrace_{i=1}^N$ be the set of basis functions spanning $U_h$ and let $\lbrace \phi_j \rbrace_{j=1}^{N}$ be the set of basis functions spanning $V_h$. Then the unknown solution $u$ can be approximated as a linear combination of the basis functions $\lbrace \psi_i \rbrace_{i=1}^N$,
+
+\begin{equation}
+u_h = \sum_{j=1}^N U_j \psi_j.
+\end{equation}
+
+This allows us to rewrite~\ref{sec:bkg:eq:disc-var} as:
+
+\begin{equation}
+\sum_{j=1}^N U_j a(\psi_j, \phi_i) = L(\phi_i),\ i=1,2,...,N
+\end{equation}
+
+
+From the solution of the following linear system we determine the set of {\em degrees of freedom} $U$ to express $u_h$:
+
+\begin{equation}
+Au = b
+\end{equation}
+
+where clearly
+
+\begin{equation}
+\centering
+\begin{split}
+A_{ij} = a(\phi_i(x), \phi_j(x)) \\
+b_i = L(\phi_i(x))
+\end{split}
+\end{equation}
+
+The matrix $A$ and the vector $b$ can be seen as the discrete operators arising from the bilinear form $a$ and from the linear form $L$ for the given choice of basis functions.
+
+The variational formulation of a {\em non-linear variational problem} requires refinements that are out of the scope of this review. The interested reader should refer to~\cite{brenner-and-scott}.
+
+\subsection{Discretization}
+In an FEM the domain $\Omega$ of the PDE is partitioned into a finite set of disjoint cells $\lbrace K \rbrace$; that is, $\bigcup K = \Omega$ and $\bigcap K = \emptyset$. This step forms a {\em mesh}. A finite element is usually defined (see for example~\cite{brenner-and-scott}) as a triple ${<}K,\mathcal{P}_K,\mathcal{L}_K{>}$, where:
+\begin{itemize}
+\item $K$ is a cell in the mesh;
+\item $\mathcal{P}_K$ is a finite dimensional ``local'' function space of dimension $n_K$;
+\item $\mathcal{L}_K$ is a basis $\lbrace l_1^K, l_2^K, ..., l_{n_K}^K\rbrace$ for $\mathcal{P}'_K$, the dual space of $\mathcal{P}_K$.
+\end{itemize}
+This definition allows to impose constraints on the basis functions $\lbrace \phi_1^K, \phi_2^K, ..., \phi_{n_K}^K\rbrace$ spanning $\mathcal{P}_K$. For instance, to enforce a {\em nodal basis} (as it is often required), we can impose that the relationship
+
+\begin{equation}
+l_i^K(\phi_j^K) = \delta_{ij},\ i,j = 1,2,...,n_K,
+\end{equation}
+
+where $\delta_{ij}$ is the Kronecker delta, is satisfied. This allows the express any $v \in \mathcal{P}_K$ as
+
+\begin{equation}
+v = \sum_{i=1}^{n_K} l_i^K(v) \phi_i^K.
+\end{equation}
+
+\paragraph{Example: the triangular Lagrange element}
+As an example\footnote{The example is extracted from~\cite{fenics-book}}, consider a triangular cell $K$ and let $\mathcal{P}_K$ be the space of polynomials of order $1$ on $K$. $\mathcal{L}_K$ may be the set of bounded linear functionals representing point evaluation at the vertices $\boldsymbol{x}^i$ ($i=1,2,3$) of $K$ such that
+
+\begin{equation}
+\centering
+\begin{split}
+l_i^K : \mathcal{P^K} \rightarrow \mathbb{R} \\
+l_i^K(v) = v(\boldsymbol{x}^i)
+\end{split}
+\end{equation}
+
+Since if $v$ is zero at each vertex, then $v$ must be zero everywhere, $\mathcal{L}_K$ really is a basis for $\mathcal{P}'_K$, so what we have defined is indeed a finite element. In particular, if we take $\boldsymbol{x}^1 = (0, 0),\ \boldsymbol{x}^2 = (1,0),\ \boldsymbol{x}^3 = (0,1)$, we have that the nodal basis is given by:
+
+\begin{equation}
+\phi_1(\boldsymbol{x}) = 1 - x_1 - x_2,\ \ \phi_2(\boldsymbol{x}) = x_1,\ \ \phi_3(\boldsymbol{x}) = x_2.
+\end{equation}
+
+
+
+
+
+\subsection{Assembly}
+\label{sec:bkg:assembly}
+The {\em assembly} of an FEM is the phase in which the matrix $A$ and the vector $b$ are constructed. 
+
+%The matrix $A$ and the vector $b$ are ``assembled'' and subsequently used to solve the linear system through (typically) an iterative method.
+%
+%We focus on the assembly phase, which is often characterized as a two-step procedure: \textit{local} and \textit{global} assembly. Local assembly is the subject of this article. It consists of computing the contributions of a single element in the discretized domain to the equation's approximated solution. In global assembly, such local contributions are ``coupled'' by suitably inserting them into $A$ and $b$. 
+%
+%We illustrate local assembly in a concrete example, the evaluation of the local element matrix for a Laplacian operator. Consider the weighted Laplace equation
+%\begin{equation}
+%- \nabla \cdot (w \nabla u) = 0
+%\end{equation}
+%in which $u$ is unknown, while $w$ is prescribed. The bilinear form associated with the weak variational form of the equation is:
+%\begin{equation}
+%a(v, u) = \int_\Omega w \nabla v \cdot \nabla u\ \mathrm{d}x
+%\end{equation}
+%The domain $\Omega$ of the equation is partitioned into a set of cells (elements) $T$ such that $\bigcup T = \Omega$ and $\bigcap T = \emptyset$. By defining $\lbrace \phi_i^K \rbrace$ as the set of local basis functions spanning $U$ on the element $K$, we can express the local element matrix as
+%\begin{equation}
+%\label{stiffness}
+%A_{ij}^K = \int_K w \nabla \phi_i^K \cdot \nabla \phi_j^K\ \mathrm{d}x
+%\end{equation}
+%The local element vector $L$ can be determined in an analogous way. 
+%
+%\subsection{Monomials}
+%\label{sec:monomials}
+%It has been shown (e.g., in~\citeN{Kirby:TC}) that local element tensors can be expressed as a sum of integrals over $K$, each integral being the product of derivatives of functions from sets of discrete spaces and, possibly, functions of some spatially varying coefficients. An integral of this form is called \textit{monomial}. 
+%
+%%From the computational perspective, its evaluation is however less expensive than that of $A$.
+%
+%\subsection{Quadrature mode}
+%Quadrature schemes are typically used to numerically evaluate $A_{ij}^K$. For convenience, a reference element $K_0$ and an affine mapping $F_K : K_0 \rightarrow K$ to any element $K \in T$ are introduced. This implies that a change of variables from reference coordinates $X_0$ to real coordinates $x = F_K (X_0)$ is necessary any time a new element is evaluated. The numerical integration routine based on quadrature over an element $K$ can be expressed as follows
+%\begin{equation}
+%\label{eq:quadrature}
+%A_{ij}^K = \sum_{q=1}^N \sum_{\alpha_3=1}^n \phi_{\alpha_3}(X^q)w_{\alpha_3} \sum_{\alpha_1=1}^d \sum_{\alpha_2=1}^d \sum_{\beta=1}^d \frac{\partial X_{\alpha_1}}{\partial x_{\beta}} \frac{\partial \phi_i^K(X^q)}{\partial X_{\alpha_1}} \frac{\partial X_{\alpha_2}}{\partial x_{\beta}} \frac{\partial \phi_j^K(X^q)}{\partial X_{\alpha_2}} det F_K' W^q
+%\end{equation}
+%where $N$ is the number of integration points, $W^q$ the quadrature weight at the integration point $X^q$, $d$ is the dimension of $\Omega$, $n$ the number of degrees of freedom associated to the local basis functions, and $det$ the determinant of the Jacobian matrix used for the aforementioned change of coordinates.  
+%
+%% Magari la summation sui coefficients la sputo dentro? che dici?
+%
+%\subsection{Tensor contraction mode}
+%\label{sec:tc}
+%Starting from Equation~\ref{eq:quadrature}, exploiting linearity, associativity and distributivity of the involved mathematical operators, we can rewrite the expression as
+%\begin{equation}
+%\label{eq:tensor}
+%A_{ij}^K = \sum_{\alpha_1=1}^d \sum_{\alpha_2=1}^d \sum_{\alpha_3=1}^n det F_K' w_{\alpha_3} \sum_{\beta=1}^d \frac{X_{\alpha_1}}{\partial x_{\beta}} \frac{\partial X_{\alpha_2}}{\partial x_{\beta}} \int_{K_0} \phi_{\alpha_3} \frac{\partial \phi_{i_1}}{\partial X_{\alpha_1}} \frac{\partial \phi_{i_2}}{\partial X_{\alpha_2}} dX.
+%\end{equation}
+%A generalization of this transformation has been proposed in~\cite{Kirby:TC}. Because of only involving reference element terms, the integral in the equation can be pre-evaluated and stored in temporary variables. The evaluation of the local tensor can then be abstracted as
+%\begin{equation}
+%A_{ij}^K = \sum_{\alpha} A_{i_1 i_2 \alpha}^0 G_{K}^\alpha
+%\end{equation}
+%in which the pre-evaluated ``reference tensor'' $A_{i_1 i_2 \alpha}$ and the cell-dependent ``geometry tensor'' $G_{K}^\alpha$ are exposed. 
+%
+%\subsection{Qualitative comparison}
+%\label{sec:qualitative}
+%Depending on form and discretization, the relative performance of the two modes, in terms of the operation count, can vary quite dramatically. The presence of derivatives or coefficient functions in the input form increases the rank of the geometry tensor, making the traditional quadrature mode preferable for ``complex'' forms. On the other hand, speed-ups from adopting tensor mode can be significant in a wide class of forms in which the geometry tensor remains ``sufficiently small''. The discretization, particularly the relative polynomial order of trial, test, and coefficient functions, also plays a key role in the resulting operation count. 
+%
+%These two modes have been implemented in the FEniCS Form Compiler (\cite{FFC-TC}). In this compiler, a heuristic is used to choose the most suitable mode for a given form. It consists of analysing each monomial in the form, counting the number of derivatives and coefficient functions, and checking if this number is greater than a constant found empirically (\cite{Fenics}). We will later comment on the efficacy of this approach (Section~\ref{sec:perf-results}). For the moment, we just recall that one of the goals of this research is to produce a system that goes beyond the dichotomy between quadrature and tensor modes. We will reason in terms of loop nests, code motion, and code pre-evaluation, searching the entire implementation space for an optimal synthesis.  
 
 \subsection{Mapping from the Reference Element}
 \label{sec:bkg:mapping}
 ...
 
-\subsection{Assembly}
-\label{sec:bkg:assembly}
-...
+
+%The solution is sought by applying suitable numerical operations, described by computational kernels, to all entities of a mesh, such as edges, vertices, or cells.
+
 
 \subsubsection{From Math to Loop Nests}
 \label{sec:bkg:mathcode}
