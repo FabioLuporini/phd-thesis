@@ -7,7 +7,7 @@ Computational methods based upon finite elements are used to approximate the sol
 
 
 \subsection{Variational Formulation}
-\label{sec:bkg:coffee-var-problems}
+\label{sec:bkg:var-problems}
 We consider the weak formulation of a {\em linear variational problem}
 
 \begin{equation}
@@ -41,7 +41,6 @@ This allows us to rewrite~\ref{sec:bkg:eq:disc-var} as:
 \sum_{j=1}^N U_j a(\psi_j, \phi_i) = L(\phi_i),\ i=1,2,...,N
 \end{equation}
 
-
 From the solution of the following linear system we determine the set of {\em degrees of freedom} $U$ to express $u_h$:
 
 \begin{equation}
@@ -51,6 +50,7 @@ Au = b
 where clearly
 
 \begin{equation}
+\label{sec:bkg:eq:disc-op}
 \centering
 \begin{split}
 A_{ij} = a(\phi_i(x), \phi_j(x)) \\
@@ -62,24 +62,26 @@ The matrix $A$ and the vector $b$ can be seen as the discrete operators arising 
 
 The variational formulation of a {\em non-linear variational problem} requires refinements that are out of the scope of this review. The interested reader should refer to~\cite{brenner-and-scott}.
 
-\subsection{Discretization}
-In an FEM the domain $\Omega$ of the PDE is partitioned into a finite set of disjoint cells $\lbrace K \rbrace$; that is, $\bigcup K = \Omega$ and $\bigcap K = \emptyset$. This step forms a {\em mesh}. A finite element is usually defined (see for example~\cite{brenner-and-scott}) as a triple ${<}K,\mathcal{P}_K,\mathcal{L}_K{>}$, where:
+\subsection{Finite Elements}
+In an FEM the domain $\Omega$ of the PDE is partitioned into a finite set of disjoint cells $\lbrace K \rbrace$; that is, $\bigcup K = \Omega$ and $\bigcap K = \emptyset$. This forms a {\em mesh}. A finite element is usually defined (see for example~\cite{brenner-and-scott}) as a triple ${<}K,\mathcal{P}_K,\mathcal{L}_K{>}$, where:
 \begin{itemize}
-\item $K$ is a cell in the mesh;
+\item $K$ is a cell in the mesh with non-empty interior and piecewise smooth boundary;
 \item $\mathcal{P}_K$ is a finite dimensional ``local'' function space of dimension $n_K$;
-\item $\mathcal{L}_K$ is a basis $\lbrace l_1^K, l_2^K, ..., l_{n_K}^K\rbrace$ for $\mathcal{P}'_K$, the dual space of $\mathcal{P}_K$.
+\item the set of degrees of freedom $\mathcal{L}_K$ is a basis $\lbrace l_1^K, l_2^K, ..., l_{n_K}^K\rbrace$ for $\mathcal{P}'_K$, the dual space of $\mathcal{P}_K$. 
 \end{itemize}
-This definition allows to impose constraints on the basis functions $\lbrace \phi_1^K, \phi_2^K, ..., \phi_{n_K}^K\rbrace$ spanning $\mathcal{P}_K$. For instance, to enforce a {\em nodal basis} (as it is often required), we can impose that the relationship
+This definition allows to impose constraints on the set of basis functions $\lbrace \phi_1^K, \phi_2^K, ..., \phi_{n_K}^K\rbrace$ spanning $\mathcal{P}_K$. For instance, to enforce a {\em nodal basis} for $\mathcal{P}_K$ -- a particularly useful property for expressing solutions in $U_h$ -- we can impose that the relationship
 
 \begin{equation}
-l_i^K(\phi_j^K) = \delta_{ij},\ i,j = 1,2,...,n_K,
+l_i^K(\phi_j^K) = \delta_{ij},\ i,j = 1,2,...,n_K
 \end{equation}
 
-where $\delta_{ij}$ is the Kronecker delta, is satisfied. This allows the express any $v \in \mathcal{P}_K$ as
+must be satisfied ($\delta_{ij}$ is the Kronecker delta). This allows the express any $v \in \mathcal{P}_K$ as
 
 \begin{equation}
 v = \sum_{i=1}^{n_K} l_i^K(v) \phi_i^K.
 \end{equation}
+
+Each linear functional in $\mathcal{L}_K$ is used to evaluate one degree of freedom of $v$ in terms of the chosen nodal basis. In other words, we can refer to both the coefficients $U$ introduced in the previous section and $\mathcal{L}_K$ as the degrees of freedom.
 
 \paragraph{Example: the triangular Lagrange element}
 As an example\footnote{The example is extracted from~\cite{fenics-book}}, consider a triangular cell $K$ and let $\mathcal{P}_K$ be the space of polynomials of order $1$ on $K$. $\mathcal{L}_K$ may be the set of bounded linear functionals representing point evaluation at the vertices $\boldsymbol{x}^i$ ($i=1,2,3$) of $K$ such that
@@ -92,23 +94,63 @@ l_i^K(v) = v(\boldsymbol{x}^i)
 \end{split}
 \end{equation}
 
-Since if $v$ is zero at each vertex, then $v$ must be zero everywhere, $\mathcal{L}_K$ really is a basis for $\mathcal{P}'_K$, so what we have defined is indeed a finite element. In particular, if we take $\boldsymbol{x}^1 = (0, 0),\ \boldsymbol{x}^2 = (1,0),\ \boldsymbol{x}^3 = (0,1)$, we have that the nodal basis is given by:
+Since if $v$ is zero at each vertex then $v$ must be zero everywhere, $\mathcal{L}_K$ really is a basis for $\mathcal{P}'_K$, so what we have defined is indeed a finite element. In particular, if we take $\boldsymbol{x}^1 = (0, 0),\ \boldsymbol{x}^2 = (1,0),\ \boldsymbol{x}^3 = (0,1)$, we have that the nodal basis is given by:
 
 \begin{equation}
 \phi_1(\boldsymbol{x}) = 1 - x_1 - x_2,\ \ \phi_2(\boldsymbol{x}) = x_1,\ \ \phi_3(\boldsymbol{x}) = x_2.
 \end{equation}
 
 
+\subsection{Global Discretization}
+A {\em local-to-global mapping} allows to patch together the finite elements to form a global function space, for instance the set of trial functions $U_h = \operatorname{span}\lbrace \psi_i \rbrace_{i=1}^N$ introduced in Section~\ref{sec:bkg:var-problems}. A local-to-global mapping is a function
 
+\begin{equation}
+\iota_K : [1,n_K] \rightarrow [1,N]
+\end{equation}
+
+that maps the local degrees of freedom $\mathcal{L}_K$ to global degrees of freedom $\mathcal{L}$. The mappings $\iota_K$, together with the choice of $\mathcal{L}_K$, determine the continuity of a function space or, in simpler words, the continuity of a function throughout the domain $\Omega$. The reader is invited to refer to~\cite{fenics-book} for a comprehensive yet simple description of this step.
+
+One of the crucial aspects of an FEM is that global function spaces are often defined in terms of a {\em reference finite element} ${<}\hat{K}, \hat{\mathcal{P}}, \hat{\mathcal{L}}{>}$ and a set of invertible mappings $\lbrace \mathcal{G}_K\rbrace_{K}$ from $\hat{K}$ to each cell in the mesh such that $K = \mathcal{G}_K(\hat{K})$.  This situation is illustrated in Figure~\ref{fig:bkg:reference-el}.
+
+For each $K$, $\mathcal{G}_K$ also allows to generate $\mathcal{P}_K$ and $\mathcal{L}_K$.  The complexity of this process depends on the mapping itself. In the simplest case, the mapping is affine; that is, expressible as $\mathcal{G}_K(\hat{\boldsymbol{x}}) = A_K \hat{\boldsymbol{x}} + b_K$, where $A_K$ and $b_K$ are, respectively, some matrix and vector.
 
 
 \subsection{Assembly}
 \label{sec:bkg:assembly}
-The {\em assembly} of an FEM is the phase in which the matrix $A$ and the vector $b$ are constructed. 
+The {\em assembly} of an FEM is the phase in which the matrix $A$ and the vector $b$ from~\ref{sec:bkg:eq:disc-op} are constructed. This is accomplished by adding the contributions from each $K$ to $A$ and $b$. Let us consider the bilinear form $a$, and assume this is an integral over $\Omega$. Thanks to the linearity of the operator, we can express $a$ as
 
-%The matrix $A$ and the vector $b$ are ``assembled'' and subsequently used to solve the linear system through (typically) an iterative method.
-%
-%We focus on the assembly phase, which is often characterized as a two-step procedure: \textit{local} and \textit{global} assembly. Local assembly is the subject of this article. It consists of computing the contributions of a single element in the discretized domain to the equation's approximated solution. In global assembly, such local contributions are ``coupled'' by suitably inserting them into $A$ and $b$. 
+\begin{equation}
+a = \sum_{K} a_K
+\end{equation}
+
+where $a_K$ is an element bilinear form. We can then define the local element matrix
+
+\begin{equation}
+A_i^K = a_K (\psi_{i_1}^K, \phi_{i_2}^K)
+\end{equation}
+
+where $i \in \mathcal{I}_K$ is the index set on $A_i^K$. That is, $\mathcal{I}_K = \lbrace (1,1), (1,2), ..., (n_U, n_V) \rbrace$, with $n_U$ and $n_V$ representing the number of degrees of freedom for the local trial functions $\psi^K \in U_h^K$ and the local test functions $\phi^K \in V_h^K$. The element matrix $A^K$ is therefore a (typically dense) matrix of dimension $n_U \times n_V$.
+
+Now let $\iota_K^U$ and $\iota_K^V$ be the local-to-global mappings for the local discrete function spaces $U_h^K$ and $V_h^K$. We can define, for each $K$, the collective local-to-global mapping $\iota_K : \mathcal{I}_K \rightarrow \mathcal{I}$ such that
+
+\begin{equation}
+\iota_K (i) = (\iota_K^U(i_1), \iota_K^V(i_2))\ \forall i \in \mathcal{I}_K.
+\end{equation}
+
+This simply maps a pair of local degrees of freedom to a pair of global degrees of freedom. Let also $\mathcal{T}$ be the subset of the cells in the mesh in which $\psi_{i_1}$ and $\phi_{i_2}$ are both non-zero. Note that here we are talking about the global functions whose restrictions to $K$ gives $\psi_{i_1}^K$ and $\phi_{i_2}^K$. By construction, $\iota_K$ is invertible if $K \in \mathcal{T}$. At this point, we have all the ingredients to compute $A$ as the sum of local contributions from the cells in the mesh:
+
+\begin{equation}
+\begin{split}
+A_i & = \sum_{K \in \mathcal{T}} a_K (\psi_{i_1},\phi_{i_2}) = \\
+& = \sum_{K \in \mathcal{T}} a_K(\psi_{(\iota_K^U)^{-1}(i_1)}^K, \phi_{(\iota_K^V)^{-1}(i_2)}^K) = \sum_{K \in \mathcal{T} A_{\iota_K^{-1}(i)}^K}
+\end{split}
+\end{equation} 
+
+Similar conclusions may be drawn for the linear form $L$. We observe that this computation can be implemented as a single iteration over all cells in the mesh. On each cell, $A^K$ is computed and added to $A$ using the inverse mappings. This approach is particularly efficient because it only evaluates the non-zero entries in the sparse matrix $A$. Other more trivial implementations of the assembly phase are possible, although rarely used in practice because ineffective. 
+
+We conclude with a useful clarification about the terminology. The assembly process is often naturally characterized as a two-step procedure: {\em local assembly}  and {\em global assembly}. The former consists of computing the contributions of each single element (i.e., the element matrices $A^K$); the latter represents the ``coupling'' of all $A^K$ into $A$. As we shall see, one of the main subjects of this thesis is the computational optimization of the local assembly phase.
+
+\subsection{Local Assembly: from Math to Code}
 %
 %We illustrate local assembly in a concrete example, the evaluation of the local element matrix for a Laplacian operator. Consider the weighted Laplace equation
 %\begin{equation}
@@ -130,7 +172,8 @@ The {\em assembly} of an FEM is the phase in which the matrix $A$ and the vector
 %It has been shown (e.g., in~\citeN{Kirby:TC}) that local element tensors can be expressed as a sum of integrals over $K$, each integral being the product of derivatives of functions from sets of discrete spaces and, possibly, functions of some spatially varying coefficients. An integral of this form is called \textit{monomial}. 
 %
 %%From the computational perspective, its evaluation is however less expensive than that of $A$.
-%
+
+
 %\subsection{Quadrature mode}
 %Quadrature schemes are typically used to numerically evaluate $A_{ij}^K$. For convenience, a reference element $K_0$ and an affine mapping $F_K : K_0 \rightarrow K$ to any element $K \in T$ are introduced. This implies that a change of variables from reference coordinates $X_0$ to real coordinates $x = F_K (X_0)$ is necessary any time a new element is evaluated. The numerical integration routine based on quadrature over an element $K$ can be expressed as follows
 %\begin{equation}
@@ -160,15 +203,9 @@ The {\em assembly} of an FEM is the phase in which the matrix $A$ and the vector
 %
 %These two modes have been implemented in the FEniCS Form Compiler (\cite{FFC-TC}). In this compiler, a heuristic is used to choose the most suitable mode for a given form. It consists of analysing each monomial in the form, counting the number of derivatives and coefficient functions, and checking if this number is greater than a constant found empirically (\cite{Fenics}). We will later comment on the efficacy of this approach (Section~\ref{sec:perf-results}). For the moment, we just recall that one of the goals of this research is to produce a system that goes beyond the dichotomy between quadrature and tensor modes. We will reason in terms of loop nests, code motion, and code pre-evaluation, searching the entire implementation space for an optimal synthesis.  
 
-\subsection{Mapping from the Reference Element}
-\label{sec:bkg:mapping}
-...
 
 
-%The solution is sought by applying suitable numerical operations, described by computational kernels, to all entities of a mesh, such as edges, vertices, or cells.
-
-
-\subsubsection{From Math to Loop Nests}
+\subsubsection{Code Examples}
 \label{sec:bkg:mathcode}
 We have explained that local assembly is the computation of contributions of a specific cell in the discretized domain to the linear system which yields the PDE solution. The process consists of numerically evaluating problem-specific integrals to produce a matrix and a vector (only the derivation of the matrix was shown in Section~\ref{sec:quadrature-rep}), whose sizes depend on the order of the method. This operation is applied to all cells in the discretized domain (mesh).
 
@@ -217,7 +254,7 @@ $\rbrace$
 \label{code:weighted-laplace}
 \end{algorithm}
 
-More complex assembly expressions, due to the employment of particular differential operators in the original PDE, are obviously possible. Intuitively, as the complexity of the PDE grows, the implementation of local assembly becomes increasingly more complicated. This fact is actually the real motivation behind reasearch in automated code generation techniques, such as those used by state-of-the-art frameworks like FEniCS and Firedrake. Automated code generation allows scientists to express the finite element specfication using a domain-specific language resembling mathematical notation, and to obtain with minimum effort a semantically correct implementation of local assembly. The goal of this research is maximizing the efficiency, in terms of run-time performance, of generic local assembly kernels, on standard CPU architectures. 
+More complex assembly expressions, due to the employment of particular differential operators in the original PDE, are obviously possible. Intuitively, as the complexity of the PDE grows, the implementation of local assembly becomes increasingly more complicated. This fact is actually the real motivation behind research in automated code generation techniques, such as those used by state-of-the-art frameworks like FEniCS and Firedrake. Automated code generation allows scientists to express the finite element specification using a domain-specific language resembling mathematical notation, and to obtain with minimum effort a semantically correct implementation of local assembly. The goal of this research is maximizing the efficiency, in terms of run-time performance, of generic local assembly kernels, on standard CPU architectures. 
 
 \begin{algorithm}[t]
 \scriptsize
@@ -235,7 +272,7 @@ a = weight\KwSty{*}\KwSty{dot}(\KwSty{grad}(v), \KwSty{grad}(u))\KwSty{*dx}
 \label{code:weighted-laplace-ufl}
 \end{algorithm}
 
-The domain-specific language used by Firedrake and FEniCS to express finite element problems is the Unified Form Language (UFL) \citep{ufl}. Listing~\ref{code:weighted-laplace-ufl} shows a possible UFL implementation for the weighted Laplace form. Note the resemblance of \emph{a = weight*...} with Equation~\ref{eq:stiffness}. A form compiler translates UFL code into the C code shown in Listing~\ref{code:weighted-laplace}. We will describe these aspects carefully in Section~\ref{sec:coffee-implementation}; for the moment, this level of detail sufficies to open a discussion on the optimization of local assembly kernels arising from different partial differential equations.
+The domain-specific language used by Firedrake and FEniCS to express finite element problems is the Unified Form Language (UFL) \citep{ufl}. Listing~\ref{code:weighted-laplace-ufl} shows a possible UFL implementation for the weighted Laplace form. Note the resemblance of \emph{a = weight*...} with Equation~\ref{eq:stiffness}. A form compiler translates UFL code into the C code shown in Listing~\ref{code:weighted-laplace}. We will describe these aspects carefully in Section~\ref{sec:coffee-implementation}; for the moment, this level of detail suffices to open a discussion on the optimization of local assembly kernels arising from different partial differential equations.
 
 % More Examples now...
 
