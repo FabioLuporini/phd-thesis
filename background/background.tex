@@ -17,7 +17,7 @@ a(u, v) = L(v), \forall v \in V
 \end{split}
 \end{equation}
 
-where $a$ and $L$ are, respectively, a bilinear form and a linear form. The term ``variational'' stems from the fact that the function $v$ can vary arbitrarily. The unfamiliar reader may find this expression unusual. Understanding the actual meaning of this formulation is far beyond the goals of this review, since an entire course in functional analysis would be needed. Informally, we can think of $V$ as a ``very nice'' space, in which functions have desirable properties. The underlying idea of the variational formulation is then to ``transfer'' certain requirements (e.g., differentiability) on the unknown $u$ to $v$.
+where $a$ and $L$ are, respectively, a bilinear form and a linear form. The term ``variational'' stems from the fact that the function $v$ can vary arbitrarily. The unfamiliar reader may find this expression unusual. Understanding the actual meaning of this formulation is far beyond the goals of this review, since an entire course in functional analysis would be needed. Informally, we can think of $V$ as a ``very nice'' space, in which functions have desirable properties. The underlying idea of the variational formulation is to ``transfer'' certain requirements (e.g., differentiability) from the unknown $u \in U$ to $v \in V$.
 
 The sets $U$ and $V$ and called, respectively, trial and test functions. The variational problem is discretized by using discrete test and trial spaces
 
@@ -44,6 +44,7 @@ This allows us to rewrite~\ref{sec:bkg:eq:disc-var} as:
 From the solution of the following linear system we determine the set of {\em degrees of freedom} $U$ to express $u_h$:
 
 \begin{equation}
+\label{sec:bkg:eq:lin-sys}
 Au = b
 \end{equation}
 
@@ -75,7 +76,7 @@ This definition allows to impose constraints on the set of basis functions $\lbr
 l_i^K(\phi_j^K) = \delta_{ij},\ i,j = 1,2,...,n_K
 \end{equation}
 
-must be satisfied ($\delta_{ij}$ is the Kronecker delta). This allows the express any $v \in \mathcal{P}_K$ as
+must be satisfied ($\delta_{ij}$ is the Kronecker delta). This allows to express any $v \in \mathcal{P}_K$ as
 
 \begin{equation}
 v = \sum_{i=1}^{n_K} l_i^K(v) \phi_i^K.
@@ -102,6 +103,7 @@ Since if $v$ is zero at each vertex then $v$ must be zero everywhere, $\mathcal{
 
 
 \subsection{Global Discretization}
+\label{sec:bkg:refel}
 A {\em local-to-global mapping} allows to patch together the finite elements to form a global function space, for instance the set of trial functions $U_h = \operatorname{span}\lbrace \psi_i \rbrace_{i=1}^N$ introduced in Section~\ref{sec:bkg:var-problems}. A local-to-global mapping is a function
 
 \begin{equation}
@@ -141,75 +143,93 @@ This simply maps a pair of local degrees of freedom to a pair of global degrees 
 
 \begin{equation}
 \begin{split}
-A_i & = \sum_{K \in \mathcal{T}} a_K (\psi_{i_1},\phi_{i_2}) = \\
+A_i & = \sum_{K \in \mathcal{T}} a_K (\psi_{i_1},\phi_{i_2}) \\
 & = \sum_{K \in \mathcal{T}} a_K(\psi_{(\iota_K^U)^{-1}(i_1)}^K, \phi_{(\iota_K^V)^{-1}(i_2)}^K) = \sum_{K \in \mathcal{T} A_{\iota_K^{-1}(i)}^K}
 \end{split}
 \end{equation} 
 
 Similar conclusions may be drawn for the linear form $L$. We observe that this computation can be implemented as a single iteration over all cells in the mesh. On each cell, $A^K$ is computed and added to $A$ using the inverse mappings. This approach is particularly efficient because it only evaluates the non-zero entries in the sparse matrix $A$. Other more trivial implementations of the assembly phase are possible, although rarely used in practice because ineffective. 
 
-We conclude with a useful clarification about the terminology. The assembly process is often naturally characterized as a two-step procedure: {\em local assembly}  and {\em global assembly}. The former consists of computing the contributions of each single element (i.e., the element matrices $A^K$); the latter represents the ``coupling'' of all $A^K$ into $A$. As we shall see, one of the main subjects of this thesis is the computational optimization of the local assembly phase.
+We conclude with a clarification concerning the terminology. The assembly process is often naturally described as a two-step procedure: {\em local assembly}  and {\em global assembly}. The former consists of computing the contributions of each single element (i.e., the element matrices $A^K$); the latter represents the ``coupling'' of all $A^K$ into $A$. As we shall see, one of the main subjects of this thesis is the computational optimization of the local assembly phase.
 
-\subsection{Local Assembly: from Math to Code}
-%
-%We illustrate local assembly in a concrete example, the evaluation of the local element matrix for a Laplacian operator. Consider the weighted Laplace equation
-%\begin{equation}
-%- \nabla \cdot (w \nabla u) = 0
-%\end{equation}
-%in which $u$ is unknown, while $w$ is prescribed. The bilinear form associated with the weak variational form of the equation is:
-%\begin{equation}
-%a(v, u) = \int_\Omega w \nabla v \cdot \nabla u\ \mathrm{d}x
-%\end{equation}
-%The domain $\Omega$ of the equation is partitioned into a set of cells (elements) $T$ such that $\bigcup T = \Omega$ and $\bigcap T = \emptyset$. By defining $\lbrace \phi_i^K \rbrace$ as the set of local basis functions spanning $U$ on the element $K$, we can express the local element matrix as
-%\begin{equation}
-%\label{stiffness}
-%A_{ij}^K = \int_K w \nabla \phi_i^K \cdot \nabla \phi_j^K\ \mathrm{d}x
-%\end{equation}
-%The local element vector $L$ can be determined in an analogous way. 
-%
-%\subsection{Monomials}
-%\label{sec:monomials}
-%It has been shown (e.g., in~\citeN{Kirby:TC}) that local element tensors can be expressed as a sum of integrals over $K$, each integral being the product of derivatives of functions from sets of discrete spaces and, possibly, functions of some spatially varying coefficients. An integral of this form is called \textit{monomial}. 
-%
-%%From the computational perspective, its evaluation is however less expensive than that of $A$.
+\subsection{Local Assembly Example: from Math to Code}
+Because of its relevance in this thesis, we illustrate local assembly in a concrete example, the evaluation of the element matrix for a Laplacian operator. 
+
+\subsubsection{Specification of the Laplacian operator}
+Consider the weighted Laplace equation
+
+\begin{equation}
+- \nabla \cdot (w \nabla u) = 0
+\end{equation}
+
+in which $u$ is unknown, while $w$ is prescribed. The bilinear form associated with the weak variational form of the equation is:
+
+\begin{equation}
+a(v, u) = \int_\Omega w \nabla v \cdot \nabla u\ \mathrm{d}x
+\end{equation}
+
+The domain $\Omega$ of the equation is partitioned into a set of cells (elements) $T$ such that $\bigcup T = \Omega$ and $\bigcap T = \emptyset$. Assuming for simplicity that the sets of trial and test functions are the same and by defining $\lbrace \phi_i^K \rbrace$ as the set of local basis functions spanning $U$ and $V$ on the element $K$, we can express the local element matrix as
+
+\begin{equation}
+\label{sec:bkg:stiffness}
+A_{ij}^K = \int_K w \nabla \phi_i^K \cdot \nabla \phi_j^K\ \mathrm{d}x
+\end{equation}
+
+The element vector $L$ can be determined in an analogous way. 
 
 
-%\subsection{Quadrature mode}
-%Quadrature schemes are typically used to numerically evaluate $A_{ij}^K$. For convenience, a reference element $K_0$ and an affine mapping $F_K : K_0 \rightarrow K$ to any element $K \in T$ are introduced. This implies that a change of variables from reference coordinates $X_0$ to real coordinates $x = F_K (X_0)$ is necessary any time a new element is evaluated. The numerical integration routine based on quadrature over an element $K$ can be expressed as follows
-%\begin{equation}
-%\label{eq:quadrature}
-%A_{ij}^K = \sum_{q=1}^N \sum_{\alpha_3=1}^n \phi_{\alpha_3}(X^q)w_{\alpha_3} \sum_{\alpha_1=1}^d \sum_{\alpha_2=1}^d \sum_{\beta=1}^d \frac{\partial X_{\alpha_1}}{\partial x_{\beta}} \frac{\partial \phi_i^K(X^q)}{\partial X_{\alpha_1}} \frac{\partial X_{\alpha_2}}{\partial x_{\beta}} \frac{\partial \phi_j^K(X^q)}{\partial X_{\alpha_2}} det F_K' W^q
-%\end{equation}
-%where $N$ is the number of integration points, $W^q$ the quadrature weight at the integration point $X^q$, $d$ is the dimension of $\Omega$, $n$ the number of degrees of freedom associated to the local basis functions, and $det$ the determinant of the Jacobian matrix used for the aforementioned change of coordinates.  
-%
-%% Magari la summation sui coefficients la sputo dentro? che dici?
-%
-%\subsection{Tensor contraction mode}
+In this example, the element tensors are expressed as a single integral over the cell domain. In general, they are expressed as a sum of integrals over $K$, each integral being the product of derivatives of functions from sets of discrete spaces and, possibly, functions of some spatially varying coefficients. Such an integral is often called \textit{monomial}. 
+
+\subsubsection{Quadrature Mode}
+A quadrature scheme is typically used to numerically evaluate $A_{ij}^K$. It consists of evaluating an integral at a set of given {\em quadrature points}, each point multiplied with some suitable {\em quadrature weight}. By mapping the computation to a reference element as explained in Section~\ref{sec:bkg:refel} and using the same approach as in Section~\ref{sec:bkg:assembly}, a quadrature scheme for the Laplacian operator on $K$ is as follows
+
+\begin{equation}
+\begin{split}
+A^K & = \int_K w \nabla \phi_i^K \cdot \nabla \phi_j^K \\
+& \approx w \sum_{k=1}^{N_q} W_k \nabla \phi_i^K(\boldsymbol{x}^k) \cdot \nabla \phi_i^K (\boldsymbol{x}^k) | \operatorname{det} \mathcal{G}_K'(\boldsymbol{x}^k) |,
+\end{split}
+\end{equation} 
+
+where $\lbrace \boldsymbol{x}^1, \boldsymbol{x}^2, ..., \boldsymbol{x}^{N_q}$ is the set of $N_q$ quadrature points, and $\lbrace W_1, W_2, ..., W_{N_q} \rbrace$ the corresponding set of quadrature weights scaled such that $\sum_{k=1}^{N_q} W_k = |\hat{K}|$. 
+
+To compute a local basis function $\phi_i^K$ from a reference element basis function $\Phi_i$ we exploit the invertible map $\mathcal{G}_K^{-1}$, which allows us to write $\phi_i^K = \Phi_i \circ \mathcal{G}_K^{-1}$. To evaluate the gradient of a basis function $\phi_i^K$ at a quadrature point $\boldsymbol{x}^k$, with $\boldsymbol{x}^k = \mathcal{G}_K(\boldsymbol{X}^k)$ and $\boldsymbol{X}^k \in \hat{K}$, we therefore have to compute a matrix-vector product
+
+\begin{equation}
+\nabla_x \phi_i^K(\boldsymbol{x}^k) = ((\mathcal{G}_K')^{-1})^{T}(\boldsymbol{x}^k) \nabla_X \Phi_i(\boldsymbol{X}^k).
+\end{equation}
+
+The term $\mathcal{G}_K')^{-1}$ represents the inverse of the Jacobian matrix originating from the change of coordinates. The resulting scalar-valued expression for each entry $A_{ij}^K$, assuming $\Omega$ to be a domain of dimension $d$, reads as:
+
+\begin{equation}
+\label{eq:quadrature}
+A_{ij}^K = \sum_{k=1}^{N_q} \sum_{\alpha_3=1}^n \phi_{\alpha_3}(\boldsymbol{X}^k) w_{\alpha_3} \sum_{\alpha_1=1}^d \sum_{\alpha_2=1}^d \sum_{\beta=1}^d \frac{\partial X_{\alpha_1}}{\partial x_{\beta}} \frac{\partial \phi_i^K(\boldsymbol{X}^k)}{\partial X_{\alpha_1}} \frac{\partial X_{\alpha_2}}{\partial x_{\beta}} \frac{\partial \phi_j^K(\boldsymbol{X}^k)}{\partial X_{\alpha_2}} \operatorname{det} \mathcal{G}_K' W^k.
+\end{equation}
+
+
+\subsubsection{Tensor Contraction Mode}
 %\label{sec:tc}
-%Starting from Equation~\ref{eq:quadrature}, exploiting linearity, associativity and distributivity of the involved mathematical operators, we can rewrite the expression as
-%\begin{equation}
-%\label{eq:tensor}
-%A_{ij}^K = \sum_{\alpha_1=1}^d \sum_{\alpha_2=1}^d \sum_{\alpha_3=1}^n det F_K' w_{\alpha_3} \sum_{\beta=1}^d \frac{X_{\alpha_1}}{\partial x_{\beta}} \frac{\partial X_{\alpha_2}}{\partial x_{\beta}} \int_{K_0} \phi_{\alpha_3} \frac{\partial \phi_{i_1}}{\partial X_{\alpha_1}} \frac{\partial \phi_{i_2}}{\partial X_{\alpha_2}} dX.
-%\end{equation}
-%A generalization of this transformation has been proposed in~\cite{Kirby:TC}. Because of only involving reference element terms, the integral in the equation can be pre-evaluated and stored in temporary variables. The evaluation of the local tensor can then be abstracted as
-%\begin{equation}
-%A_{ij}^K = \sum_{\alpha} A_{i_1 i_2 \alpha}^0 G_{K}^\alpha
-%\end{equation}
-%in which the pre-evaluated ``reference tensor'' $A_{i_1 i_2 \alpha}$ and the cell-dependent ``geometry tensor'' $G_{K}^\alpha$ are exposed. 
-%
-%\subsection{Qualitative comparison}
-%\label{sec:qualitative}
-%Depending on form and discretization, the relative performance of the two modes, in terms of the operation count, can vary quite dramatically. The presence of derivatives or coefficient functions in the input form increases the rank of the geometry tensor, making the traditional quadrature mode preferable for ``complex'' forms. On the other hand, speed-ups from adopting tensor mode can be significant in a wide class of forms in which the geometry tensor remains ``sufficiently small''. The discretization, particularly the relative polynomial order of trial, test, and coefficient functions, also plays a key role in the resulting operation count. 
-%
-%These two modes have been implemented in the FEniCS Form Compiler (\cite{FFC-TC}). In this compiler, a heuristic is used to choose the most suitable mode for a given form. It consists of analysing each monomial in the form, counting the number of derivatives and coefficient functions, and checking if this number is greater than a constant found empirically (\cite{Fenics}). We will later comment on the efficacy of this approach (Section~\ref{sec:perf-results}). For the moment, we just recall that one of the goals of this research is to produce a system that goes beyond the dichotomy between quadrature and tensor modes. We will reason in terms of loop nests, code motion, and code pre-evaluation, searching the entire implementation space for an optimal synthesis.  
+Consider the case in which $\mathcal{G}_K : \hat{K} \rightarrow K$ is an affine mapping. Starting from Equation~\ref{eq:quadrature} and exploiting linearity, associativity and distributivity of the involved mathematical operators, we can rewrite \ref{eq:quadrature} as
+\begin{equation}
+\label{eq:tensor}
+A_{ij}^K = \sum_{\alpha_1=1}^d \sum_{\alpha_2=1}^d \sum_{\alpha_3=1}^n \operatorname{det} \mathcal{G}_K' w_{\alpha_3} \sum_{\beta=1}^d \frac{X_{\alpha_1}}{\partial x_{\beta}} \frac{\partial X_{\alpha_2}}{\partial x_{\beta}} \int_{K_0} \phi_{\alpha_3} \frac{\partial \phi_{i_1}}{\partial X_{\alpha_1}} \frac{\partial \phi_{i_2}}{\partial X_{\alpha_2}} dX.
+\end{equation}
+A generalization of this transformation has been proposed in~\cite{Kirby:TC}. Because of only involving reference element terms, the integral in the equation can be pre-evaluated and stored in temporary variables. The evaluation of the local tensor can then be abstracted as
+\begin{equation}
+A_{ij}^K = \sum_{\alpha} A_{i_1 i_2 \alpha}^0 G_{K}^\alpha
+\end{equation}
+in which the pre-evaluated ``reference tensor'' $A_{i_1 i_2 \alpha}$ and the cell-dependent ``geometry tensor'' $G_{K}^\alpha$ are exposed. 
 
+
+\subsubsection{Qualitative comparison}
+%\label{sec:qualitative}
+Depending on form and discretization, the relative performance of the two modes, in terms of the operation count, can vary quite dramatically. The presence of derivatives or coefficient functions in the input form increases the rank of the geometry tensor, making the traditional quadrature mode preferable for ``complex'' forms. On the other hand, speed-ups from adopting tensor mode can be significant in a wide class of forms in which the geometry tensor remains ``sufficiently small''. The discretization, particularly the relative polynomial order of trial, test, and coefficient functions, also plays a key role in the resulting operation count. 
+
+These two modes have been implemented in the FEniCS Form Compiler~\cite{FFC-TC}, which we review in later sections. In this compiler, a heuristic is used to choose the most suitable mode for a given form. It consists of analysing each monomial in the form, counting the number of derivatives and coefficient functions, and checking if this number is greater than a constant found empirically (\cite{Fenics}). In Chapter~\ref{ch:optimality}, we will describe a code generation system that goes beyond the dichotomy between quadrature and tensor modes, relying on cost models comparing the impact of different rewrite operators (e.g., expansion of products, factorization).
 
 
 \subsubsection{Code Examples}
 \label{sec:bkg:mathcode}
-We have explained that local assembly is the computation of contributions of a specific cell in the discretized domain to the linear system which yields the PDE solution. The process consists of numerically evaluating problem-specific integrals to produce a matrix and a vector (only the derivation of the matrix was shown in Section~\ref{sec:quadrature-rep}), whose sizes depend on the order of the method. This operation is applied to all cells in the discretized domain (mesh).
-
-We consider again the weighted Laplace example of the previous section. A C-code implementation of Equation~\ref{eq:quadrature} is illustrated in Listing~\ref{code:weighted-laplace}. The values at the various quadrature points of basis functions ($\phi$) derivatives are tabulated in the A and B arrays. The summation along quadrature points $q$ is implemented by the \emph{i} loop, whereas the one along $\alpha_3$ is represented by the \emph{r} loop. In this example, we assume $d=2$ (2D mesh), so the summations along $\alpha_1$, $\alpha_2$ and $\beta$ have been straightforwardly expanded in the expression that evaluates the local element matrix $A$. 
+A possible C implementation of Equation~\ref{eq:quadrature} is illustrated in Listing~\ref{code:weighted-laplace}. We assume a domain of dimension $d=2$ and polynomial order $1$ Lagrange elements. The values at the quadrature points of the derivatives of the basis functions are pre-tabulated in the \texttt{B} and \texttt{D} arrays (representing, respectively, the derivatives with respect to the coordinates $x$ and $y$). The values at the quadrature points of the basis functions spanning the field $w$ are pre-tabulated in the array \texttt{C}. Pre-tabulation, which is made possible by mapping the computation to a reference element, is of fundamental importance to speed-up the local assembly phase. The summation over the $N_q = 6$ quadrature points is implemented by the \texttt{i} loop. The \texttt{r} loop implements the summation over $\alpha_3$ for discretization of the weight $w$. Given their small range, the summations over the spatial dimensions $\alpha_1$, $\alpha_2$ and $\beta$ have all been expanded in the ``assembly expression'' that evaluates the local element matrix $A$. The $K$ array includes the four components of the inverse of the Jacobian matrix for the change of coordinates. 
 
 \begin{algorithm}[t]
 \scriptsize\ttfamily
@@ -250,108 +270,8 @@ $\lbrace$ \\
 ~~~~$\rbrace$\\
 ~~$\rbrace$\\
 $\rbrace$
-\caption{A possible implementation of Equation~\ref{eq:quadrature} assuming a 2D triangular mesh and polynomial order $q=2$ Lagrange basis functions.}
+\caption{A possible implementation of Equation~\ref{eq:quadrature} assuming a 2D triangular mesh and polynomial order $1$ Lagrange basis functions.}
 \label{code:weighted-laplace}
-\end{algorithm}
-
-More complex assembly expressions, due to the employment of particular differential operators in the original PDE, are obviously possible. Intuitively, as the complexity of the PDE grows, the implementation of local assembly becomes increasingly more complicated. This fact is actually the real motivation behind research in automated code generation techniques, such as those used by state-of-the-art frameworks like FEniCS and Firedrake. Automated code generation allows scientists to express the finite element specification using a domain-specific language resembling mathematical notation, and to obtain with minimum effort a semantically correct implementation of local assembly. The goal of this research is maximizing the efficiency, in terms of run-time performance, of generic local assembly kernels, on standard CPU architectures. 
-
-\begin{algorithm}[t]
-\scriptsize
-\SetAlgorithmName{LISTING}{}
-
-// This is a Firedrake construct (\textbf{not} an UFL's) to instantiate a 2D mesh.\\
-mesh = UnitSquareMesh(size, size)\\
-// FunctionSpace also belongs to the Firedrake language \\
-V = FunctionSpace(mesh, "Lagrange", 2)\\
-u = \KwSty{TrialFunction}(V)\\
-v = \KwSty{TestFunction}(V)\\
-weight = \KwSty{Function(V)}.\KwSty{assign}(value)\\
-a = weight\KwSty{*}\KwSty{dot}(\KwSty{grad}(v), \KwSty{grad}(u))\KwSty{*dx}
-\caption{UFL specification of the weighted Laplace equation for polynomial order $q=2$ Lagrange basis functions.}
-\label{code:weighted-laplace-ufl}
-\end{algorithm}
-
-The domain-specific language used by Firedrake and FEniCS to express finite element problems is the Unified Form Language (UFL) \citep{ufl}. Listing~\ref{code:weighted-laplace-ufl} shows a possible UFL implementation for the weighted Laplace form. Note the resemblance of \emph{a = weight*...} with Equation~\ref{eq:stiffness}. A form compiler translates UFL code into the C code shown in Listing~\ref{code:weighted-laplace}. We will describe these aspects carefully in Section~\ref{sec:coffee-implementation}; for the moment, this level of detail suffices to open a discussion on the optimization of local assembly kernels arising from different partial differential equations.
-
-% More Examples now...
-
-\begin{figure}
-\begin{alltt}
-\scriptsize
-\textbf{Input:} element matrix (2D array, initialized to 0), coordinates (array), 
-       coefficients (array, e.g. velocity)
-\textbf{Output:} element matrix (2D array)
-- Compute Jacobian from coordinates
-- Define basis functions
-- Compute element matrix in an affine loop nest
-\end{alltt}
-\caption{Structure of a local assembly kernel}
-\label{code:general-structure}
-\end{figure}
-
-%The code transformations described in this work are also
-%generalizable to non-Firedrake assembly kernels, provided that the
-%same numerical integration algorithm is employed.
-
-The structure of a local assembly kernel can be generalized as in Figure~\ref{code:general-structure}. The inputs are a zero-initialized two dimensional array used to store the element matrix, the element's coordinates in the discretized domain, and coefficient fields, for instance indicating the values of velocity or pressure in the element. The output is the evaluated element matrix. The kernel body can be logically split into three parts:
-\begin{enumerate}
-  \item Calculation of the Jacobian matrix, its determinant and its
-    inverse required for the aforementioned change of coordinates from
-    the reference element to the one being computed.
-  % FIXME: this rather hand-wavy and not technically correct
-  \item Definition of basis functions used to interpolate fields at the
-    quadrature points in the element. The choice of basis functions is
-    expressed in UFL directly by users. In the generated code, they are
-    represented as global read-only two dimensional arrays (i.e., using
-    \texttt{static const} in C) of double precision floats.
-  \item Evaluation of the element matrix in an affine loop nest, in which
-    the integration is performed.
-\end{enumerate}
-Table~\ref{table:map-name-letters} shows the variable names we will use in the upcoming code snippets to refer to the various kernel objects.
-
-\begin{table}
-\scriptsize
-\begin{center}
-\begin{tabulary}{1.0\columnwidth}{C|C|C}
-\hline
-Object name & Type & Variable name(s) \\\hline
-Determinant of the Jacobian matrix & double & det  \\
-Inverse of the Jacobian matrix & double & K1, K2, ... \\
-Coordinates & double** & coords\\
-Fields (coefficients) & double** & w \\
-Coefficients at quadrature points & double & f0, f1, ...\\
-Numerical integration weights & double[] & W \\
-Basis functions (and derivatives) & double[][] & A, B, C, ... \\
-Element matrix & double[][] & M\\ \hline
-\end{tabulary}
-\end{center}
-\caption{Type and variable names used in the various listings to identify local assembly objects.}
-\label{table:map-name-letters}
-\end{table}
-
-
-\begin{algorithm}[t]
-\scriptsize
-\SetAlgorithmName{LISTING}{}
-
-\KwSty{void} helmholtz(\KwSty{double} M[3][3], \KwSty{double} **coords) $\lbrace$\\
-~~// K, det = Compute Jacobian (coords) \\
-~~\\
-~~\KwSty{static const double} W[3] = $\lbrace$...$\rbrace$\\
-~~\KwSty{static const double} A[3][3] = $\lbrace\lbrace$...$\rbrace\rbrace$\\
-~~\KwSty{static const double} B[3][3] = $\lbrace\lbrace$...$\rbrace\rbrace$\\
-~~\\
-~~\KwSty{for} (\KwSty{int} i = 0; i$<$3; i++) \\
-~~~~\KwSty{for} (\KwSty{int} j = 0; j$<$3; j++) \\
-~~~~~~\KwSty{for} (\KwSty{int} k = 0; k$<$3; k++) \\
-~~~~~~~~M[j][k] += \underline{(}Y[i][k]*Y[i][j]+\\
-~~~~~~~~~~~~~~~~~~~~~+((K1*A[i][k]+K3*B[i][k])*(K1*A[i][j]+K3*B[i][j]))+\\
-~~~~~~~~~~~~~~~~~~~~~+((K0*A[i][k]+K2*B[i][k])*(K0*A[i][j]+K2*B[i][j]))\underline{)}*\\
-~~~~~~~~~~~~~~~~~~~~~~*det*W[i];\\
-$\rbrace$
-\caption{Local assembly implementation for a Helmholtz problem on a 2D mesh using polynomial order $q=1$ Lagrange basis functions.}
-\label{code:helmholtz}
 \end{algorithm}
 
 \begin{algorithm}[t]
@@ -388,19 +308,23 @@ $\rbrace$
 \label{code:burgers}
 \end{algorithm}
 
-The actual complexity of a local assembly kernel depends on the finite element problem being solved. In simpler cases, the loop nest is perfect, has short trip counts (in the range 3--15), and the computation reduces to a summation of a few products involving basis functions. An example is provided in Listing~\ref{code:helmholtz}, which shows the assembly kernel for a Helmholtz problem using Lagrange basis functions on 2D elements with polynomial order $q=1$. In other scenarios, for instance when solving the Burgers equation, the number of arrays involved in the computation of the element matrix can be much larger. The assembly code is given in Listing~\ref{code:burgers} and contains 14 unique arrays that are accessed, where the same array can be referenced multiple times within the same expression. This may also require the evaluation of constants in outer loops (called $F$ in the code) to act as scaling factors of arrays. Trip counts grow proportionally to the order of the method and arrays may be block-sparse.
+The evaluation of integrals becomes more computationally expensive if the complexity of a variational form grows, in terms of number of coefficients and tensor algebra or differential operators employed. It is not pathological a scenario in which the computation of a local element tensor requires more than hundreds or even thousands of floating point operations. An excerpt from one such example is shown in Listing~\ref{code:burgers}: here, in the main expression, $14$ unique arrays are accessed (with the same array referenced multiple times within the expression) along with several other constants. The loop trip counts are also larger due to the different domain discretization employed. As we shall see, automated code generation for finite element operators has had two main objectives:
 
-In general, the variations in the structure of mathematical expressions and in loop trip counts (although typically limited to the order of tens of iterations) that different equations show, render the optimization process challenging, requiring distinct sets of transformations to bring performance closest to the machine peak. For example, the Burgers problem, given the large number of arrays accessed, suffers from high register pressure, whereas the Helmholtz equation does not. Moreover, arrays in Burgers are block-sparse due to the use of vector-valued basis functions (we will elaborate on this in the next sections). These few aspects (we could actually find more) already intuitively suggests that the two problems require a different treatment, based on an in-depth analysis of both data and iteration spaces. Furthermore, domain knowledge enables transformations that a general-purpose compiler could not apply, making the optimization space even larger. In this context, our goal is to understand the relationship between distinct code transformations, their impact on cross-loop arithmetic intensity, and to what extent their composability is effective in a wide class of real-world equations and architectures.
+\begin{itemize}
+\item relieving the implementation burden when it comes to translate into code non-trivial operators, a tedious, error-prone task;
+\item facilitating the introduction of techniques to reduce the operation count and powerful low-level optimizations.
+\end{itemize}
 
-We also note that despite the infinite variety of assembly kernels that frameworks like FEniCS and Firedrake can generate, it is still possible to identify common domain-specific traits that are potentially exploitable for our optimization strategy. These include: 1) memory accesses along the three loop dimensions are always unit stride; 2) the \texttt{j} and \texttt{k} loops are interchangeable, whereas interchanges involving the $i$ loop require pre-computation of values (e.g. the $F$ values in Burgers) and introduction of temporary arrays (explained next); 3) depending on the problem being solved, the \texttt{j} and \texttt{k} loops could iterate along the same iteration space; 4) most of the sub-expressions on the right hand side of the element matrix computation depend on just two loops (either \texttt{i}-\texttt{j} or \texttt{i}-\texttt{k}). In the following sections we show how to exploit these observations to define a set of systematic, composable optimizations.
+The second point, as already anticipated, is one of the topics treated in this thesis.
+
 
 \subsection{Linear Solvers}
 \label{sec:bkg:linearsolvers}
-..
+The last step of an FEM is the resolution of the linear system (\ref{sec:bkg:eq:lin-sys}) arising from the variational form of the input problem. This and the assembly of $A$ and $b$ are the most expensive phases of an FEM. There is a whole science concerning the efficient resolution of linear systems. Among the most effective solvers are the family of {\em Krylov-type iteration methods}, such {\em conjugate gradient} for symmetric positive-definite matrices and {\em generalized minimal residual} (GMRES), which does not require $A$ in explicit form. {\em Multi-grid} methods are also widely used, whereas {\em direct methods} computing an LU factorization using {\em Gaussian elimination} have limited applicability. 
 
-\subsection{Impact of Assembly on Execution Time}
-\label{sec:bkg:impact}
-...
+The resolution of linear systems is not one of the topics of this thesis, so the interested reader is invited to refer to~\cite{good-linear-system-source}. It is however important to keep in mind that this phase usually has a significant impact on the execution time of an FEM: the performance optimization of the assembly phase has marginal impact if the method is solver-dominated. 
+
+
 
 
 \section{Abstractions in Computational Science}
