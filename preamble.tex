@@ -168,3 +168,22 @@
 \newtheorem{Algo}{Algorithm}
 \newtheorem{Const}{Constraint}
 \newtheorem{Strategy}{Strategy}
+
+% The following configs are thanks to Florian Rathgeber
+\usepackage[usenames,dvipsnames,svgnames]{xcolor}
+\usepackage[pdftex,
+            urlcolor=DarkBlue,       % \href{...}{...} external (URL)
+            filecolor=DarkGreen,     % \href{...} local file
+            linkcolor=DarkRed,       % \ref{...} and \pageref{...}
+            citecolor=DarkGreen,
+            %allcolors=black,
+            colorlinks=true,
+            hypertexnames=false,
+            bookmarks=true,
+            bookmarksnumbered=true,
+            bookmarksopen=false]{hyperref}
+
+\usepackage{enumitem}
+\setlist[itemize]{itemsep=0pt,topsep=0pt,leftmargin=12pt}
+\setlist[enumerate]{itemsep=0pt,topsep=0pt}
+\setlist[description]{itemsep=0pt,topsep=0pt,leftmargin=0pt}
