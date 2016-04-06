@@ -385,68 +385,125 @@ The UFL specification of a variational form is eventually passed to a form compi
 
 TSFC has two main features:
 \begin{itemize}
-\item It is a \textit{structure-preserving compiler} in that it keeps intact the structure of linear algebra operations. Rather than committing to a specific implementation strategy, it preserves the algebraic operations (e.g., index sums, inner products), thus letting the lower-level compiler to easily explore the space of all possible transformations.
+\item It is a \textit{structure-preserving compiler} in that it keeps intact the structure of algebraic operations (e.g., index sums, inner products), rather than committing to a specific implementation. This lets the lower-level compiler to explore the space of all possible transformations.
 \item As opposed to FFC, it supports the compilation of complicated forms making extensive use of tensor algebra. TSFC can efficiently identify repeated sub-expressions and assign them to temporary variables, thus drastically reducing the code generation time.
 \end{itemize}
 
-From this overview, it is clear that in Firedrake there is a neat separation of concerns:
+We observe that in Firedrake there is a neat separation of concerns:
 \begin{itemize}
 \item UFL is the mathematical language that allows expressing finite element problems.
-\item TSFC progressively abstracts away finite element from ...
-\item COFFEE handles performance optimization
+\item TSFC progressively abstracts away the domain knowledge and transforms the input into an AST. Some nodes in the ASTs are decorated to keep track of properties (e.g., linearity of an expression in a given set of symbols) exploitable for later optimization.
+\item COFFEE uses several rewrite operators for reducing the operation count of the operators returned by TSFC. 
 \end{itemize}
 
-Prior to this thesis, a form compiler ...
-
+The COFFEE layer, design and optimization algorithms constitute one of the main contributions of this thesis. Chapters~\ref{ch:optimality},~\ref{ch:lowlevelopt} and~\ref{ch:coffee} are entirely devoted to these topics.
 
 \subsubsection{Iteration over the Mesh}
 \label{sec:bkg:meshiteration}
-\begin{description}
-\item[Structured Meshes] ...
-\item[Unstructured Meshes] OP2, PyOP2, Lizst
-\end{description}
+Finite element problems require the application of computational {\em kernels} over the discretized equation domain. In Firedrake, this is accomplished through {\em PyOP2}~\cite{pyop2isc}, a domain specific language embedded in Python relying on just-in-time compilation and execution. 
 
-\subsection{The OP2 Active Library}
+Typical kernels are the assembly operators presented in Section~\ref{sec:bkg:assembly}, usually the most expensive from a computational viewpoint. Other relevant examples are the application of boundary conditions as well as the interpolation and projection of fields. The fact that a kernel is a local operation -- its application on an element of the mesh is independent of the application on any another element -- suits naturally parallel execution. This does not mean, however, that parallelizing a finite element computation is straightforward. As clarified in Section~\ref{sec:bkg:op2}, a kernel can update a field either directly or indirectly. In the latter case, a subset of values, for instance the degrees of freedom at the boundary between two elements, may need be incremented by two different processes/threads, which requires non-trivial coordination.
+
+PyOP2 supports the parallel application of kernels over unstructured meshes, a key requirement for FEMs. It also provides global data structures such as sparse matrices, which are essential when it comes to solve linear systems as~\ref{sec:bkg:eq:lin-sys}.
+
+This abstraction implements another separation of concerns. The kernels, which encode the numerics of an FEM, are produced at layers above PyOP2, usually in a completely automated fashion by Firedrake and the form compilers themselves. On the other hand, the parallel execution is completely masked by PyOP2. 
+
+The PyOP2 layer, and its relationship with the OP2 library~\cite{op2-main}, are documented in mode detail in Section~\ref{sec:bkg:op2}.
+
+%the parallel execution needs handling A local assembly operator is an example of the latter case, since the kernel is applied to a cell and the values of the degrees of freedom associated 
+
+ \subsubsection{Unstructured Meshes}
+PyOP2 only works with sets and fixed-arity maps. Possible sets are topological entities such as cells or degrees of freedom. A map is an object describing the adjacency relationship between the elements of two distinct sets (e.g., a map from cells to degrees of freedom). PyOP2 has therefore no concept of what a mesh is or how it can be constructed. This task, in Firedrake, is carried out by another software module, PETSc's {\em DMPlex}~\cite{dmplex-cite}. The maps required by PyOP2 are then directly derived from DMPlex. 
+ 
+DMPlex is a data management abstraction representing unstructured mesh data through direct acyclic graphs. DMPlex relieves PyOP2 from the duty of handling two complex operations: partitioning for distributed parallel execution and reordering for efficient memory accesses.  Moreover, the flexibility of the abstraction allows implementing techniques for communication-computation overlap, for instance via redundant computation along partition boundaries. 
+
+In this thesis, we will exploit the versatility of DMPlex for implementing automated loop fusion (Chapter~\ref{ch:sparsetiling}).
+ 
+ \subsubsection{Solving systems of linear equations}
+As we have seen, one of the key design principles characterizing Firedrake is exploiting successful, available software to carry out specific tasks of an FEM. This philosophy is also applied for what concerns the resolution of systems of linear equation, for which the {\em Portable, Extensible Toolkit for Scientific Computation} library~\cite{petsc-cite}, or simply PETSc, is employed. 
+
+PETSc is entirely implemented in C, although its Python interface {\em petsc4py} makes it easily usable by frameworks such as Firedrake. It provides a wide range of algorithms for solving linear systems as well as a considerable number of options to drive the solvers. All algorithms are parallelized for distributed-memory execution through MPI. All these aspects probably make PETSc the most powerful tool when it comes to deal with expensive linear algebra operations. 
+
+Similarly to Firedrake, PETSc never attempts to reinvent science: many functionalities are implemented on top of existing libraries (e.g., BLAS) or offered via third-party implementations through suitable wrappers.
+
+\subsection{The PyOP2 and OP2 Libraries}
 \label{sec:bkg:op2}
+PyOP2 is inspired from and shares many ideas with OP2\footnote{The name OP2 indicates that this is the second software engineering iteration of the OPlus library, or Oxford Parallel Library.}~\cite{op2-main}, although it differs in a few yet significant ways. In this section, we first describe the main features of the abstraction and the implementation that are in common; we then conclude explaining how PyOP2 detaches itself from OP2.
 
-\begin{algorithm}
+\subsubsection{Programming Model}
+
+OP2 offers abstractions for modeling an unstructured mesh, in terms of {\it sets} (e.g. vertices, edges), and mapping between them (e.g. mapping between edges and vertices) that express the mesh connectivity. An OP2 dataset associates data to each element of a mesh set (e.g. 3D coordinates).
+
+\begin{algorithm}[t]
 \scriptsize\ttfamily
 \SetAlgorithmName{LISTING}{}
 
-void kernel1 (double * x, double * tmp1, double * tmp2) {
-  *tmp1 += *x;
-  *tmp2 += *x;
-}
-// loop over edges
-op$\_$par$\_$loop (edges, kernel1,
-  op$\_$arg$\_$dat (x, -1, OP$\_$ID, OP$\_$READ),
-  op$\_$arg$\_$dat (temp, 0, edges2vertices, OP$\_$INC),
-  op$\_$arg$\_$dat (temp, 1, edges2vertices, OP$\_$INC))
+void kernel1 (double * x, double * tmp1, double * tmp2) $\lbrace$\\
+~~*tmp1 += *x;\\
+~~*tmp2 += *x;\\
+$\rbrace$~\\
+~\\
+// loop over edges\\
+op$\_$par$\_$loop (edges, kernel1,\\
+~~~~~~~~~~~~op$\_$arg$\_$dat (x, -1, OP$\_$ID, OP$\_$READ),\\
+~~~~~~~~~~~~op$\_$arg$\_$dat (temp, 0, edges2vertices, OP$\_$INC),\\
+~~~~~~~~~~~~op$\_$arg$\_$dat (temp, 1, edges2vertices, OP$\_$INC))\\
+~\\
+// loop over cells\\
+op$\_$par$\_$loop (cells, kernel2,\\
+~~~~~~~~~~~~op$\_$arg$\_$dat (temp, 0, cells2vertices, OP$\_$INC),\\
+~~~~~~~~~~~~op$\_$arg$\_$dat (temp, 1, cells2vertices, OP$\_$INC),\\
+~~~~~~~~~~~~op$\_$arg$\_$dat (temp, 2, cells2vertices, OP$\_$INC),\\
+~~~~~~~~~~~~op$\_$arg$\_$dat (res, -1, OP$\_$ID, OP$\_$READ))\\
+~\\
+// loop over edges\\
+op$\_$par$\_$loop (edges, kernel3,\\
+~~~~~~~~~~~~op$\_$arg$\_$dat (temp, 0, edges2vertices, OP$\_$INC),\\
+~~~~~~~~~~~~op$\_$arg$\_$dat (temp, 1, edges2vertices, OP$\_$INC))\\
 
-// loop over cells
-op$\_$par$\_$loop (cells, kernel2,
-  op$\_$arg$\_$dat (temp, 0, cells2vertices, OP$\_$INC),
-  op$\_$arg$\_$dat (temp, 1, cells2vertices, OP$\_$INC),
-  op$\_$arg$\_$dat (temp, 2, cells2vertices, OP$\_$INC),
-  op$\_$arg$\_$dat (res, -1, OP$\_$ID, OP$\_$READ))
-
-// loop over edges
-op$\_$par$\_$loop (edges, kernel3,
-  op$\_$arg$\_$dat (temp, 0, edges2vertices, OP$\_$INC),
-  op$\_$arg$\_$dat (temp, 1, edges2vertices, OP$\_$INC))
-
-\caption{...}
+\caption{Section of a toy OP2 program.}
 \label{code:op2program}
 \end{algorithm}
 
-%TODO : paste description from ESA report
+OP2 programs, such as the one in Listing~\ref{code:op2-program}, are expressed as sequences of parallel loops, each loop applying a computational kernel to every element in a mesh set. These {\it kernels} can access data associated to either the loop iteration set (direct access) or to other sets (indirect access) through mappings (or OP2 maps). As an example, a parallel loop iterates over all edges of the mesh and the kernel increments a dataset associated to vertices (i.e. each edge updates its two vertices). OP2 maps are implemented as arrays of indices.
 
+The running example including three parallel loops. The first loop iterates over edges, as indicated by the first parameter of the {\it op\_par\_loop} function. In OP2, an iteration space (edges, in this case) is expressed as an op\_set structured type, whose declaration is omitted in the example. The op\_par\_loop applies a kernel ``kernel1'' to every element in the indicated iteration space, i.e. to each edge. The kernel of this example reads data associated to an edge and increments the two adjacent vertices with the read value. This is indicated by the {\tt OP\_READ} and {\tt OP\_INC} modes in the access descriptors.
+
+The access descriptors (or op\_arg\_dat) are used to indicate which datasets are being accessed when iterating on an OP2 set. When the access descriptor indicates OP\_ID for a data array, then that data array is being accessed with the identity function. The second and third op\_args in the example use indirections. Assuming that {\it temp} is a dataset associated to vertices, we need to tell OP2 what vertex data should be passed as second and third parameters (i.e. what fields of {\it temp} are required for each invocation). The index array {\it edges2vertices} maps each edge index into the indices of its two incident vertices with the integer values of 0 and 1 indicating which of the two vertices should be considered.
+
+\subsubsection{Execution Model for Shared-Memory Parallelism}
+The execution order of parallel loop iterations does not influence the result. The best ordering scheme, therefore, can be chosen by the run-time implementation. For shared-memory-parallelism, in case of indirect increments/reductions (as in the example), OP2 guarantees data race avoidance by scheduling serially (in any order) iterations incrementing the same variable.
+
+Data races are avoided by partitioning the vertices in the underlying mesh. Partitions that share an iteration set element (e.g. edge, cell) access shared vertex data and, therefore, are considered conflicting partitions. The partition conflict graph is eventually colored to enforce serialisation of increments to shared data. Partitions assigned the same color can be executed in parallel by different threads. On the other hand, partitions of different colors are scheduled serially, to prevent race conditions. The execution of elements inside a partition is serialized by scheduling them to a single thread.
+
+Partitioning is performed on a per-loop basis. Each loop iteration set is partitioned by creating a dependency list between iterations using one of the maps used to access data in the loop. The built adjacency list can optionally be passed to a partitioning algorithm (METIS and PT-Scotch have been demonstrated for use in OP2) to maximize iteration locality according to their data access pattern. In other words, iterations accessing the same data will be more likely to be assigned to the same partition rather than independent iterations.
+
+\subsubsection{Execution Model for Distributed-Memory Parallelism}
+Distributed-memory parallelism is conceptually simpler than shared-memory parallelism. During the OP2 initialization phase, sets, maps, and datasets are partitioned and then distributed to different processes. For executing a parallel loop, MPI messages are usually exchanged to refresh the out-of-date values along the partition boundaries. In overlap, each process computes its own portion of ``local'' iterations. Once both phases have finished, a process can correctly execute the remaining boundary iterations.
+
+To implement this parallelization scheme, the iterations of each locally stored OP2 set are divided into four contiguous regions:
+\begin{description}
+\item[Core] Iterations owned that can be processed without reading halo data. 
+\item[Owned] Iterations owned that can be processed only by reading halo data.
+\item[Exec halo] Off-process iterations that are redundant executed because they indirectly increment owned iterations.
+\item[Non-exec halo] Off-process iterations that only need be read to compute the exec halo iterations.
+\end{description}
+This situation is depicted in Figure~\ref{fig:sets-division}. Clearly, a good partitioning maximizes the ratio between the sizes of the core and non-core regions. 
+
+%The separation into four regions 
+
+%In spite of a simple execution model, the implementation of distributed-memory parallelism requires a great deal of effort. 
+
+\subsubsection{PyOP2 Features}
+PyOP2 distinguishes itself from OP2 in a number of different ways. 
+
+...
 
 \subsection{Stencil Languages}
 ...
 
 
-\section{Compilers and Libraries for Code Optimization}
+\section{Compilers and Libraries for Loop Optimization}
 \label{sec:bkg:codeopt}
 
 
@@ -506,7 +563,7 @@ Mention their unsuitability for tiling unstructured meshes... (use email I sent 
 %\subsection{Space Filling Curves}
 %...
 
-\subsection{Domain Specific Optimization}
+\section{Domain Specific Optimization}
 ...
 
 \subsubsection{Tensor Contraction Engine}
