@@ -495,12 +495,43 @@ This situation is depicted in Figure~\ref{fig:sets-division}. Clearly, a good pa
 %In spite of a simple execution model, the implementation of distributed-memory parallelism requires a great deal of effort. 
 
 \subsubsection{PyOP2 Features}
-PyOP2 distinguishes itself from OP2 in a number of different ways. 
+PyOP2 distinguishes itself from OP2 in a number of features.
 
-...
+\begin{itemize}
+\item An OP2 program is statically analyzed. The OP2 source-to-source compiler produces a legal C program, which is subsequently compiled and executed, possibly on a variety of different architectures. PyOP2, on the other hand, is entirely implemented in Python. Code is generated at run-time by inspecting the objects representing a program. The choice of Python makes PyOP2 easily composable with other abstractions. In the context of the Firedrake project, for example, PyOP2 relieves from the need for a fully-fledged compiler capable of translating arbitrary Python code into C (recall that UFL is embedded in Python). Rather, the analysis is for free as PyOP2 objects (e.g., sets, maps, parallel loops) are constructed as they are encountered during interpretation. A hierarchy of ``software caches'' minimizes the overhead of such an implementation by avoiding repeatedly generating code for kernels and parallel loops already ``seen'' during execution.
+
+\item Despite sharing relevant constructs (e.g., sets, maps), the PyOP2 domain specific language tends to be more compact and expressive than the OP2 counterpart. This is again a consequence of simplifying the analysis phase.
+
+\item PyOP2 supports global sparse matrices, basis linear algebra operations and mixed types (e.g., mixed sets), which are essential features for integration with a finite element framework. OP2 has none of these. 
+
+\item OP2 completely handles distributed-memory parallelism, including partitioning and distribution of data structures as well as renumbering for increased data locality. PyOP2, as explained, relies on an external software module, DMPlex, for these features. The versatility of DMPlex will be fundamental for implementing and automating the performance optimization described in Chapter~\ref{ch:sparsetiling}.
+\end{itemize}
+
+
 
 \subsection{Stencil Languages}
-...
+A stencil defines how to access a set of values associated with a grid point and its neighboring points. The word ``stencil'' often tacitly refers to the case in which the rule for accessing the neighboring points is expressed as an affine function. Many computational methods, typically based upon finite difference or close variants, can then be described by means of stencils operating on $n$-dimensional structured meshes. This definition can be generalized to include the relevant case of this thesis -- that is, unstructured meshes -- by relaxing the constraint about the affine nature of the access function. In particular:
+
+\begin{description}
+\item[Stencils for structured meshes] Given an element $\boldsymbol{i}$ in the mesh, a stencil is a vector-valued function $f(\boldsymbol{i}) = [f_1(\boldsymbol{i}), f_2(\boldsymbol{i}), ..., f_n(\boldsymbol{i})]$ which retrieves the $n$ elements that need be updated when accessing $\boldsymbol{i}$. A function $f_j$ is affine and usually takes the form $f_j(\boldsymbol{i}) = \boldsymbol{i}*h + o$, where $h, o \in \mathbb{N}$ act as offsetting parameters.
+\item[Stencils for unstructured meshes] Given an element $\boldsymbol{i}$ in the mesh and an affine access function $g$, a stencil is a vector-valued high-order function $f(\boldsymbol{i}, g) = [f_1(\boldsymbol{i}, g), f_2(\boldsymbol{i}, g), ..., f_n(\boldsymbol{i}, g)]$ which retrieves the $n$ elements that need be updated when accessing $\boldsymbol{i}$. A function $f_j$ is non-affine and usually takes the form $f_j(\boldsymbol{i}, g) = g(\boldsymbol{i})*h + o$, where $h, o \in \mathbb{N}$ act as offsetting parameters.
+\end{description}
+
+\subsubsection{Stencil Languages for Unstructured Meshes}
+OP2 is an example of a language implementing stencils for unstructured mesh applications. The keyword ``map'' is used in the language to denote a non-affine stencil. 
+
+Yet another example of language for unstructured mesh stencils is Lizst \citep{lizst}. Similarly to OP2, Lizst supports multiple architectures, including distributed-memory execution via MPI and GPUs. The language is less flexible than that of OP2, though. Mesh elements such as vertices and cells are first-class citizens and fields can only be associated with mesh elements. This is from one hand helpful, because the stencils (i.e., the relationship between mesh elements) can be automatically inferred, assuming that the mesh topology does not change over time. On the other hand, it makes integration with a finite element framework difficult, or simply unnatural. Consider the case in which quadratic or higher-order basis functions on triangles are used. The degrees of freedom are associated with both vertices and edges. In OP2, this is naturally expressible by defining a map between cells and degrees of freedom, whereas in Lizst one needs managing two different fields (one for the degrees of freedom on the vertices and the other for those on the edges). A computation in Lizst is expressed through sequences of {\em for-comprehensions} over mesh elements. The for-comprehensions can be arbitrarily nested. One of the key prerequisites is that each field in a for-comprehension nest has a fixed state, one among read, write, or increment (for local reductions). This allows the compiler to automatically perform useful actions such as scheduling transformations (e.g., by rearranging iterations in a for-comprehensions nest) and placement of MPI calls. The Lizst compiler derives data dependency information automatically, while OP2 relies on access descriptors. 
+
+\subsubsection{Stencil Languages for Structured Meshes}
+The field of domain specific languages for structured mesh computations has received a large number of contributions over the last decade. 
+
+SBLOCK~\cite{sblock-cite} is a Python framework for defining structured stencils; the run-time supports automatically generates low-level code for multi-node many-core architectures. Mint~\cite{mint-cite} is a framework based on pragma directives targeting GPUs that has been used to accelerate a 3D earthquake simulation~\cite{mint-simulation-cite}. Other stencil languages relying on auto-tuning systems for increasing the performance of the generated code are~\cite{zhang-mueller-cite},~\cite{kamil-cite},~\cite{patus}~\cite{gpu-stencil-automated}.
+
+An interesting approach is adopted in Pochoir~\cite{pochoir}, in which a compiler translates the high-level specification into cache-oblivious algorithms for multi-core CPUs. Interestingly, an attempt at integrating this system with a higher-level domain specific language for finite difference computations failed~\cite{tj-thesis} due to constraints on the programming interface. 
+
+A stencil language explicitly aiming for generation of highly-efficient vector code is~\cite{stencil-compiler-2-simd}.
+
+A commonality characterizing all these works is that it is not clear to what extent stencil languages have been adopted in production code. 
 
 
 \section{Compilers and Libraries for Loop Optimization}
@@ -510,6 +541,7 @@ PyOP2 distinguishes itself from OP2 in a number of different ways.
 \subsection{Loop Optimization - Static Analysis}
 \label{sec:bkg:poly}
 Polyhedral compilers ...
+pochoir
 scheduling functions
 Mention their unsuitability for tiling unstructured meshes... (use email I sent listing all issues...)
 
