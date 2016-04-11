@@ -554,47 +554,28 @@ For further information the reader is invited to consult~\cite{bacon-comp-transf
 
 To this class also belong the two fundamental reordering transformations used in this thesis.
 \begin{description}
-\item[Tiling] Also known as {\em blocking}, loop tiling is probably one of the most studied and powerful transformations. Its aim is improving data locality. It achieves that by ``chunking'' the iteration space of a loop nest into partitions of a given shape. This requires major changes to the loop nest structure, as shown in Listing~\ref{code:loop-tiling}; here, the ``tiled'' code executes, in sequence, ``square tiles'', thus increasing data locality. Depending on aspects such as the data dependency pattern and the control flow, implementing tiling may pose significant challenges. For example, ensuring the correctness of tiling requires non-trivial analysis and synthesis if the loop nest includes a stencil. Early studies on loop tiling are~\cite{early-tile-cite-1,early-tile-cite-2}. Recent works on automation and tiling algorithms are~\cite{recent-tile-cite-1,recent-tile-cite-2,recent-tile-cite-3}. Analyses of the effects of different tile shapes are available in~\cite{tile-shape-1,tile-shape-2}. 
-\item[Fusion] 
+\item[Tiling] Also known as {\em blocking}, loop tiling is probably one of the most studied and powerful transformations. Its main aim is improving data locality. It achieves that by ``chunking'' the iteration space of a loop nest into partitions of a given shape. This requires major changes to the loop nest structure, as shown in Listing~\ref{code:loop-tiling}; here, the ``tiled'' code executes, in sequence, ``square tiles'', thus increasing data locality. Depending on aspects such as the data dependency pattern and the control flow, implementing tiling may pose significant challenges. For example, ensuring the correctness of tiling requires a non-trivial analysis of the code if the loop nest includes a stencil. Among the first studies on loop tiling are~\cite{early-tile-cite-1,early-tile-cite-2}. More recent works on automation and scheduling strategies are~\cite{recent-tile-cite-1,recent-tile-cite-2,recent-tile-cite-3}. The effects of different tile shapes have been analyzed in~\cite{tile-shape-1,tile-shape-2}. 
+\item[Fusion] A sequence of loops can be fused, or ``merged'', to improve data locality and reduce loop overhead. In the most simple case, all loops in a sequence have same iteration space and, given $S_1$ a statement in a first loop and $S_2$ a statement in a subsequence loop, $S_2$ does not modify any data read by $S_1$. In general, loops can have different bounds and different kind of dependencies may arise. A theoretical study on the complexity of loop fusion is~\cite{fusion-complexity}. 
 \end{description}
 
 \subsection{Composing Loop Tiling and Loop Fusion}
 \label{sec:bkg:tiling}
+Reordering transformations can be composed to maximize their effectiveness. A case of particular interest for this thesis is when fusion and tiling are combined. Here, a sequence of loops is first fused into a single loop; then, consecutive iterations are grouped together to form tiles. Such a transformation can exploit the data locality across consecutive loops, thus optimizing for memory bandwidth and latency. Unfortunately, automating or even just implementing such an optimization can be cumbersome depending on what kind of loops need be supported. 
 
+There is a large body of research on the composition of fusion and tiling for structured stencil codes, for example~\cite{cohen-timetiling,timetiling-gpu,hierarchical-tiling} as well as most articles concerning polyhedral compilation (reviewed in Section~\ref{sec:bkg:poly}), such as~\cite{pluto}. When applied to computational methods for solving partial differential equations, this transformation has often been called {\em time tiling}. In these codes, a sequence of loops over the spatial dimensions is iteratively executed within a time loop. Time tiling fuses the spatial loops and builds tiles spanning the time dimension.
+
+To a much smaller extent, fusion and tiling have been applied in the context of unstructured stencil codes. The composition of these two transformations takes the name {\em sparse tiling}. What makes it difficult to apply sparse tiling is the data dependency pattern induced by the stencil, which cannot be analyzed statically. Early studies focused on ``ad-hoc techniques'' for individual benchmarks relying on so called {\em inspector/executor strategies}. These will be extensively reviewed in Section~\ref{sec:tiling:relatedwork}. In essence, this thesis advances the state-of-the-art by introducing:
 \begin{itemize}
-\item Tiling is for a nested loop ! 
-\item tiles are atomic blabla
-\item split vs overlapped
+\item a technique to fuse and tile a sequence of loops including unstructured stencils, or ``irregular loops''. The sequence and the loop dependencies can be arbitrary as long as they are expressible through the so called {\em loop chain abstraction}~\cite{ST-KriegerHIPS2013}. This contribution was a joint effort with the authors in~\cite{st-paper}.
+\item a system that fully automates this technique and enables execution on distributed-memory architectures.
 \end{itemize}
-
-
-\subsubsection{Split tiling}
-
-
-\subsubsection{Overlapped tiling}
- %These techniques work by dividing a loop nest's iteration space into a number of overlapping regions called tiles. These tiles are shaped such that each of them can execute in parallel without requiring communication.  
  
- \subsubsection{Fusion vs Tiling}
- \label{sec:bkg:sparsetiling}
- so time tiling is just fusion across the time stepping loop, then tiling
-% IDEA: time skewing is just fusion. If it's a nested loop nest, you do tiling; but across loops at the same level of a block, you always do fusion. This way, SFCs and tiling are instances of scheduling functions for a nested loop; what is called "time tiling" or "time skewing" is just a shorthand for "fuse the loops within the time stepping loop".
-
-%Sparse tiling techniques were developed to group iterations of irregular applications
-%into atomic tiles at runtime with an 
-%inspector~\citep{dimeEtna00,StroutIJHPCA,StroutPLDI03,commAvoidingSparse2009}.
-%In general, the inspector iterates over index arrays that do not change during
-%the main computation to determine data reorderings or new schedules, like
-%sparse tiling schedules.
-%The resulting tiles have either an implicit or explicit partial ordering (i.e., a task graph)
-%that exposes asynchronous parallelism~\citep{Adams99c,dimeEtna00,StroutLCPC2002}.
-%These benchmark-specific, sparse tiling executors
-%exhibited performance improvements for sparse stencil computations, 
-%%FIXME: dime?Jacobi, % FIXME:~\cite{dime?}, 
-%Gauss-Seidel~\citep{Adams99c,StroutIJHPCA}, moldyn~\cite{StroutPLDI03},
-%and sparse matrix powers kernel~\cite{commAvoidingSparse2009}.
-
-%\subsection{Space Filling Curves}
-%...
+Independently of the stencil structure, there are two basic approaches for composing fusion and tiling:
+\begin{description}
+\item[Split tiling] The loops are fused by computing tiles and dependencies between tiles. The tiles are then scheduled such that all tile-to-tile dependencies are satisfied. In the context of structured stencil codes, over the last decade a great deal of effort has been invested in finding algorithms to compute effective split tiling schemes. These schemes take their name from the resulting shape of the tiles into which an iteration space is partitioned, such as {\em hexagonal tiling} or {\em diamond tiling}. Split tiling schemes usually differ in the trade-off between achieved parallelism and data locality.
+\item[Overlapped tiling] The loops are fused by computing overlapping tiles; that is, tiles that share a subset of iterations. The shared iterations are usually ``owned'' by a specific tile and are executed redundantly by a set of tiles, which store intermediate values into ``ghost'' regions of memory. This approach allows all tiles to execute in parallel without the need for any form of synchronization, although at the price of redundant computation. 
+\end{description}
+In this thesis, we employ a mixed split-overlapped scheme for effective tiling of unstructured stencil codes on distributed-memory architectures. A survey on different tiling techniques is provided by ~\cite{survey-tile-shape}. 
 
 
 \subsection{Automation via Static Analysis}
