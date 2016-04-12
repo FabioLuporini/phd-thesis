@@ -580,20 +580,30 @@ In this thesis, we employ a mixed split-overlapped scheme for effective tiling o
 
 \subsection{Automation via Static Analysis}
 \label{sec:bkg:poly}
-Polyhedral compilers ...
-pochoir
-scheduling functions
-Mention their unsuitability for tiling unstructured meshes... (use email I sent listing all issues...)
+There exist two different approaches to the automation of loop reordering transformations, and both of them rely on static analysis of source code:
 
+\begin{description}
+\item[Graph-based Representation] General-purpose compilers analyze the source code and produce an intermediate representation (IR) usually based on a graph-like data structure (e.g., SSA in LLVM). Algorithms and cost models are used to assert the legality of a transformation and its potential impact on performance. Sometimes the cost models are made visible to the user by suitable compiler reports (e.g., detailed vectorization reports can be requested to the Intel compiler). Users have some form of control over the optimization process. Pragma directives can be used to explicitly choose how to optimize a loop nest (e.g., to set a specific unroll factor or to enforce vectorization when the compiler erroneously thinks it is unprofitable), while compiler parameters can be tuned to change global optimization heuristics. 
+\item[Polyhedral Model] Several research compilers, and more recently a fork of the LLVM compiler itself through a module called Polly~\cite{polly}, apply reordering transformations based on geometric representations of loop nests. To model a loop nest as a {\em polyhedron}, two conditions must be satisfied: (i) loop bounds as well as array indices are expressions affine in the loop indices and (ii) pointer aliasing known at compile-time. These conditions are often necessary in the case of graph-based IRs too, although in a more relaxed fashion (e.g., the Intel compiler can vectorize, to some extent, non-affine loop nests). Polyhedral compilers target parallelism and data locality by composing {\em scheduling functions}. A schedule defines the order in which the iterations of a loop nest are executed; a scheduling function can be applied to change the original order. Once a polyhedron is available, a scheduling function can be constructed and cost models applied to assess its potential.
+\end{description}
+
+To apply a reordering transformation, a compiler -- irrespective of the IR employed -- first needs to build a model of the data dependencies pattern. If this model can be built and the optimization is determined to be legal and profitable -- these steps require a sophisticated analysis of the code region -- then the transformation is applied by suitable manipulation of the IR. 
+
+If, from one hand, general-purpose compilers using graph-based IRs have now reached an impressive level of sophistication (our experience with the Cray and Intel auto-vectorization systems is remarkably positive), there is still quite a lot of debate on the effectiveness of polyhedral compilers. Even for a state-of-the-art polyhedral compiler like PLUTO~\cite{pluto}, it is difficult to find real-world applications in which significant performance results could be achieved. There are multiple reasons for this; we will review the most important ones in Section~\ref{sec:tiling:difficult} with emphasis on the applicability of fusion and tiling to codes arising in scientific simulations. 
+
+In this thesis we focus on irregular codes -- that is, where the loops have unstructured stencils -- as those arising in finite element and finite volume methods. Unstructured stencils make loop nests non-affine, thus precluding the adoption of polyhedral compilation. Recently, there has been some effort on extending the polyhedral model to non-affine loops~\cite{sparse-poly-framework}, but we hardly believe this model will ever be capable of handling the complexity inherent in the real-world codes we are interested in. 
 
 
 \subsection{Automation via Dynamic Analysis}
 \label{sec:bkg:ie}
-\begin{itemize}
-\item Inspector/Executor schemes
-\item Space filling curves for unstructured meshes
-\item sparse tiling = loop fusion + loop tiling
-\end{itemize}
+
+If a stencil is unstructured, the memory access pattern is characterized by indirect accesses that can only be resolved at execution time. In this case, loop reordering transformations can be enabled through an inspector/executor strategy, as originally proposed in~\cite{ST-Saltz91}. Informally, an inspector is a piece of code to be executed prior to an irregular loop nest to capture the data dependency pattern into a suitable data structure. An executor is semantically equivalent to the original loop nest, but it changes the iteration order by exploiting the information produced by the inspector. Examples of reordering transformations through inspector/executor schemes can be found in~\cite{strout-reordering-transf}.
+
+To automate a loop reordering transformation in presence of unstructured stencils, a mixed compiler/run-time system approach is required, with the compiler searching for loops amenable to dynamic analysis and replacing them with suitable inspector/executor schemes. 
+
+
+%Space filling curves for unstructured meshes
+%sparse tiling = loop fusion + loop tiling
 
 
 
