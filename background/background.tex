@@ -589,7 +589,7 @@ There exist two different approaches to the automation of loop reordering transf
 
 To apply a reordering transformation, a compiler -- irrespective of the IR employed -- first needs to build a model of the data dependencies pattern. If this model can be built and the optimization is determined to be legal and profitable -- these steps require a sophisticated analysis of the code region -- then the transformation is applied by suitable manipulation of the IR. 
 
-If, from one hand, general-purpose compilers using graph-based IRs have now reached an impressive level of sophistication (our experience with the Cray and Intel auto-vectorization systems is remarkably positive), there is still quite a lot of debate on the effectiveness of polyhedral compilers. Even for a state-of-the-art polyhedral compiler like PLUTO~\cite{pluto}, it is difficult to find real-world applications in which significant performance results could be achieved. There are multiple reasons for this; we will review the most important ones in Section~\ref{sec:tiling:difficult} with emphasis on the applicability of fusion and tiling to codes arising in scientific simulations. 
+If, from one hand, general-purpose compilers using graph-based IRs have now reached an impressive level of sophistication (our experience with the Cray and Intel auto-vectorization systems is remarkably positive), there is still quite a lot of debate on the effectiveness of polyhedral compilers. Even for a state-of-the-art polyhedral compiler like PLUTO~\citep{pluto} it is difficult to find realistic applications in which significant performance improvements have been achieved. We will review the main causes of this weakness in Section~\ref{sec:tiling:difficult}, with emphasis on the applicability of fusion and tiling to codes arising in scientific simulations. 
 
 In this thesis we focus on irregular codes -- that is, where the loops have unstructured stencils -- as those arising in finite element and finite volume methods. Unstructured stencils make loop nests non-affine, thus precluding the adoption of polyhedral compilation. Recently, there has been some effort on extending the polyhedral model to non-affine loops~\cite{sparse-poly-framework}, but we hardly believe this model will ever be capable of handling the complexity inherent in the real-world codes we are interested in. 
 
@@ -597,7 +597,7 @@ In this thesis we focus on irregular codes -- that is, where the loops have unst
 \subsection{Automation via Dynamic Analysis}
 \label{sec:bkg:ie}
 
-If a stencil is unstructured, the memory access pattern is characterized by indirect accesses that can only be resolved at execution time. In this case, loop reordering transformations can be enabled through an inspector/executor strategy, as originally proposed in~\cite{ST-Saltz91}. Informally, an inspector is a piece of code to be executed prior to an irregular loop nest to capture the data dependency pattern into a suitable data structure. An executor is semantically equivalent to the original loop nest, but it changes the iteration order by exploiting the information produced by the inspector. Examples of reordering transformations through inspector/executor schemes can be found in~\cite{strout-reordering-transf}.
+If a stencil is unstructured, the memory access pattern is characterized by indirect accesses that can only be resolved at execution time. In such a case, loop reordering transformations can be enabled through an inspector/executor strategy, as originally proposed in~\cite{ST-Saltz91}. Informally, an inspector is an additional piece of code that captures the data dependency pattern of an irregular loop nest into a suitable data structure. An executor is semantically equivalent to the original loop nest, but it changes the iteration order by exploiting the information produced by the inspector. Examples of reordering transformations through inspector/executor schemes were provided by~\cite{strout-reordering-transf}.
 
 To automate a loop reordering transformation in presence of unstructured stencils, a mixed compiler/run-time system approach is required, with the compiler searching for loops amenable to dynamic analysis and replacing them with suitable inspector/executor schemes. 
 
@@ -609,28 +609,25 @@ To automate a loop reordering transformation in presence of unstructured stencil
 
 
 \section{Domain Specific Optimization}
+By targeting affine loop nests, polyhedral compilers are theoretically applicable in a wide range of programs, including computational methods for approximating the solution of partial differential equations, linear algebra routines, and image processing kernels. From our perspective, the class of affine loop nest is still quite generic however. As observed in~\cite{armin-poly-usability}, by restricting the attention to narrower fields or classes of programs, it is relatively simple to identify optimization opportunities that, due to their domain-specific nature (e.g., they rely on some mathematical properties), will be missed by any general-purpose of polyhedral compilers. Optimization systems specialized for specific classes of codes can therefore achieve significant performance gains over more general compilers. This observation is one of the cornerstones of this thesis, as one can appreciate from the contributions in Chapters~\ref{ch:sparsetiling},~\ref{ch:optimality} and~\ref{ch:lowlevelopt}. In this section, we review some of the most important domain optimization systems that somehow inspired our work. 
+
+\subsection{Tensor Contraction Engine}
+The Tensor Contraction Engine (TCE) is a successful story of how the mathematical structure of expensive computations in the field of quantum chemistry can be turned into powerful optimizations~\cite{TCE-url}. These codes need execute large sequences of tensor contractions, or generalized matrix multiplications, which can easily result in teraflops of computation and terabytes of data for simultaneously storing huge dense matrices. The TCE provides a domain-specific language to express formulae in a mathematical style. The mathematical specification is then transformed into low-level code undergoing several optimization steps. Transformations for reducing the operation count~\cite{TCE-2006,TCE-2009}, for finding the best trade-off between redundant computation and data locality~\cite{TCE-2011,TCE-2013}, and for more generic low-level optimization~\cite{TCE-2012} are available. Most of these optimizations exploit the mathematical structure inherent in tensor contractions. 
+
+In Chapter~\ref{ch:optimality} we use a similar approach for optimizing the operation count of finite element operators -- we exploit the mathematical property that these operators are linear in test and trial functions to identify effective factorizations.
+
+
+\subsection{Halide}
+\cite{halide} recently introduced Halide, a high level language for expressing image processing kernels. The run-time optimization system, which exploits auto-tuning to explore a large space of transformations, has been demonstrated to achieve a performance at least comparable to that of hand-written (and hand-optimized) code, and in many cases to outperform them. Halide is another successful story in the context of domain specific languages and domain specific optimization systems, since it is currently employed for development by several companies\footnote{At least Google and Adobe have declared that some of their groups (more than 30 researchers and developers in total) are actively using Halide.}.
+
+Halide allows users to define image processing pipelines. These are sequences of interconnected stages, each stage applying a numerical kernel -- usually a structured stencil or reductions -- to their input. Numerical kernels are pure functions applied to a 2D domain representing the image being processed. In realistic cases, an image processing pipeline can be quite complex. For example, in~\cite{halide-locallaplacian} it is shown a pipeline with 99 stages. What makes Halide powerful from the viewpoint of optimization is the fact that the schedules are decoupled from the numerical kernels. A schedule describes aspects like the iteration ordering and the trade-off between temporary values and redundant computation. These optimizations are fundamental in image processing pipelines and, as such, are treated as first-class citizens by Halide. Different schedules can be explored automatically or provided as user input.
+
+
+\subsection{Spiral and LGen}
 ...
 
-\subsubsection{Tensor Contraction Engine}
-...
 
-\subsubsection{LGen}
-Why potentially useful ...
-
-\subsubsection{Halide}
-...
-
-\subsubsection{Spiral}
-...
-
-\section{State-of-the-art Hardware Architectures}
-\label{sec:bkg:arch}
-...
-
-\subsection{SIMD Vectorization}
-...
-
-\subsection{Terminology}
+\section{Comments on the Terminology}
 \label{sec:bkg:terminology}
 
 \begin{description}
