@@ -623,12 +623,25 @@ In Chapter~\ref{ch:optimality} we use a similar approach for optimizing the oper
 Halide allows users to define image processing pipelines. These are sequences of interconnected stages, each stage applying a numerical kernel -- usually a structured stencil or reductions -- to their input. Numerical kernels are pure functions applied to a 2D domain representing the image being processed. In realistic cases, an image processing pipeline can be quite complex. For example, in~\cite{halide-locallaplacian} it is shown a pipeline with 99 stages. What makes Halide powerful from the viewpoint of optimization is the fact that the schedules are decoupled from the numerical kernels. A schedule describes aspects like the iteration ordering and the trade-off between temporary values and redundant computation. These optimizations are fundamental in image processing pipelines and, as such, are treated as first-class citizens by Halide. Different schedules can be explored automatically or provided as user input.
 
 
-\subsection{Spiral and LGen}
-...
+\subsection{Spiral}
+Spiral is one of the pioneering projects on automated code generation from a high level specification of a mathematical problem~\cite{spiral}. The domain of interest is the one of digital signal processing (DSP). Spiral generates highly optimized DSP algorithms, such as the discrete Fourier transform, and autonomously tunes them for the underlying platform. To achieve that, the mathematical specification of a DSP algorithm is first transformed according to a set of pre-established rewrite rules. The resulting formulae are translated into an intermediate language, which enables a set of optimizations, including explicit vectorization and parallelization. Finally, low level code is produced, compiled, executed and timed. The last phase eventually provides feedback to the system so that increasingly optimized implementations can be generated. 
+
+Spiral provides several examples of how the mathematical knowledge can be turned into powerful optimization algorithms. The rewrite rules system itself -- as mentioned above, essential for simplifying otherwise extremely complicated formulae -- is one such example. Yet another example is the framework used by the Spiral compiler to identify loop fusion opportunities~\cite{spiral-fusion}. The general loop fusion problem is NP-complete~\cite{darte-fusion}; the domain knowledge, however, allows Spiral to apply effective search algorithms that overcome the obvious limitations of any possible lower level compiler.
 
 
-\section{Comments on the Terminology}
+\subsection{Small-scale Linear Algebra}
+In several fields, such as graphics, media processing and scientific computing, many operations can be cast as small-scale linear algebra operations. By small-scale we mean that the size of some of the involved tensors can be as small as a few units, and only occasionally exceeds a few hundreds elements. Despite the small size, it is important to optimize these operations because they may be applied iteratively (e.g., in a time-stepping loop), thus accounting for a significant fraction of the overall execution time. 
+
+Libraries for linear algebra are tuned for large-scale problems and they become inefficient when tensors are small. Novel approaches, mostly centred on auto-tuning, have been developed. In the domain of scientific computing, it is worth mentioning the technique employed by the finite element code {\em nek5000}~\citep{nek5000-web-page} to optimize small matrix multiplications~\citep{nek5000}. A set of highly-optimized routines, each routine specialized for a particular size of the input problem, are generated and tuned for the underlying platform. At run-time, a dispatcher function picks one such routines given the size of the input matrix multiplication. A higher level approach has recently been presented in~\cite{Spampinato:14}, where the {\em LGen} language is used to write composite linear algebra operations. A set of rewrite rules and a transformation system deeply inspired by Spiral are used for optimization.
+
+The field of small-scale linear algebra optimization systems is interesting because some techniques could be used for low-level optimization of finite element local assembly, a topic treated by this thesis in Chapter~\ref{ch:lowlevelopt}.
+
+
+\section{On the Terminology Adopted}
 \label{sec:bkg:terminology}
+Throughout the thesis we employ a standard terminology, very close to the one used in reference textbooks such as~\cite{patterson-book}. We here review a set of relevant keywords. This will especially be useful when discussing the performance achieved by the proposed optimizations.
+
+%It may be useful to refer back to this section during the reading of the later chapters,  -- especially when analyzing the performance achieved by the proposed optimizations.
 
 \begin{description}
 \item[Memory pressure, Register pressure]
