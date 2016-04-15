@@ -31,17 +31,19 @@
 \usepackage[sc]{mathpazo}
 \usepackage[scaled=0.90]{helvet}
 \usepackage{inconsolata}
+\usepackage{courier}
 
 \usepackage{amsfonts}
-\usepackage{amsmath}
+\usepackage[cmex10]{amsmath}
 \usepackage{amssymb}
 
 \usepackage{fncychap}
 \usepackage{fancyhdr}
 
 \usepackage{graphicx}
-\usepackage{caption}
 \usepackage{subcaption}
+\usepackage{caption}
+%\usepackage{subfigure}
 
 \usepackage{url}
 \usepackage{xfrac}
@@ -140,7 +142,17 @@
 \newcommand{\code}[1]{\lstset{basicstyle=\small\tt}\lstinline£#1£\lstset
 {basicstyle=\footnotesize\tt}}
 
-%
+
+\makeatletter
+\newenvironment{CenteredBox}{% 
+\begin{Sbox}}{% Save the content in a box
+\end{Sbox}\centerline{\parbox{\wd\@Sbox}{\TheSbox}}}% And output it centered
+\makeatother
+
+
+\usepackage{setspace}
+\usepackage{fancybox}
+% \usepackage{enumitem}
 
 
 \usepackage{color}
@@ -154,20 +166,30 @@
 	numbersep=5pt,
 	backgroundcolor=\color{white},
 	showspaces=false,
-	showstringspaces=false,
+%	showstringspaces=false,
 	showtabs=false,
 	tabsize=2,
 	breaklines=true,
 	breakatwhitespace=false,
+	mathescape,
+	morekeywords={each,min,not},
 	escapeinside={\%*}{*)}
 }
 
+\let\proof\relax
+\let\endproof\relax
+\usepackage{amsthm}
 
+
+% Theorems, definitions, lemmas, etc
 \newtheorem{Def}{Definition}
 \newtheorem{Prop}{Proposition}
 \newtheorem{Algo}{Algorithm}
 \newtheorem{Const}{Constraint}
 \newtheorem{Strategy}{Strategy}
+
+
+\DeclareMathOperator*{\argmin}{arg\,min}
 
 % The following configs are thanks to Florian Rathgeber
 \usepackage[usenames,dvipsnames,svgnames]{xcolor}

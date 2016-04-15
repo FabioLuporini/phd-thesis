@@ -540,7 +540,7 @@ A commonality characterizing all these works is that it is not clear to what ext
 In this section, we review the state-of-the-art on compiler- and library-based approaches to loop optimization. This will provide the necessary background for the contributions presented in Chapter~\ref{ch:sparsetiling}.
 
 \subsection{Loop Reordering Transformations}
-\label{sec:bkg:poly}
+\label{sec:bkg:loop-transf}
 High-level transformations for optimization of loops in imperative languages date back to the sixties. The first studies focused on improving data locality and vectorization in loop nests. The main motivation was the observation that many programs spend a considerable fraction of time in executing these regions of code. A survey on the main results achieved between the sixties and the nineties was provided by~\cite{bacon-comp-transf}. Over the last twenty years, a great deal of effort has been invested in tools capable of automating these transformations as well as in developing techniques to increase their effectiveness. Excellent results have been achieved by many general-purpose compilers, which can now count on powerful loop transformation engines (e.g., the {\em Intel} and {\em Cray} compilers). Polyhedral compilers, discussed in Section~\ref{sec:bkg:poly}, have aimed for similar goals, although they have so far achieved controversial results.
 
 A class of optimizations relevant for this thesis is the one based on the {\em reordering} of iterations of a loop nest, or a sequence of loop nests. Notable transformations belonging to this class are:

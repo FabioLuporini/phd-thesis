@@ -1,0 +1,5 @@
+for (i = 0; i < I; i++)
+  $t_i$ = $c_i + d_i$
+for (j = 0; j < J; j++)
+  for (i = 0; i < I; i++)
+    $a_{ji}$ += $b_j t_i$

@@ -1,0 +1,19 @@
+// Pre-evaluated tables
+...
+for (e = 0; e < E; e++)
+  // Temporaries due to sharing elimination
+  // (Sharing was a by-product of pre-evaluation)
+  ...
+  // Loop nest for pre-evaluated monomials
+  for (j = 0; j < J; j++)
+    for (k = 0; k < K; k++)
+      $a_{ejk}$ += F$'$(...) + F$''$(...) + ...
+
+  // Loop nest for monomials for which run-time
+  // integration was determined to be faster
+  for (i = 0; i < I; i++)
+    // Temporaries due to sharing elimination
+    ...
+    for (j = 0; j < J; j++)
+      for (k = 0; k < K; k++)
+        $a_{ejk}$ += H(...)

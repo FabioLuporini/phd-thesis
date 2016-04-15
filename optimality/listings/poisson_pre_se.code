@@ -1,0 +1,12 @@
+for (e = 0; e < E; e++)
+  $z_0$ = ...
+  $z_1$ = ...
+  ...
+  for (i = 0; i < I; i++)
+    for (j = 0; j < J; j++)
+      for (k = 0; k < K; k++)
+        $a_{ejk}$ += $(((z_0 a_{ik} + z_2 b_{ik})*$
+                 $(z_0 c_{ij} + z_2 d_{ij}))+$
+                $((z_1 a_{ik} + z_3 b_{ik})*$
+                 $(z_1 c_{ij} + z_3 d_{ij})))*$
+                $W_i*\operatorname{det}$
