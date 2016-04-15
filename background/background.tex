@@ -510,6 +510,7 @@ PyOP2 distinguishes itself from OP2 in a number of features.
 
 
 \subsection{Stencil Languages}
+\label{sec:bkg:stencil-lang}
 A stencil defines how to access a set of values associated with a grid point and its neighboring points. The word ``stencil'' often tacitly refers to the case in which the rule for accessing the neighboring points is expressed as an affine function. Many computational methods, typically based upon finite difference or close variants, can then be described by means of stencils operating on $n$-dimensional structured meshes. This definition can be generalized to include the relevant case of this thesis -- that is, unstructured meshes -- by relaxing the constraint about the affine nature of the access function. In particular:
 
 \begin{description}
@@ -609,6 +610,7 @@ To automate a loop reordering transformation in presence of unstructured stencil
 
 
 \section{Domain Specific Optimization}
+\label{sec:bkg:dslopt}
 By targeting affine loop nests, polyhedral compilers are theoretically applicable in a wide range of programs, including computational methods for approximating the solution of partial differential equations, linear algebra routines, and image processing kernels. From our perspective, the class of affine loop nest is still quite generic however. As observed in~\cite{armin-poly-usability}, by restricting the attention to narrower fields or classes of programs, it is relatively simple to identify optimization opportunities that, due to their domain-specific nature (e.g., they rely on some mathematical properties), will be missed by any general-purpose of polyhedral compilers. Optimization systems specialized for specific classes of codes can therefore achieve significant performance gains over more general compilers. This observation is one of the cornerstones of this thesis, as one can appreciate from the contributions in Chapters~\ref{ch:sparsetiling},~\ref{ch:optimality} and~\ref{ch:lowlevelopt}. In this section, we review some of the most important domain optimization systems that somehow inspired our work. 
 
 \subsection{Tensor Contraction Engine}
@@ -643,14 +645,32 @@ Throughout the thesis we employ a standard terminology, very close to the one us
 
 %It may be useful to refer back to this section during the reading of the later chapters,  -- especially when analyzing the performance achieved by the proposed optimizations.
 
+
+\subsection*{Compilers}
+
 \begin{description}
-\item[Memory pressure, Register pressure]
-\item[Arithmetic intensity]
-\item[Operational intensity] Maybe add a subsection of the roofline model ?
-\item[Flops]
-\item[Access function (for array)]
-\item[General-purpose compiler]
-\item[Communication vs computation]
-\item[CPU- vs Memory-bound]
-\item[Local vs Global reduction]
+\item[General-purpose compiler] With this term we generically refer to any open-source or commercial compilers capable of translating low level source code (e.g., Fortran, C, C++) into machine code. Examples are the GNU ({\em gcc}), Intel ({\em icc}), Cray and LLVM compilers. With ``general-purpose'' we aim to distinguish them from other (higher level) compilers, such as polyhedral and domain specific language compilers, which we also need to refer to when discussing code transformations.
+
+\item[Autovectorization] Vectorization is a well-known paradigm that generalizes computation on scalars to computation on vectors -- that is, an array of contiguous elements. A single instruction, multiple data (SIMD) computation is one that employs vectorization to carry out a sequence of instructions. SIMD architectures, which are nowadays ubiquitous, emit vector code in two circumstances: (i) sections of a program are explicitly vectorized (e.g., through high level libraries, intrinsics instructions, or assembly code); (ii) a compiler transforms scalar code into vector code. The latter case is often referred to as auto-vectorization, since SIMD instructions are generated without user intervention. When possible and demonstrated to be effective, auto-vectorization should be preferred over explicit vectorization for portability reasons. Auto-vectorization is traditionally applied to (inner) loops, although block vectorization~\cite{superword-vect} is also supported by more powerful compilers (e.g., Intel's). 
+
+\item[Access function] An access function specifies how the elements of an array are accessed. Usually, these are functions of one or more loop indices. Access functions can be constant, affine or non-affine, as already shown in Section~\ref{sec:bkg:stencil-lang}.
+
+\item[Local and global reductions] A reduction is a commutative and associative operation that is applied to a set of values to produce a scalar. For instance, the sum of a set of numbers is a reduction. In mesh-based computations, it is useful to distinguish between local and global reductions. A reduction is local if only applied to a (typically small) subset of mesh elements. A reduction is global if applied to an entire set of elements (e.g., a field associated with a set of degrees of freedom), thus introducing a global synchronization point in the computation. 
+
+\item[Communication] A communication indicates a generic form of interaction between two or more entities. The most obvious case is when two processes on two different cores communicate explicitly via message passing; if the cores are on the same node the communication occurs via memory, whereas if they are on different nodes both the network and the memory are needed. However, the term can also be used in more general scenarios. We can say, for instance, that two tiles in a blocked iteration space communicate if their execution needs be synchronized. Intuitive terms like {\em communication-avoiding} or {\em communication-computation overlap} are often used to classify optimizations that aim to minimize communication. 
+
 \end{description}
+
+
+\subsection*{Performance and Cost Models}
+\begin{description}
+
+\item[Memory pressure] This is often used as an umbrella term to emphasize the fact that ore or more levels of the memory hierarchy (e.g., RAM, caches, registers) are stressed by a relatively large number of load/store instructions. A high memory pressure is often responsible for performance degradation because it causes memory-boundedness.
+
+\item[Memory- and CPU-boundedness] At high level, a section of code can be either CPU-bound or memory-bound. In the former case, the performance achieved is limited by the operation throughput of the CPU; in the latter case, the memory bandwidth or the memory latency are the limiting factors. The loop reordering transformations reviewed in Section~\ref{sec:bkg:codeopt} tackle memory-boundedness; for example, both tiling and fusion aim to maximize the cache hit ratio, thus reducing latency and memory pressure. Many domain specific optimizations, as discussed in Section~\ref{sec:bkg:dslopt}, instead target CPU-boundedness; for example, the Tensor Contraction Engine and Spiral manipulate mathematical formulae to reduce the operation count of the resulting kernels.
+
+\item[Operational intensity and Roofline Model] This parameter defines the ratio of total operations to total data movement (bytes) between the DRAM and the cache hierarchy for a given section of code. The operational intensity, which ``{\it predicts the DRAM bandwidth needed by a kernel on a particular computer}, is useful to derive {\em roofline plots}~\cite{roofline-cite}. This tool is particularly helpful to study the computational behaviour of a program, since it provides an insightful mean to understand what the performance bottleneck is -- if any -- and, therefore, what kind of optimization is most useful. 
+
+\item[Arithmetic intensity] Sometimes, the term {\em arithmetic intensity} is used in place of {\em operational intensity}. The differences are that only the fraction of arithmetic operations emitted, instead of all operations, is considered and that the total data movement is to be interpreted as between the CPU and the last level of cache.
+\end{description}
+
