@@ -2,7 +2,7 @@
 
 \section{The Finite Element Method}
 \label{sec:bkg:fem}
-Computational methods based upon finite elements are used to approximate the solution of partial differential equations (henceforth, PDEs) in a wide variety of domains. The mathematical abstraction used in finite element methods (or FEMs) is extremely powerful: not only does it help reasoning about the problem, but also provides systematic ways of deriving effective computer implementations. In~\cite{brenner-and-scott}, it is usefully suggested to consider an FEM as a black box that, given a differential equation, returns a discrete algorithm capable of approximating the equation solution. Unveiling the whole magic of such a black box is clearly out of the scope of this chapter. We rather limit ourselves to review the mathematical properties and the computational aspects that are essential for understanding the contributions in Chapters~\ref{ch:optimality} and~\ref{ch:lowlevelopt}. The content and the notation used in this section are inspired by~\cite{florian-thesis} and~\cite{quadrature-olegaard}. For a complete treatment of the subject, the reader is invited to refer to~\cite{brenner-and-scott}.
+Computational methods based upon finite elements are used to approximate the solution of partial differential equations (henceforth, PDEs) in a wide variety of domains. The mathematical abstraction used in finite element methods (or FEMs) is extremely powerful: not only does it help reasoning about the problem, but also provides systematic ways of deriving effective computer implementations. In~\cite{brenner-and-scott}, it is usefully suggested to consider an FEM as a black box that, given a differential equation, returns a discrete algorithm capable of approximating the equation solution. Unveiling the whole magic of such a black box is clearly out of the scope of this chapter. We rather limit ourselves to review the mathematical properties and the computational aspects that are essential for understanding the contributions in Chapters~\ref{ch:optimality} and~\ref{ch:lowlevelopt}. The content and the notation used in this section are inspired by~\cite{florian-thesis},~\cite{Fenics} and~\cite{quadrature-olegaard}. For a complete treatment of the subject, the reader is invited to refer to~\cite{brenner-and-scott}.
 
 
 
@@ -61,10 +61,10 @@ b_i = L(\phi_i(x))
 
 The matrix $A$ and the vector $b$ can be seen as the discrete operators arising from the bilinear form $a$ and from the linear form $L$ for the given choice of basis functions.
 
-The variational formulation of a {\em non-linear variational problem} requires refinements that are out of the scope of this review. The interested reader should refer to~\cite{brenner-and-scott}.
+The variational formulation of a {\em non-linear variational problem} requires refinements that are out of the scope of this review. The interested reader is again invited to refer to~\cite{brenner-and-scott}.
 
 \subsection{Finite Elements}
-In an FEM the domain $\Omega$ of the PDE is partitioned into a finite set of disjoint cells $\lbrace K \rbrace$; that is, $\bigcup K = \Omega$ and $\bigcap K = \emptyset$. This forms a {\em mesh}. A finite element is usually defined (see for example~\cite{brenner-and-scott}) as a triple ${<}K,\mathcal{P}_K,\mathcal{L}_K{>}$, where:
+In an FEM the domain $\Omega$ of the PDE is partitioned into a finite set of disjoint cells $\lbrace K \rbrace$; that is, $\bigcup K = \Omega$ and $\bigcap K = \emptyset$. This forms a {\em mesh}. Formally, A finite element is a triple ${<}K,\mathcal{P}_K,\mathcal{L}_K{>}$, where:
 \begin{itemize}
 \item $K$ is a cell in the mesh with non-empty interior and piecewise smooth boundary;
 \item $\mathcal{P}_K$ is a finite dimensional ``local'' function space of dimension $n_K$;
@@ -114,6 +114,14 @@ that maps the local degrees of freedom $\mathcal{L}_K$ to global degrees of free
 
 One of the crucial aspects of an FEM is that global function spaces are often defined in terms of a {\em reference finite element} ${<}\hat{K}, \hat{\mathcal{P}}, \hat{\mathcal{L}}{>}$ and a set of invertible mappings $\lbrace \mathcal{G}_K\rbrace_{K}$ from $\hat{K}$ to each cell in the mesh such that $K = \mathcal{G}_K(\hat{K})$.  This situation is illustrated in Figure~\ref{fig:bkg:reference-el}.
 
+\begin{figure}
+\begin{CenteredBox}
+\includegraphics[scale=0.8]{background/figures/reference-element}
+\end{CenteredBox}
+\caption{Affine mapping from the reference element $\hat{K}$ to an element $K$.}
+\label{fig:bkg:reference-el}
+\end{figure}
+
 For each $K$, $\mathcal{G}_K$ also allows to generate $\mathcal{P}_K$ and $\mathcal{L}_K$.  The complexity of this process depends on the mapping itself. In the simplest case, the mapping is affine; that is, expressible as $\mathcal{G}_K(\hat{\boldsymbol{x}}) = A_K \hat{\boldsymbol{x}} + b_K$, where $A_K$ and $b_K$ are, respectively, some matrix and vector.
 
 
@@ -131,7 +139,7 @@ where $a_K$ is an element bilinear form. We can then define the local element ma
 A_i^K = a_K (\psi_{i_1}^K, \phi_{i_2}^K)
 \end{equation}
 
-where $i \in \mathcal{I}_K$ is the index set on $A_i^K$. That is, $\mathcal{I}_K = \lbrace (1,1), (1,2), ..., (n_U, n_V) \rbrace$, with $n_U$ and $n_V$ representing the number of degrees of freedom for the local trial functions $\psi^K \in U_h^K$ and the local test functions $\phi^K \in V_h^K$. The element matrix $A^K$ is therefore a (typically dense) matrix of dimension $n_U \times n_V$.
+where $i \in \mathcal{I}_K$ is the index set on $A_i^K$. That is, $\mathcal{I}_K = \lbrace (1,1), ..., (n_U, n_V) \rbrace$, with $n_U$ and $n_V$ representing the number of degrees of freedom for the local trial functions $\psi^K \in U_h^K$ and the local test functions $\phi^K \in V_h^K$. The element matrix $A^K$ is therefore a (typically dense) matrix of dimension $n_U \times n_V$.
 
 Now let $\iota_K^U$ and $\iota_K^V$ be the local-to-global mappings for the local discrete function spaces $U_h^K$ and $V_h^K$. We can define, for each $K$, the collective local-to-global mapping $\iota_K : \mathcal{I}_K \rightarrow \mathcal{I}$ such that
 
@@ -139,7 +147,7 @@ Now let $\iota_K^U$ and $\iota_K^V$ be the local-to-global mappings for the loca
 \iota_K (i) = (\iota_K^U(i_1), \iota_K^V(i_2))\ \forall i \in \mathcal{I}_K.
 \end{equation}
 
-This simply maps a pair of local degrees of freedom to a pair of global degrees of freedom. Let also $\mathcal{T}$ be the subset of the cells in the mesh in which $\psi_{i_1}$ and $\phi_{i_2}$ are both non-zero. Note that here we are talking about the global functions whose restrictions to $K$ gives $\psi_{i_1}^K$ and $\phi_{i_2}^K$. By construction, $\iota_K$ is invertible if $K \in \mathcal{T}$. At this point, we have all the ingredients to compute $A$ as the sum of local contributions from the cells in the mesh:
+This simply maps a pair of local degrees of freedom to a pair of global degrees of freedom. Let also $\mathcal{T}$ be the subset of the cells in the mesh in which $\psi_{i_1}$ and $\phi_{i_2}$ are both non-zero. Note that here we are talking about the global functions whose restrictions to $K$ gives $\psi_{i_1}^K$ and $\phi_{i_2}^K$. By construction, $\iota_K$ is invertible if $K \in \mathcal{T}$. At this point, we have all the ingredients to formulate the computation of $A$ as the sum of local contributions from the elements in the mesh:
 
 \begin{equation}
 \begin{split}
@@ -148,9 +156,9 @@ A_i & = \sum_{K \in \mathcal{T}} a_K (\psi_{i_1},\phi_{i_2}) \\
 \end{split}
 \end{equation} 
 
-Similar conclusions may be drawn for the linear form $L$. We observe that this computation can be implemented as a single iteration over all cells in the mesh. On each cell, $A^K$ is computed and added to $A$ using the inverse mappings. This approach is particularly efficient because it only evaluates the non-zero entries in the sparse matrix $A$. Other more trivial implementations of the assembly phase are possible, although rarely used in practice because ineffective. 
+Similar conclusions may be drawn for the linear form $L$. We observe that this computation can be implemented as a single iteration over all cells in the mesh. On each cell, $A^K$ is computed and added to $A$ using the corresponding inverse map. This approach is particularly efficient because it only evaluates the non-zero entries in the sparse matrix $A$. Other more trivial implementations of the assembly phase are possible, although rarely used in practice because ineffective. 
 
-We conclude with a clarification concerning the terminology. The assembly process is often naturally described as a two-step procedure: {\em local assembly}  and {\em global assembly}. The former consists of computing the contributions of each single element (i.e., the element matrices $A^K$); the latter represents the ``coupling'' of all $A^K$ into $A$. As we shall see, one of the main subjects of this thesis is the computational optimization of the local assembly phase.
+We conclude with a clarification concerning the terminology. The assembly process is often described as a two-step procedure: {\em local assembly}  and {\em global assembly}. The former consists of computing the contributions of each single element (i.e., the element matrices $A^K$); the latter represents the ``coupling'' of all $A^K$ into $A$. As we shall see, one of the main subjects of this thesis is the computational optimization of the local assembly phase.
 
 \subsection{Local Assembly Example: from Math to Code}
 \label{sec:bkg:math-to-code}
@@ -192,15 +200,15 @@ A^K & = \int_K w \nabla \phi_i^K \cdot \nabla \phi_j^K \\
 \end{split}
 \end{equation} 
 
-where $\lbrace \boldsymbol{x}^1, \boldsymbol{x}^2, ..., \boldsymbol{x}^{N_q}$ is the set of $N_q$ quadrature points, and $\lbrace W_1, W_2, ..., W_{N_q} \rbrace$ the corresponding set of quadrature weights scaled such that $\sum_{k=1}^{N_q} W_k = |\hat{K}|$. 
+where $\lbrace \boldsymbol{x}^1, \boldsymbol{x}^2, ..., \boldsymbol{x}^{N_q} \rbrace$ is the set of $N_q$ quadrature points, and $\lbrace W_1, W_2, ..., W_{N_q} \rbrace$ the corresponding set of quadrature weights scaled such that $\sum_{k=1}^{N_q} W_k = |\hat{K}|$. 
 
-To compute a local basis function $\phi_i^K$ from a reference element basis function $\Phi_i$ we exploit the invertible map $\mathcal{G}_K^{-1}$, which allows us to write $\phi_i^K = \Phi_i \circ \mathcal{G}_K^{-1}$. To evaluate the gradient of a basis function $\phi_i^K$ at a quadrature point $\boldsymbol{x}^k$, with $\boldsymbol{x}^k = \mathcal{G}_K(\boldsymbol{X}^k)$ and $\boldsymbol{X}^k \in \hat{K}$, we therefore have to compute a matrix-vector product
+To compute a local basis function $\phi_i^K$ from a reference element basis function $\Phi_i$ we exploit the inverse map $\mathcal{G}_K^{-1}$, which allows us to write $\phi_i^K$ as $\phi_i^K = \Phi_i \circ \mathcal{G}_K^{-1}$. To evaluate the gradient of a basis function $\phi_i^K$ at a quadrature point $\boldsymbol{x}^k$, with $\boldsymbol{x}^k = \mathcal{G}_K(\boldsymbol{X}^k)$ and $\boldsymbol{X}^k \in \hat{K}$, we therefore have to compute a matrix-vector product
 
 \begin{equation}
 \nabla_x \phi_i^K(\boldsymbol{x}^k) = ((\mathcal{G}_K')^{-1})^{T}(\boldsymbol{x}^k) \nabla_X \Phi_i(\boldsymbol{X}^k).
 \end{equation}
 
-The term $\mathcal{G}_K')^{-1}$ represents the inverse of the Jacobian matrix originating from the change of coordinates. The resulting scalar-valued expression for each entry $A_{ij}^K$, assuming $\Omega$ to be a domain of dimension $d$, reads as:
+The term $(\mathcal{G}_K')^{-1}$ represents the inverse of the Jacobian matrix originating from the change of coordinates. The resulting scalar-valued expression for each entry $A_{ij}^K$, assuming $\Omega$ to be a domain of dimension $d$, reads as:
 
 \begin{equation}
 \label{eq:quadrature}
@@ -215,7 +223,7 @@ Consider the case in which $\mathcal{G}_K : \hat{K} \rightarrow K$ is an affine 
 \label{eq:tensor}
 A_{ij}^K = \sum_{\alpha_1=1}^d \sum_{\alpha_2=1}^d \sum_{\alpha_3=1}^n \operatorname{det} \mathcal{G}_K' w_{\alpha_3} \sum_{\beta=1}^d \frac{X_{\alpha_1}}{\partial x_{\beta}} \frac{\partial X_{\alpha_2}}{\partial x_{\beta}} \int_{K_0} \phi_{\alpha_3} \frac{\partial \phi_{i_1}}{\partial X_{\alpha_1}} \frac{\partial \phi_{i_2}}{\partial X_{\alpha_2}} dX.
 \end{equation}
-A generalization of this transformation has been proposed in~\cite{FFC-TC}. Because of only involving reference element terms, the integral in the equation can be pre-evaluated and stored in temporary variables. The evaluation of the local tensor can then be abstracted as
+A generalization of this transformation has been proposed in~\cite{FFC-TC}. As a consequence of involving reference element terms only, the integral in the equation can be pre-evaluated and stored in temporary variables. The evaluation of the local tensor can then be abstracted as
 \begin{equation}
 A_{ij}^K = \sum_{\alpha} A_{i_1 i_2 \alpha}^0 G_{K}^\alpha
 \end{equation}
