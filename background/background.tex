@@ -2,43 +2,38 @@
 
 \section{The Finite Element Method}
 \label{sec:bkg:fem}
-Computational methods based upon finite elements are used to approximate the solution of partial differential equations (henceforth, PDEs) in a wide variety of domains. The mathematical abstraction used in finite element methods (or FEMs) is extremely powerful: not only does it help reasoning about the problem, but also provides systematic ways of deriving effective computer implementations. In~\cite{brenner-and-scott}, it is usefully suggested to consider an FEM as a black box that, given a differential equation, returns a discrete algorithm capable of approximating the equation solution. Unveiling the whole magic of such a black box is clearly out of the scope of this chapter. We rather limit ourselves to review the mathematical properties and the computational aspects that are essential for understanding the contributions in Chapters~\ref{ch:optimality} and~\ref{ch:lowlevelopt}. The content and the notation used in this section are inspired by~\cite{florian-thesis},~\cite{Fenics} and~\cite{quadrature-olegaard}. For a complete treatment of the subject, the reader is invited to refer to~\cite{brenner-and-scott}.
+Computational methods based upon finite elements are used to approximate the solution of partial differential equations (henceforth, PDEs) in a wide variety of domains. The mathematical abstraction used in finite element methods (or FEMs) is extremely powerful: not only does it help reasoning about the problem, but also provides systematic ways of deriving effective computer implementations. In~\cite{brenner-and-scott}, it is usefully suggested to consider an FEM as a black box that, given a differential equation, returns a discrete algorithm capable of approximating the equation solution. Unveiling the magic of such a black box is clearly out of the scope of this chapter. We rather limit ourselves to review the mathematical and computational aspects that are essential for understanding the contributions in Chapters~\ref{ch:optimality} and~\ref{ch:lowlevelopt}. The content and the notation used in this section are inspired by~\cite{florian-thesis},~\cite{Fenics} and~\cite{quadrature-olegaard}. For a complete treatment of the subject, the reader is invited to refer to~\cite{brenner-and-scott}.
 
 
 
-\subsection{Variational Formulation}
+\subsection{Weak Formulation}
 \label{sec:bkg:var-problems}
-We consider the weak formulation of a {\em linear variational problem}
+In a {\em boundary value problem}, the solution of a (partial) differential equation subjected to a set of {\em boundary conditions} is sought. The boundary conditions specify the behaviour of the unknown at the domain boundary. We consider the {\em variational} or {\em weak} formulation of one such problem
 
 \begin{equation}
-\begin{split}
-\text{Find}\ u \in U\ \text{such that} \\
-a(u, v) = L(v), \forall v \in V
-\end{split}
+\text{Find}\ u \in U\ \text{such that}\ \ \ \ a(u, v) = L(v)\ \ \ \ \forall v \in V
 \end{equation}
 
-where $a$ and $L$ are, respectively, a bilinear form and a linear form. The term ``variational'' stems from the fact that the function $v$ can vary arbitrarily. The unfamiliar reader may find this expression unusual. Understanding the actual meaning of this formulation is far beyond the goals of this review, since an entire course in functional analysis would be needed. Informally, we can think of $V$ as a ``very nice'' space, in which functions have desirable properties. The underlying idea of the variational formulation is to ``transfer'' certain requirements (e.g., differentiability) from the unknown $u \in U$ to $v \in V$.
+where $u$ is the sought solution, $a$ a bilinear form and $L$ a linear form. The term ``variational'' stems from the fact that the function $v$ can vary arbitrarily. The reader unfamiliar with the theory of Hilbert spaces may find this formulation unusual. Informally, we can think of $V$ as a ``very nice'' space, in which functions have desirable properties. The underlying idea of the variational formulation consists of ``transferring'' certain requirements on the unknown (e.g., differentiability) to $v$. 
+%A deep understanding of meaning and implications of a weak formulation goes, however, far beyond the objectives of this section.
 
-The sets $U$ and $V$ and called, respectively, trial and test functions. The variational problem is discretized by using discrete test and trial spaces
+The sets $U$ and $V$ and called, respectively, trial and test functions. In an FEM, the variational problem is discretized by using discrete test and trial function spaces
 
 \begin{equation}
 \label{sec:bkg:eq:disc-var}
-\begin{split}
-\text{Find}\ u_h \in U_h \subset U\ \text{such that} \\
-a(u_h, v_h) = L(v_h), \forall v_h \in V_h \subset V
-\end{split}
+\text{Find}\ u_h \in U_h \subset U\ \text{such that}\ \ \ \ a(u_h, v_h) = L(v_h)\ \ \ \ \forall v_h \in V_h \subset V
 \end{equation}
 
-Let $\lbrace \psi_i \rbrace_{i=1}^N$ be the set of basis functions spanning $U_h$ and let $\lbrace \phi_j \rbrace_{j=1}^{N}$ be the set of basis functions spanning $V_h$. Then the unknown solution $u$ can be approximated as a linear combination of the basis functions $\lbrace \psi_i \rbrace_{i=1}^N$,
+Let $\lbrace \psi_j \rbrace_{j=1}^N$ be the set of basis functions spanning $U_h$ and let $\lbrace \phi_i \rbrace_{i=1}^{N}$ be the set of basis functions spanning $V_h$. The unknown solution $u$ can be approximated as a linear combination of the basis functions $\lbrace \psi_j \rbrace_{j=1}^N$,
 
 \begin{equation}
 u_h = \sum_{j=1}^N U_j \psi_j.
 \end{equation}
 
-This allows us to rewrite~\ref{sec:bkg:eq:disc-var} as:
+This allows us to rewrite (\ref{sec:bkg:eq:disc-var}) as:
 
 \begin{equation}
-\sum_{j=1}^N U_j a(\psi_j, \phi_i) = L(\phi_i),\ i=1,2,...,N
+\sum_{j=1}^N U_j \, a(\psi_j, \phi_i) = L(\phi_i),\ \ \ i=1,2,...,N
 \end{equation}
 
 From the solution of the following linear system we determine the set of {\em degrees of freedom} $U$ to express $u_h$:
@@ -54,8 +49,8 @@ where clearly
 \label{sec:bkg:eq:disc-op}
 \centering
 \begin{split}
-A_{ij} = a(\phi_i(x), \phi_j(x)) \\
-b_i = L(\phi_i(x))
+A_{ij} = a(\psi_j,\phi_i) \\
+b_i = L(\phi_i)
 \end{split}
 \end{equation}
 
@@ -64,28 +59,28 @@ The matrix $A$ and the vector $b$ can be seen as the discrete operators arising 
 The variational formulation of a {\em non-linear variational problem} requires refinements that are out of the scope of this review. The interested reader is again invited to refer to~\cite{brenner-and-scott}.
 
 \subsection{Finite Elements}
-In an FEM the domain $\Omega$ of the PDE is partitioned into a finite set of disjoint cells $\lbrace K \rbrace$; that is, $\bigcup K = \Omega$ and $\bigcap K = \emptyset$. This forms a {\em mesh}. Formally, A finite element is a triple ${<}K,\mathcal{P}_K,\mathcal{L}_K{>}$, where:
+In an FEM the domain $\Omega$ of the PDE is partitioned into a finite set of disjoint cells $\lbrace K \rbrace$; that is, $\bigcup K = \Omega$ and $\bigcap K = \emptyset$. This forms a {\em mesh}. Formally, a finite element is a triple ${<}K,\mathcal{P}_K,\mathcal{L}_K{>}$, where:
 \begin{itemize}
 \item $K$ is a cell in the mesh with non-empty interior and piecewise smooth boundary;
 \item $\mathcal{P}_K$ is a finite dimensional ``local'' function space of dimension $n_K$;
 \item the set of degrees of freedom $\mathcal{L}_K$ is a basis $\lbrace l_1^K, l_2^K, ..., l_{n_K}^K\rbrace$ for $\mathcal{P}'_K$, the dual space of $\mathcal{P}_K$. 
 \end{itemize}
-This definition allows to impose constraints on the set of basis functions $\lbrace \phi_1^K, \phi_2^K, ..., \phi_{n_K}^K\rbrace$ spanning $\mathcal{P}_K$. For instance, to enforce a {\em nodal basis} for $\mathcal{P}_K$ -- a particularly useful property for expressing solutions in $U_h$ -- we can impose that the relationship
+This definition allows imposing constraints on the set of basis functions $\lbrace \phi_1^K, \phi_2^K, ..., \phi_{n_K}^K\rbrace$ spanning $\mathcal{P}_K$. For instance, to enforce a {\em nodal basis} for $\mathcal{P}_K$ -- a particularly useful property for expressing solutions in $U_h$ -- we can impose that the relationship
 
 \begin{equation}
-l_i^K(\phi_j^K) = \delta_{ij},\ i,j = 1,2,...,n_K
+l_i^K(\phi_j^K) = \delta_{ij},\ \ \ \ i,j = 1,2,...,n_K
 \end{equation}
 
-must be satisfied ($\delta_{ij}$ is the Kronecker delta). This allows to express any $v \in \mathcal{P}_K$ as
+where $\delta_{ij}$ is the Kronecker delta, must be satisfied. This allows to express any $v \in \mathcal{P}_K$ as
 
 \begin{equation}
-v = \sum_{i=1}^{n_K} l_i^K(v) \phi_i^K.
+v = \sum_{i=1}^{n_K} l_i^K(v) \, \phi_i^K.
 \end{equation}
 
 Each linear functional in $\mathcal{L}_K$ is used to evaluate one degree of freedom of $v$ in terms of the chosen nodal basis. In other words, we can refer to both the coefficients $U$ introduced in the previous section and $\mathcal{L}_K$ as the degrees of freedom.
 
 \paragraph{Example: the triangular Lagrange element}
-The following example is extracted from~\cite{Fenics}. Consider a triangular cell $K$ and let $\mathcal{P}_K$ be the space of polynomials of order $1$ on $K$. $\mathcal{L}_K$ may be the set of bounded linear functionals representing point evaluation at the vertices $\boldsymbol{x}^i$ ($i=1,2,3$) of $K$ such that
+The following example is extracted from~\cite{Fenics}. Consider a triangular cell $K$ and let $\mathcal{P}_K$ be the space of polynomials of order $1$ on $K$. Let $\mathcal{L}_K$ be the set of bounded linear functionals representing point evaluation at the vertices $\boldsymbol{x}^i$ ($i=1,2,3$) of $K$ such that
 
 \begin{equation}
 \centering
@@ -98,13 +93,13 @@ l_i^K(v) = v(\boldsymbol{x}^i)
 Since if $v$ is zero at each vertex then $v$ must be zero everywhere, $\mathcal{L}_K$ really is a basis for $\mathcal{P}'_K$, so what we have defined is indeed a finite element. In particular, if we take $\boldsymbol{x}^1 = (0, 0),\ \boldsymbol{x}^2 = (1,0),\ \boldsymbol{x}^3 = (0,1)$, we have that the nodal basis is given by:
 
 \begin{equation}
-\phi_1(\boldsymbol{x}) = 1 - x_1 - x_2,\ \ \phi_2(\boldsymbol{x}) = x_1,\ \ \phi_3(\boldsymbol{x}) = x_2.
+\phi_1(\boldsymbol{x}) = 1 - x_1 - x_2,\ \ \ \ \ \phi_2(\boldsymbol{x}) = x_1,\ \ \ \ \ \phi_3(\boldsymbol{x}) = x_2.
 \end{equation}
 
 
 \subsection{Global Discretization}
 \label{sec:bkg:refel}
-A {\em local-to-global mapping} allows to patch together the finite elements to form a global function space, for instance the set of trial functions $U_h = \operatorname{span}\lbrace \psi_i \rbrace_{i=1}^N$ introduced in Section~\ref{sec:bkg:var-problems}. A local-to-global mapping is a function
+A {\em local-to-global mapping} allows to patch together the finite elements to form a global function space, for instance the set of trial functions $U_h = \operatorname{span}\lbrace \psi_j \rbrace_{j=1}^N$ introduced in Section~\ref{sec:bkg:var-problems}. A local-to-global mapping is a function
 
 \begin{equation}
 \iota_K : [1,n_K] \rightarrow [1,N]
@@ -127,7 +122,7 @@ For each $K$, $\mathcal{G}_K$ also allows to generate $\mathcal{P}_K$ and $\math
 
 \subsection{Assembly}
 \label{sec:bkg:assembly}
-The {\em assembly} of an FEM is the phase in which the matrix $A$ and the vector $b$ from~\ref{sec:bkg:eq:disc-op} are constructed. This is accomplished by adding the contributions from each $K$ to $A$ and $b$. Let us consider the bilinear form $a$, and assume this is an integral over $\Omega$. Thanks to the linearity of the operator, we can express $a$ as
+The {\em assembly} of an FEM is the phase in which the matrix $A$ and the vector $b$ in (\ref{sec:bkg:eq:disc-op}) are constructed. This is accomplished by adding the contributions from each $K$ to $A$ and $b$. Let us consider the bilinear form $a$. Since the operator is linear, we can express $a$ as
 
 \begin{equation}
 a = \sum_{K} a_K
@@ -139,15 +134,15 @@ where $a_K$ is an element bilinear form. We can then define the local element ma
 A_i^K = a_K (\psi_{i_1}^K, \phi_{i_2}^K)
 \end{equation}
 
-where $i \in \mathcal{I}_K$ is the index set on $A_i^K$. That is, $\mathcal{I}_K = \lbrace (1,1), ..., (n_U, n_V) \rbrace$, with $n_U$ and $n_V$ representing the number of degrees of freedom for the local trial functions $\psi^K \in U_h^K$ and the local test functions $\phi^K \in V_h^K$. The element matrix $A^K$ is therefore a (typically dense) matrix of dimension $n_U \times n_V$.
+where $i \in \mathcal{I}_K$, the index set on $A_i^K$. That is, $\mathcal{I}_K = \lbrace (1,1), ..., (n_U, n_V) \rbrace$, with $n_U$ and $n_V$ representing the number of degrees of freedom for the local trial functions $\psi^K \in U_h^K$ and the local test functions $\phi^K \in V_h^K$. The element matrix $A^K$ is therefore a (typically dense) matrix of dimension $n_U \times n_V$.
 
 Now let $\iota_K^U$ and $\iota_K^V$ be the local-to-global mappings for the local discrete function spaces $U_h^K$ and $V_h^K$. We can define, for each $K$, the collective local-to-global mapping $\iota_K : \mathcal{I}_K \rightarrow \mathcal{I}$ such that
 
 \begin{equation}
-\iota_K (i) = (\iota_K^U(i_1), \iota_K^V(i_2))\ \forall i \in \mathcal{I}_K.
+\iota_K (i) = (\iota_K^U(i_1), \iota_K^V(i_2)),\ \ \ \forall i \in \mathcal{I}_K.
 \end{equation}
 
-This simply maps a pair of local degrees of freedom to a pair of global degrees of freedom. Let also $\mathcal{T}$ be the subset of the cells in the mesh in which $\psi_{i_1}$ and $\phi_{i_2}$ are both non-zero. Note that here we are talking about the global functions whose restrictions to $K$ gives $\psi_{i_1}^K$ and $\phi_{i_2}^K$. By construction, $\iota_K$ is invertible if $K \in \mathcal{T}$. At this point, we have all the ingredients to formulate the computation of $A$ as the sum of local contributions from the elements in the mesh:
+This simply maps a pair of local degrees of freedom to a pair of global degrees of freedom. Let $\mathcal{T}$ be the subset of the cells in the mesh in which $\psi_{i_1}$ and $\phi_{i_2}$ are both non-zero. Note that here we are talking about the global functions whose restrictions to $K$ gives $\psi_{i_1}^K$ and $\phi_{i_2}^K$. By construction, $\iota_K$ is invertible if $K \in \mathcal{T}$. At this point, we have all the ingredients to formulate the computation of $A$ as the sum of local contributions from the elements in the mesh:
 
 \begin{equation}
 \begin{split}
@@ -187,11 +182,12 @@ A_{ij}^K = \int_K w \nabla \phi_i^K \cdot \nabla \phi_j^K\ \mathrm{d}x
 
 The element vector $L$ can be determined in an analogous way. 
 
-
-In this example, the element tensors are expressed as a single integral over the cell domain. In general, they are expressed as a sum of integrals over $K$, each integral being the product of derivatives of functions from sets of discrete spaces and, possibly, functions of some spatially varying coefficients. Such an integral is often called \textit{monomial}. 
+\subsubsection{Monomials}
+\label{sec:bkg:monomials}
+In this example, the element tensors are expressed as a single integral over the cell domain. In general, they are expressed as a sum of integrals over $K$, each integral being the product of derivatives of functions from sets of discrete spaces and, possibly, functions of some spatially varying coefficients. We refer to such integrals as the \textit{monomials} of the form. 
 
 \subsubsection{Quadrature Mode}
-A quadrature scheme is typically used to numerically evaluate $A_{ij}^K$. It consists of evaluating an integral at a set of given {\em quadrature points}, each point multiplied with some suitable {\em quadrature weight}. By mapping the computation to a reference element as explained in Section~\ref{sec:bkg:refel} and using the same approach as in Section~\ref{sec:bkg:assembly}, a quadrature scheme for the Laplacian operator on $K$ is as follows
+$A_{ij}^K$ is numerically evaluated by means of a quadrature scheme. A quadrature scheme evaluates an integral at a set of {\em quadrature points}, each point multiplied with some suitable {\em quadrature weight}. By mapping the computation to a reference element as explained in Section~\ref{sec:bkg:refel} and by using the assembly procedure detailed in Section~\ref{sec:bkg:assembly}, a quadrature scheme for the Laplacian operator on $K$ is as follows
 
 \begin{equation}
 \begin{split}
@@ -218,12 +214,12 @@ A_{ij}^K = \sum_{k=1}^{N_q} \sum_{\alpha_3=1}^n \phi_{\alpha_3}(\boldsymbol{X}^k
 
 \subsubsection{Tensor Contraction Mode}
 %\label{sec:tc}
-Consider the case in which $\mathcal{G}_K : \hat{K} \rightarrow K$ is an affine mapping. Starting from Equation~\ref{eq:quadrature} and exploiting linearity, associativity and distributivity of the involved mathematical operators, we can rewrite \ref{eq:quadrature} as
+Consider the case in which $\mathcal{G}_K : \hat{K} \rightarrow K$ is an affine mapping. Exploiting linearity, associativity and distributivity of the involved mathematical operators, we can rewrite (\ref{eq:quadrature}) as
 \begin{equation}
 \label{eq:tensor}
 A_{ij}^K = \sum_{\alpha_1=1}^d \sum_{\alpha_2=1}^d \sum_{\alpha_3=1}^n \operatorname{det} \mathcal{G}_K' w_{\alpha_3} \sum_{\beta=1}^d \frac{X_{\alpha_1}}{\partial x_{\beta}} \frac{\partial X_{\alpha_2}}{\partial x_{\beta}} \int_{K_0} \phi_{\alpha_3} \frac{\partial \phi_{i_1}}{\partial X_{\alpha_1}} \frac{\partial \phi_{i_2}}{\partial X_{\alpha_2}} dX.
 \end{equation}
-A generalization of this transformation has been proposed in~\cite{FFC-TC}. As a consequence of involving reference element terms only, the integral in the equation can be pre-evaluated and stored in temporary variables. The evaluation of the local tensor can then be abstracted as
+A generalization of this transformation has been proposed in~\cite{FFC-TC}. By only involving reference element terms, the integral in the equation can be pre-evaluated and stored in temporary variables. The evaluation of the local tensor can then be abstracted as
 \begin{equation}
 A_{ij}^K = \sum_{\alpha} A_{i_1 i_2 \alpha}^0 G_{K}^\alpha
 \end{equation}
@@ -234,12 +230,12 @@ in which the pre-evaluated ``reference tensor'' $A_{i_1 i_2 \alpha}$ and the cel
 %\label{sec:qualitative}
 Depending on form and discretization, the relative performance of the two modes, in terms of the operation count, can vary quite dramatically. The presence of derivatives or coefficient functions in the input form increases the rank of the geometry tensor, making the traditional quadrature mode preferable for ``complex'' forms. On the other hand, speed-ups from adopting tensor mode can be significant in a wide class of forms in which the geometry tensor remains ``sufficiently small''. The discretization, particularly the relative polynomial order of trial, test, and coefficient functions, also plays a key role in the resulting operation count. 
 
-These two modes have been implemented in the FEniCS Form Compiler~\cite{FFC-TC}, which we review in later sections. In this compiler, a heuristic is used to choose the most suitable mode for a given form. It consists of analysing each monomial in the form, counting the number of derivatives and coefficient functions, and checking if this number is greater than a constant found empirically (\cite{Fenics}). In Chapter~\ref{ch:optimality}, we will describe a code generation system that goes beyond the dichotomy between quadrature and tensor modes, relying on cost models comparing the impact of different rewrite operators (e.g., expansion of products, factorization).
+These two modes have been implemented in the FEniCS Form Compiler~\citep{FFC-TC}, which we review in later sections. In this compiler, a heuristic is used to choose the most suitable mode for a given form. It consists of analysing each monomial in the form, counting the number of derivatives and coefficient functions, and checking if this number is greater than a constant found empirically \citep{Fenics}. In Chapter~\ref{ch:optimality}, we will introduce a novel code generation system that goes beyond the dichotomy between quadrature and tensor modes.
 
 
 \subsubsection{Code Examples}
 \label{sec:bkg:mathcode}
-A possible C implementation of Equation~\ref{eq:quadrature} is illustrated in Listing~\ref{code:weighted-laplace}. We assume a domain of dimension $d=2$ and polynomial order $1$ Lagrange elements. The values at the quadrature points of the derivatives of the basis functions are pre-tabulated in the \texttt{B} and \texttt{D} arrays (representing, respectively, the derivatives with respect to the coordinates $x$ and $y$). The values at the quadrature points of the basis functions spanning the field $w$ are pre-tabulated in the array \texttt{C}. Pre-tabulation, which is made possible by mapping the computation to a reference element, is of fundamental importance to speed-up the local assembly phase. The summation over the $N_q = 6$ quadrature points is implemented by the \texttt{i} loop. The \texttt{r} loop implements the summation over $\alpha_3$ for discretization of the weight $w$. Given their small range, the summations over the spatial dimensions $\alpha_1$, $\alpha_2$ and $\beta$ have all been expanded in the ``assembly expression'' that evaluates the local element matrix $A$. The $K$ array includes the four components of the inverse of the Jacobian matrix for the change of coordinates. 
+A possible C implementation of (\ref{eq:quadrature}) is illustrated in Listing~\ref{code:weighted-laplace}. We assume a domain of dimension $d=2$ and polynomial order $1$ Lagrange elements. The values at the quadrature points of the derivatives of the basis functions are pre-tabulated in the \texttt{B} and \texttt{D} arrays (representing, respectively, the derivatives with respect to the coordinates $x$ and $y$). The values at the quadrature points of the basis functions spanning the field $w$ are pre-tabulated in the array \texttt{C}. Pre-tabulation, which is made possible by mapping the computation to a reference element, is of fundamental importance to speed-up the local assembly phase. The summation over the $N_q = 6$ quadrature points is implemented by the \texttt{i} loop. The summation over $\alpha_3$ for expressing $w$ is implemented by the loop \texttt{r}. The summations over the spatial dimensions $\alpha_1$, $\alpha_2$ and $\beta$ have been expanded in the ``assembly expression'' that evaluates the local element matrix $A$. The $K$ array includes the four components of the inverse of the Jacobian matrix for the change of coordinates. 
 
 \begin{algorithm}
 \scriptsize\ttfamily
@@ -332,19 +328,21 @@ $\rbrace$
 \label{code:burgers}
 \end{algorithm}
 
-The evaluation of integrals becomes more computationally expensive if the complexity of a variational form grows, in terms of number of coefficients and tensor algebra or differential operators employed. It is not pathological a scenario in which the computation of a local element tensor requires more than hundreds or even thousands of floating point operations. An excerpt from one such example is shown in Listing~\ref{code:burgers}: here, in the main expression, $14$ unique arrays are accessed (with the same array referenced multiple times within the expression) along with several other constants. The loop trip counts are also larger due to the different domain discretization employed. As we shall see, automated code generation for finite element operators has had two main objectives:
+The evaluation of integrals becomes more computationally expensive if the complexity of the variational form grows, in terms of number of coefficients and differential or algebraic operators involved. It is not pathological a scenario in which the computation of the local element tensor requires more than hundreds or even thousands of floating point operations. An excerpt from one such example is shown in Listing~\ref{code:burgers}: here, in the main assembly expression, $14$ unique arrays are accessed (with the same array referenced multiple times within the expression) along with several other constants. The loop trip counts are also larger due to the different choice of finite elements. 
 
-\begin{itemize}
-\item relieving the implementation burden when it comes to translate into code non-trivial operators, a tedious, error-prone task;
-\item facilitating the introduction of techniques to reduce the operation count and powerful low-level optimizations.
-\end{itemize}
-
-The second point, as already anticipated, is one of the topics treated in this thesis.
+%As we shall see, automated code generation for finite element operators has had two main objectives:
+%
+%\begin{itemize}
+%\item relieving the implementation burden when it comes to translate into code non-trivial operators, a tedious, error-prone task;
+%\item facilitating the introduction of techniques to reduce the operation count and powerful low-level optimizations.
+%\end{itemize}
+%
+%The second point, as already anticipated, is one of the topics treated in this thesis.
 
 
 \subsection{Linear Solvers}
 \label{sec:bkg:linearsolvers}
-The last step of an FEM is the resolution of the linear system (\ref{sec:bkg:eq:lin-sys}) arising from the variational form of the input problem. This and the assembly of $A$ and $b$ are the most expensive phases of an FEM. There is a whole science concerning the efficient resolution of linear systems. Among the most effective solvers are the family of {\em Krylov-type iteration methods}, such {\em conjugate gradient} for symmetric positive-definite matrices and {\em generalized minimal residual} (GMRES), which does not require $A$ in explicit form. {\em Multi-grid} methods are also widely used, whereas {\em direct methods} computing an LU factorization using {\em Gaussian elimination} have limited applicability. 
+The last step of an FEM is the resolution of the linear system (\ref{sec:bkg:eq:lin-sys}) arising from the variational form of the input problem. This and the assembly of $A$ and $b$ are the most expensive phases of an FEM. There is a whole science behind the resolution of linear systems. Among the most effective solvers are the family of {\em Krylov-type iteration methods}, such {\em conjugate gradient} for symmetric positive-definite matrices and {\em generalized minimal residual} (GMRES), which does not require $A$ in explicit form. {\em Multi-grid} methods are also widely used, whereas {\em direct methods} computing an LU factorization using {\em Gaussian elimination} have limited applicability. 
 
 The resolution of linear systems is not one of the topics of this thesis. The interested reader is invited to refer to~\cite{good-linear-system-source}. It is however important to keep in mind that this phase usually has a significant impact on the execution time of an FEM: the performance optimization of the assembly phase has marginal impact if the method is solver-dominated. 
 
@@ -362,12 +360,12 @@ The performance optimizations studied in this thesis target different layers of 
 \subsection{Automating the Finite Element Method}
 \label{sec:bkg:fenics-and-firedrake}
 
-The need for rapid implementation of high performance, robust, and portable finite element methods has led to approaches based on automated code generation. This has been proven extremely successful in the context of the FEniCS \citep{Fenics} and Firedrake \citep{firedrake-paper} projects. In these frameworks, the weak variational form of a problem is expressed at high level by means of a domain-specific language. The mathematical specification is manipulated by a form compiler that generates a representation of the assembly operators. Such representation may first be transformed for performance optimization and, subsequently, translated into C code, compiled and executed. This entire process occurs at run-time: both FEniCS and Firedrake were indeed written in Python to simplify the analysis of the top-level domain-specific language. When the operators are assembled, a linear system needs be solved. For this, the PETSc library~\citep{petsc-cite} is employed. In the following, we expand on the components of this tool-chain that are relevant for the following chapters. We focus on Firedrake, rather than FEniCS, because all algorithms and techniques developed in this thesis have been integrated with this framework.
+The need for rapid implementation of high performance, robust, and portable finite element methods has led to approaches based on automated code generation. This has been proven extremely successful in the context of the FEniCS \citep{Fenics} and Firedrake \citep{firedrake-paper} projects. In these frameworks, the weak variational formulation of a problem is expressed at high level by means of a domain-specific language. The mathematical specification is manipulated by a form compiler that generates a representation of the assembly operators. Such representation may first be transformed for performance optimization and, subsequently, translated into C code, compiled and executed. This entire process occurs at run-time: both FEniCS and Firedrake were indeed written in Python to simplify the analysis of the top-level domain-specific language. When the operators are assembled, a linear system needs be solved. For this, the PETSc library~\citep{petsc-cite} is employed. In the following, we expand on the components of this tool-chain that are relevant for the following chapters. We focus on Firedrake, rather than FEniCS, because all algorithms and techniques developed in this thesis have been integrated with this framework.
 
 \subsubsection{Problem Specification}
-Firedrake uses a mathematical language called UFL, the {\em Unified Form Language}~\citep{ufl-cite}. UFL is unrelated to meshes, function spaces, and solvers. It only concerns with the variational formulation of a problem. It provides different kinds of operators, including differential operators (e.g., \texttt{grad} for taking the gradient of a function, \texttt{inner} to compute inner products) and algebraic operators (e.g., \texttt{transpose}, \texttt{inverse}), as well as elementary functions (e.g., \texttt{abs} for the absolute value, \texttt{sqrt} for the square root). UFL starts analyzing the input form to collect some useful information; it applies some preliminary transformations, such as automatic differentiation; eventually, it emits a representation suitable for the underlying compiler.
+Firedrake uses a mathematical language called UFL, the {\em Unified Form Language}~\citep{ufl-cite}. UFL is unrelated to meshes, function spaces, and solvers. It only concerns with the variational formulation of a problem. It provides different kinds of operators, including differential operators (e.g., \texttt{grad} for taking the gradient of a function, \texttt{inner} to compute inner products) and algebraic operators (e.g., \texttt{transpose}, \texttt{inverse}), as well as elementary functions (e.g., \texttt{abs} for the absolute value, \texttt{sqrt} for the square root). UFL starts analyzing the input form to collect some useful information; it then applies some preliminary transformations, such as automatic differentiation; eventually, it emits a representation suitable for the underlying compiler.
 
-\begin{algorithm}[h]
+\begin{algorithm}
 \scriptsize\ttfamily
 \SetAlgorithmName{LISTING}{}
 
@@ -405,17 +403,17 @@ We observe that in Firedrake there is a neat separation of concerns:
 \item COFFEE applies code transformations for improving the performance of the operators returned by TSFC. 
 \end{itemize}
 
-The conception and the design of the COFFEE layer is one of the main contributions of this thesis. Chapters~\ref{ch:optimality},~\ref{ch:lowlevelopt} and~\ref{ch:coffee} are entirely devoted to these topics.
+The conception and the design of the COFFEE layer is one of the main contributions of this thesis. Chapters~\ref{ch:optimality},~\ref{ch:lowlevelopt} and~\ref{ch:coffee} are entirely devoted to this topic.
 
 \subsubsection{Iteration over the Mesh}
 \label{sec:bkg:meshiteration}
-Finite element problems require the application of computational {\em kernels} over the discretized equation domain. In Firedrake, this is accomplished through {\em PyOP2}~\cite{pyop2isc}, a domain specific language embedded in Python relying on just-in-time compilation and execution. 
+Finite element problems require the application of computational {\em kernels} over the discretized equation domain. In Firedrake, this is accomplished through {\em PyOP2}, a domain specific language embedded in Python relying on just-in-time compilation and execution~\citep{pyop2isc}. 
 
-Typical kernels are the assembly operators presented in Section~\ref{sec:bkg:assembly}, usually the most expensive from a computational viewpoint. Other relevant examples are the application of boundary conditions as well as the interpolation and projection of fields. The fact that a kernel is a local operation -- its application on an element of the mesh is independent of the application on any another element -- suits naturally parallel execution. This does not mean, however, that parallelizing a finite element computation is straightforward. As clarified in Section~\ref{sec:bkg:op2}, a kernel can update a field either directly or indirectly. In the latter case, a subset of values, for instance the degrees of freedom at the boundary between two elements, may need be incremented by two different processes/threads, which requires non-trivial coordination.
+Several kinds of kernels may need be executed in a Firedrake program. The computationally expensive kernels arise from the assembly operators presented in Section~\ref{sec:bkg:assembly}. Other kernels are required for applying boundary conditions as well as for the interpolation and projection of fields. The fact that a kernel is a local operation -- its application on an element of the mesh is independent of the application on any another element -- suits naturally parallel execution. This does not mean, however, that parallelizing a finite element computation is straightforward. As clarified in Section~\ref{sec:bkg:op2}, a kernel can update a field either directly or indirectly. In the latter case, a subset of values, for instance the degrees of freedom at the boundary between two elements, may receive contributions from two different processes/threads, which requires non-trivial coordination.
 
-PyOP2 supports the parallel application of kernels over unstructured meshes, a key requirement for FEMs. It also provides global data structures such as sparse matrices, which are essential when it comes to solve linear systems as~\ref{sec:bkg:eq:lin-sys}.
+PyOP2 supports the parallel application of kernels over unstructured meshes, a key requirement for FEMs. It also provides global data structures such as sparse matrices, which are essential when it comes to solve a linear system as (\ref{sec:bkg:eq:lin-sys}).
 
-This abstraction implements another separation of concerns. The kernels, which encode the numerics of an FEM, are produced at layers above PyOP2, usually in a completely automated fashion by Firedrake and the form compilers themselves. On the other hand, the parallel execution is completely masked by PyOP2. 
+The PyOP2 abstraction implements another separation of concerns. The kernels, which encode the numerics of an FEM, are produced at layers above PyOP2 through the Firedrake's language and form compiler; the parallel application of a kernel over the mesh is completely handled by PyOP2. 
 
 The PyOP2 layer, and its relationship with the OP2 library~\cite{op2-main}, are documented in mode detail in Section~\ref{sec:bkg:op2}.
 
