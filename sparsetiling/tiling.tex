@@ -67,9 +67,9 @@ We show in Listing~\ref{code:tiling-struct} the ``skeleton'' of a typical PDE so
 \SetAlgorithmName{LISTING}{}
 
 // Time-stepping loop (T = total number of iterations)\\
-\KwSty{for} t = 0 \KwSty{to} T $\lbrace$\\
+\KwSty{for} t = 1 \KwSty{to} T $\lbrace$\\
 ~~// 1st sweep over the $C$ cells of the mesh\\
-~~\KwSty{for} i = 0 \KwSty{to} $C$ $\lbrace$\\
+~~\KwSty{for} i \KwSty{in} $C$ $\lbrace$\\
 ~~~~buffer$\_$0 = gather$\_$data ( A[f(map[i])], ... )\\
 ~~~~...\\
 ~~~~kernel$\_$1( buffer$\_$0, buffer$\_$1, ... );\\
@@ -78,11 +78,11 @@ We show in Listing~\ref{code:tiling-struct} the ``skeleton'' of a typical PDE so
 ~~Calc (...);\\
 ~~MPI$\_$Comm (...); \\
 ~~// 2nd sweep over the $N$ nodes of the mesh\\
-~~\KwSty{for} i = 0 \KwSty{to} $N$ $\lbrace$\\
+~~\KwSty{for} i \KwSty{in} $N$ $\lbrace$\\
 ~~~~... // Similar to sweep 1 \\
 ~~$\rbrace$\\
 ~~// Boundary conditions: sweep over the $BV$ boundary nodes\\
-~~\KwSty{for} i = 0 \KwSty{to} $BV$ $\lbrace$\\
+~~\KwSty{for} i \KwSty{in} $BV$ $\lbrace$\\
 ~~~~... // Similar to sweep 1 \\
 ~~$\rbrace$\\
 ~~...\\
