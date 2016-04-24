@@ -146,35 +146,36 @@ In structured codes, multiple layers of halo, or ``ghost'' elements, are often u
 
 
 
-\section{Generalized Inspector/Executor Schemes}
+\section{The Loop Chain Abstraction for Generalized Inspector/Executor Schemes}
 \label{sec:tiling:lc}
-In this section we explain how to build inspector/executor schemes for arbitrary sequences of loops. 
+In this section, we formalize the loop chain abstraction for unstructured mesh applications and discuss its relationship with inspector/executor schemes.
 
 \subsection{Relationship between Loop Chain and Inspector}
 The \textit{loop chain} is an abstraction introduced in~\cite{ST-KriegerHIPS2013}. Informally, a loop chain is a sequence of loops with no global synchronization points, with attached some extra information to enable run-time data dependence analysis. 
 
-We recall from Section~\ref{sec:tiling:difficult} that the indirect memory accesses inhibit static optimization for data locality in unstructured mesh applications. The idea to work around this issue is to exploit the data dependence information carried by a loop chain to replace compile-time with run-time analysis. The source code must be modified adding a description of the loop chain and the inspector, as well as by replacing a sequence of loops with a new piece of code, the executor. At run-time, the inspector exploits the data dependence information in the loop chain and builds a ``scheduling'', which is eventually used as input to the executor. 
+We reiterate once more the fact that indirect memory accesses inhibit static loop optimization for data locality. The idea pursued in this chapter is to replace static with dynamic optimization, exploiting the data dependence information carried by the loop chain. The loop chain must somehow be attached to or derived from the input code. The inspector performs data dependence analysis using the information carried by the loop chain and produces a loop reordering, which implements sparse tiling. This new schedule is used by the executor, a piece of code that replaces the original sequence of loops.
 
-Before diving into the description of the loop chain abstraction, it is worth observing the following:
+Before diving into the description of the loop chain abstraction, it is worth observing that:
 \begin{itemize}
-\item The execution of the inspection phase introduces an overhead. In many scientific computations, however, the data dependence pattern is static; or, more informally, ``the mesh does not change over time''. This means that the inspection cost can be amortized over multiple iterations of the time loop. If instead the mesh changes over time (e.g., in case of adaptive mesh refinement), the inspection needs be executed again. We have spent a considerable amount of time in designing and implementing a highly optimized inspector algorithm; this hopefully will make the overhead negligible even in the unfortunate case of frequent changes to the data dependence pattern. 
-\item We have explained that the loop chain must be somewhat provided. One possibility is that application specialists manually change their programs by constructing the loop chain and the inspector/executor scheme through library calls. As already observed, this is clearly challenging. Another possibility is that the loop chain is constructed at a higher layer of abstraction, in which case the optimization process is fully automated. The tools we have built enable both approaches.
+\item The computation of the inspection phase introduces an overhead. In many scientific computations, the data dependence pattern is static or, more informally, ``the mesh does not change over time''. This means that the inspection cost may be amortized over multiple iterations of the executor. If instead the mesh changes over time (e.g., in case of adaptive mesh refinement), a new inspection must be performed. 
+%We have spent a considerable amount of time in designing and implementing a highly optimized inspector algorithm; this hopefully will make the overhead negligible even in the unfortunate case of frequent changes to the data dependence pattern. 
+\item To write a inspector/executor scheme based on sparse tiling there are several options. One possibility is to leave the application specialists in charge of this task. As observed in the previous sections, this is extremely challenging. Another alternative is to raise the level of abstraction: programs can be written in a domain-specific language, and the loop chain, the inspector, and the executor can be automatically derived at the level of the intermediate representation. The tools that we have built enable both approaches.
 \end{itemize}
-Further details on these two points will be provided in the later sections. 
+We will further elaborate on these points in the later sections. 
 
-\subsection{The Loop Chain Abstraction}
+\subsection{Definition of a Loop Chain}
 In~\cite{ST-KriegerHIPS2013}, a loop chain $\mathbb{L}$ is defined as follows:
 \begin{itemize}
-\item $\mathbb{L}$ consists of $n$ loops, $L_0, L_1, ..., L_{n-1}$. There are no global synchronization points between the loops. The execution order of a loop's iterations does not influence the result. This means that given $L_i$, we can choose an arbitrary scheduling of iterations because there will not be loop-carried dependencies. 
+\item $\mathbb{L}$ consists of $n$ loops, $L_0, L_1, ..., L_{n-1}$. There are no global synchronization points between the loops. The execution order of a loop's iterations does not influence the result.
 \item $\mathbb{D}$ is a set of disjoint $m$ data spaces, $D_0, D_1, ..., D_{m-1}$. Each loop accesses (reads from, writes to) a certain subset of these data spaces. An access can be either direct (e.g., \texttt{A[i]}) or indirect (e.g., \texttt{A[map(i)]}).
-\item $R_{L_l\rightarrow D_d}(\vec{i})$ and $W_{L_l\rightarrow D_d}(\vec{i})$, where the $R$ and $W$ access relations are defined over for each data space $D_d \in D$. They indicate which data locations in data space $D_d$ an iteration $i \in L_i$ reads from and writes to respectively (e.g., if we have \texttt{A[B(i)] = ...} in loop $L_j$, the access relation $B_{L_j\rightarrow A}(\vec{i})$ will be available). 
+\item $R_{L_l\rightarrow D_d}(\vec{i})$ and $W_{L_l\rightarrow D_d}(\vec{i})$ are access relations for a loop $L_l$ over a data space $D_d \in D$. They indicate which locations in the data space $D_d$ an iteration $i \in L_l$ reads from and writes to, respectively. A loop chain must provide all access relations for all loops. For example, if $L_l$ writes {\tt A} as {\tt A[B(i)] = f(...)}, the loop chain must provide an access relation $B_{L_l\rightarrow A}(\vec{i})$. 
 \end{itemize}
 
-\subsection{The Loop Chain Abstraction Revisited for Unstructured Mesh Computations}
+\subsection{The Abstraction Revisited for Unstructured Mesh Applications}
 \label{sec:tiling:lc-unstruct}
 Because of our focus on unstructured mesh computations, and inspired by the programming and execution models of OP2 (see Section~\ref{sec:bkg:op2}), the definition of a loop chain $\mathbb{L}$ is changed as follows:
 \begin{itemize}
-\item $\mathbb{L}$ consists of $n$ loops, $L_0, L_1, ..., L_{n-1}$. There are no global synchronization points between the loops. The execution order of a loop's iterations does not influence the result. This means that given $L_i$, we can choose an arbitrary scheduling of iterations because there will not be loop-carried dependencies. 
+\item $\mathbb{L}$ consists of $n$ loops, $L_0, L_1, ..., L_{n-1}$. There are no global synchronization points between the loops. The execution order of a loop's iterations does not influence the result. 
 
 \item $\mathbb{S}$ is a set of disjoint $m$ sets, $S_0, S_1, ..., S_{m-1}$. Possible sets are the cells in the mesh or the degrees of freedom associated to a certain function. Sets are used to define both iteration spaces and datasets. In the former case, a set element is an iteration; in the latter case, a set element is logically associated with a data value (not necessarily a scalar). 
 
@@ -566,6 +567,14 @@ Algorithm~\ref{algo:st-projection} takes as input $\sigma_{i-1}$ and (the descri
 
 A projection tells what tile a set element logically belongs to at a given point of the tiling process. A new projection $\phi_{S}$ is needed if the elements of $S$ are written by $L_i$. Let us consider the non-trivial case in which writes or increments occur indirectly through a map $M : S_i \rightarrow S_j^0 \times S_j^1 \times ... \times S_j^{a-1}$. To compute $\phi_{S_{j}}$, we first determine the inverse map (an example is shown in Figure~\ref{fig:st-inverse-map}). Then, we iterate over all elements of $S_i$ that indirectly access elements in $S_j$. In particular, given $e \in S_j$, we determine the last tile that writes to $e$, say $T_{last}$, through the application of the $\operatorname{MAX}$ function to tile colors. We then simply set $\phi_{S_{j}}[e] = T_{last}$. 
 
+
+\begin{figure}
+\begin{CenteredBox}
+\includegraphics[scale=0.7]{sparsetiling/figures/inverse_map}
+\end{CenteredBox}
+\caption{Representation of an inverse map. The original map shows that the triangular cell $1$ is adjacent to three vertices, namely $3$, $7$, and $9$. The inverse map associates vertices to cells. Since the mesh is unstructured, different vertices can be incident to a different number of cells. The array {\tt offset} determines the distance between two consecutive vertices in the inverse map. For instance, all entries in the inverse map between {\tt offset[3]} and {\tt offset[4]} are cells incident to vertex $3$ (in the illustrated case, the first of these is cell $1$).}
+\label{fig:st-inverse-map}
+\end{figure}
 
 % ($C[i,j] = 1$ implies that $T_i$ and $T_j$ have the same color and will become adjacent after tiling $L_{i-1}$).
 

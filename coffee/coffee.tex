@@ -7,11 +7,10 @@ Sharing elimination and pre-evaluation, which we presented in Chapter~\ref{ch:op
 Firedrake users employ the Unified Form Language to express problems in a notation resembling mathematical equations. At run-time, the high-level specification is translated by a form compiler, the Two-Stage Form Compiler (TSFC)~\cite{TSFC-Compiler}, into one or more abstract syntax trees (ASTs) representing assembly kernels. ASTs are then passed to COFFEE for optimization. The output of COFFEE, C code, is eventually provided to PyOP2~\citep{pyop2isc}, where just-in-time compilation and execution over the discretized domain take place. The flow and the compiler structure are outlined in Figure~\ref{fig:coffee-pipeline}. 
 
 \begin{figure}
-\begin{center}
-\includegraphics[scale=0.70]{coffee/pictures/coffee-pipeline.pdf}
-\caption{High-level view of Firedrake. COFFEE is at the core, receiving ASTs from a modified version of the FEniCS Form Compiler and producing optimized C code kernels.}
+\centering
+\includegraphics[scale=0.50]{coffee/pictures/coffee-pipeline.pdf}
+\caption{The structure of COFFEE and its place within Firedrake.}
 \label{fig:coffee-pipeline}
-\end{center}
 \end{figure}
 
 \section{The Compilation Pipeline}

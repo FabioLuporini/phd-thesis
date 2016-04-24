@@ -495,7 +495,15 @@ To implement this parallelization scheme, the iterations of each locally stored 
 \item[Exec halo] Off-process iterations that are redundant executed because they indirectly increment owned iterations.
 \item[Non-exec halo] Off-process iterations that only need be read to compute the exec halo iterations.
 \end{description}
-This situation is depicted in Figure~\ref{fig:sets-division}. Clearly, a good partitioning maximizes the ratio between the sizes of the core and non-core regions. 
+This situation is depicted in Figure~\ref{fig:bkg:sets-division}. Clearly, a good partitioning maximizes the ratio between the sizes of the core and non-core regions. 
+
+\begin{figure}
+\begin{CenteredBox}
+\includegraphics[scale=0.8]{background/figures/mpi_mesh}
+\end{CenteredBox}
+\caption{Distributed-memory parallelism in OP2 and PyOP2. Matching colors represent identical subsets of iterations. The image was inspired by an example in~\cite{florian-thesis}.}
+\label{fig:bkg:sets-division}
+\end{figure}
 
 %The separation into four regions 
 
