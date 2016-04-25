@@ -153,37 +153,38 @@ In this section, we formalize the loop chain abstraction for unstructured mesh a
 \subsection{Relationship between Loop Chain and Inspector}
 The \textit{loop chain} is an abstraction introduced in~\cite{ST-KriegerHIPS2013}. Informally, a loop chain is a sequence of loops with no global synchronization points, with attached some extra information to enable run-time data dependence analysis. 
 
-We reiterate once more the fact that indirect memory accesses inhibit static loop optimization for data locality. The idea pursued in this chapter is to replace static with dynamic optimization, exploiting the data dependence information carried by the loop chain. The loop chain must somehow be attached to or derived from the input code. The inspector performs data dependence analysis using the information carried by the loop chain and produces a loop reordering, which implements sparse tiling. This new schedule is used by the executor, a piece of code that replaces the original sequence of loops.
+We reiterate once more that the presence of indirect memory accesses inhibit static loop optimization for data locality. The idea pursued in this chapter is to replace static with dynamic optimization, exploiting the information carried by the loop chain. The loop chain must somehow be added to or derived from the input code. The inspector performs data dependence analysis using the information carried by the loop chain and produces a loop reordering, which implements a sparse tiling schedule. This schedule is used by the executor, a piece of code that replaces the original sequence of loops.
 
 Before diving into the description of the loop chain abstraction, it is worth observing that:
 \begin{itemize}
-\item The computation of the inspection phase introduces an overhead. In many scientific computations, the data dependence pattern is static or, more informally, ``the mesh does not change over time''. This means that the inspection cost may be amortized over multiple iterations of the executor. If instead the mesh changes over time (e.g., in case of adaptive mesh refinement), a new inspection must be performed. 
+\item The computation of the inspection phase introduces an overhead. In many scientific computations, the data dependence pattern is static -- or, more informally, ``the mesh does not change over time''. This means that the inspection cost may be amortized over multiple iterations of the executor. If instead the mesh changes over time (e.g., in case of adaptive mesh refinement), a new inspection must be performed. 
 %We have spent a considerable amount of time in designing and implementing a highly optimized inspector algorithm; this hopefully will make the overhead negligible even in the unfortunate case of frequent changes to the data dependence pattern. 
-\item To write a inspector/executor scheme based on sparse tiling there are several options. One possibility is to leave the application specialists in charge of this task. As observed in the previous sections, this is extremely challenging. Another alternative is to raise the level of abstraction: programs can be written in a domain-specific language, and the loop chain, the inspector, and the executor can be automatically derived at the level of the intermediate representation. The tools that we have built enable both approaches.
+\item To write an inspector/executor scheme for sparse tiling there are several options. One possibility is to provide a library to the application specialists and leave them the responsibility of rewriting their code. As observed in the previous sections, this is a very optimistic perspective. Another alternative is to raise the level of abstraction: programs can be written in a domain-specific language; loop chain, inspector, and executor can then be automatically derived at the level of the intermediate representation. The tools developed in this thesis enable both approaches.
 \end{itemize}
 We will further elaborate on these points in the later sections. 
 
 \subsection{Definition of a Loop Chain}
-In~\cite{ST-KriegerHIPS2013}, a loop chain $\mathbb{L}$ is defined as follows:
+In~\cite{ST-KriegerHIPS2013}, a loop chain is defined as follows:
 \begin{itemize}
-\item $\mathbb{L}$ consists of $n$ loops, $L_0, L_1, ..., L_{n-1}$. There are no global synchronization points between the loops. The execution order of a loop's iterations does not influence the result.
-\item $\mathbb{D}$ is a set of disjoint $m$ data spaces, $D_0, D_1, ..., D_{m-1}$. Each loop accesses (reads from, writes to) a certain subset of these data spaces. An access can be either direct (e.g., \texttt{A[i]}) or indirect (e.g., \texttt{A[map(i)]}).
-\item $R_{L_l\rightarrow D_d}(\vec{i})$ and $W_{L_l\rightarrow D_d}(\vec{i})$ are access relations for a loop $L_l$ over a data space $D_d \in D$. They indicate which locations in the data space $D_d$ an iteration $i \in L_l$ reads from and writes to, respectively. A loop chain must provide all access relations for all loops. For example, if $L_l$ writes {\tt A} as {\tt A[B(i)] = f(...)}, the loop chain must provide an access relation $B_{L_l\rightarrow A}(\vec{i})$. 
+\item A loop chain $\mathbb{L}$ consists of $n$ loops, $L_0, L_1, ..., L_{n-1}$. There are no global synchronization points in between the loops. The execution order of a loop's iterations does not influence the result.
+\item $\mathbb{D}$ is a set of disjoint $m$ data spaces, $D_0, D_1, ..., D_{m-1}$. Each loop accesses (reads from, writes to) a subset of these data spaces. An access can be either direct (e.g., \texttt{A[i]}) or indirect (e.g., \texttt{A[map(i)]}).
+\item $R_{L_l\rightarrow D_d}(\vec{i})$ and $W_{L_l\rightarrow D_d}(\vec{i})$ are access relations for a loop $L_l$ over a data space $D_d \in D$. They indicate which locations in the data space $D_d$ an iteration $i \in L_l$ reads from and writes to, respectively. A loop chain must provide all access relations for all loops. For example, if $L_l$ writes to the array {\tt A} as {\tt A[B(i)] = f(...)}, then the loop chain will have to provide an access relation $B_{L_l\rightarrow A}(\vec{i})$. 
 \end{itemize}
 
 \subsection{The Abstraction Revisited for Unstructured Mesh Applications}
 \label{sec:tiling:lc-unstruct}
-Because of our focus on unstructured mesh computations, and inspired by the programming and execution models of OP2 (see Section~\ref{sec:bkg:op2}), the definition of a loop chain $\mathbb{L}$ is changed as follows:
-\begin{itemize}
-\item $\mathbb{L}$ consists of $n$ loops, $L_0, L_1, ..., L_{n-1}$. There are no global synchronization points between the loops. The execution order of a loop's iterations does not influence the result. 
+Motivated by the issues raised in Section~\ref{sec:tiling:difficult} and inspired by the programming and execution models of OP2 (reviewed in Section~\ref{sec:bkg:op2}), we revisit the loop chain abstraction. This new definition is more suitable for real-world unstructured mesh applications.
 
-\item $\mathbb{S}$ is a set of disjoint $m$ sets, $S_0, S_1, ..., S_{m-1}$. Possible sets are the cells in the mesh or the degrees of freedom associated to a certain function. Sets are used to define both iteration spaces and datasets. In the former case, a set element is an iteration; in the latter case, a set element is logically associated with a data value (not necessarily a scalar). 
+\begin{itemize}
+\item A loop chain $\mathbb{L}$ consists of $n$ loops, $L_0, L_1, ..., L_{n-1}$. There are no global synchronization points in between the loops. The execution order of a loop's iterations does not influence the result. 
+
+\item $\mathbb{S}$ is a set of disjoint $m$ sets, $S_0, S_1, ..., S_{m-1}$. Sets are used to define iteration spaces. Possible sets are the cells in the mesh or the degrees of freedom associated with a function.  
 
 A set $S$ is logically split into three contiguous regions: core ($S^{c}$), boundary ($S^{b}$), and non-exec ($S^{ne}$). Given a process $P$ and a set $S$, we have that:
 \begin{description}
  \item[$S^{c}$] The iterations of $S$ that exclusively belong to $P$.
- \item[$S^{b}$] The boundary region can be seen as the union of two sub-regions, owned ($S^{owned}$) and exec ($S^{exec}$). $S^{owned}$ are iterations that belong to $P$ which will be redundantly executed by some other processes; $S^{exec}$ are iterations from other processes which are redundantly executed by $P$. We will see that redundant computation is exploited to preserve atomic execution of a tile -- the property that enables execution without the need for synchronization.
-  \item[$S^{ne}$] These are iterations of other processes that are communicated to $P$ because they need be indirectly read to correctly compute $S^{b}$.
+ \item[$S^{b}$] The boundary region can be seen as the union of two sub-regions, owned ($S^{owned}$) and exec ($S^{exec}$). $S^{owned}$ are iterations that belong to $P$ which will be executed redundantly by some other processes; $S^{exec}$ are iterations from other processes which are redundantly executed by $P$. We will see that redundant computation is exploited to preserve atomic execution -- a property that enables executing tiles without the need for synchronization.
+  \item[$S^{ne}$] These are iterations of other processes that are communicated to $P$ because they need be read to correctly compute $S^{b}$.
  \end{description} 
  
 A set is uniquely identified by a name and the sizes of its three regions. For example, the notation $S = (\texttt{vertices},\ C,\ B,\ N)$ defines the $\texttt{vertices}$ set, which comprises $C$ elements in the core region (iterations $0$ to $C-1$), $B$ elements in the boundary region (iterations $C$ to $C+B-1$), and $N$ elements in the non-exec region (iterations $C+B$ to $C+B+N-1$).
@@ -193,18 +194,19 @@ A set is uniquely identified by a name and the sizes of its three regions. For e
 
 \item $\mathbb{M}$ is a set of $k$ maps, $M_0, M_1, ..., M_{k-1}$. A map of arity $a$ is a vector-valued function $M : S_i \rightarrow S_j^0 \times S_j^1 \times ... \times S_j^{a-1}$ that connects each element of $S_i$ to one or more elements in $S_j$. For example, if a triangular cell $c$ is connected to three vertices $v_0,v_1,v_2$, we have $M(c) = [v_0,\ v_1,\ v_2]$. 
 
-\item A loop $L_i$ over the iteration space $S$ is associated with $d$ descriptors, $D_0, D_1, ..., D_{d-1}$. A descriptor $D$ is a 2-tuple $D = {<}M,\ \texttt{mode}{>}$. $M$ is either a map from $S_j$ to some other sets or the special placeholder $\perp$, which indicates that the access is direct to some data associated with $S_j$. $\texttt{mode}$ is one of $[r,\ w,\ i]$, meaning that a memory access is respectively of type read, write or increment.
+\item A loop $L_i$ over the iteration space $S$ is associated with $d$ descriptors, $D_0, D_1, ..., D_{d-1}$. A descriptor $D$ is a 2-tuple $D = {<}M,\ \texttt{mode}{>}$. $M$ is either a map from $S$ to some other sets or the special placeholder $\perp$, which indicates that the access is direct to some data associated with $S$. $\texttt{mode}$ is one of $[r,\ w,\ i]$, meaning that a memory access is respectively of type read, write or increment.
 \end{itemize}
 
-With respect to the original definition, one of the most important differences is the lack of data spaces. In unstructured mesh applications, a loop tends to access multiple data spaces associated with the same set. The idea, therefore, is to rather rely on sets to perform data dependency analysis. This can significantly improve the inspection cost, because typically $|\mathbb{S}| << |\mathbb{D}|$. 
+With respect to the original definition, one crucial difference is the presence of sets in place of data spaces. In unstructured mesh applications, a loop tends to access multiple data spaces associated with the same set. The idea is to rely on sets, rather than data spaces, to perform data dependence analysis. This can significantly improve the inspection cost, because typically $|\mathbb{S}| << |\mathbb{D}|$. 
 
-The second fundamental difference is the characterization of sets into the three regions core, boundary and non-exec. This separation is essential for distributed-memory parallelism (we simply have that both $S^{b}$ and $S^{ne}$  contain no elements in the special case of execution entirely based on shared-memory parallelism). The ``extent'' of the boundary regions is captured by the {\em depth} of the loop chain; the actual role of this parameter will become clear in Section~\ref{algo:st-executor}. 
+Another important difference is the characterization of sets into the three regions core, boundary and non-exec. This separation is essential for enabling distributed-memory parallelism. The extent of the boundary regions is captured by the {\em depth} of the loop chain. Informally, the {\em depth} tells how many extra ``strips'' of elements are provided by the neighboring processes; this allows some redundant computation along the partition boundary and, in turn, limits the depth of the loop chain (i.e., how many loops can be fused). The role of this parameter will become clear in the following sections. 
 
+% (we simply have that both $S^{b}$ and $S^{ne}$  contain no elements in the special case of execution entirely based on shared-memory parallelism). 
 
 \section{Loop Chain and Inspection Examples}
 
 
-\begin{algorithm}[t]
+\begin{algorithm}
 \scriptsize\ttfamily
 \SetAlgorithmName{LISTING}{}
 
@@ -249,7 +251,7 @@ E = set (inspector, core$\_$edges, boundary$\_$edges, nonexec$\_$edges, ...);\\
 C = set (inspector, core$\_$cells, boundary$\_$cells, nonexec$\_$cells, ...);\\
 V = set (inspector, core$\_$vertices, boundary$\_$vertices, nonexec$\_$vertices, ...);\\ 
 ~\\
-// Two maps: from edges to vertices and from cells to vertices\\
+// Two maps, from edges to vertices and from cells to vertices\\
 e2vMap = map (inspector, E, V, edges2vertices, ...);\\
 c2vMap = map (inspector, C, V, cells2vertices, ...);\\
 ~\\
@@ -265,66 +267,64 @@ inspection = run$\_$inspection (mode, inspector, tile$\_$size, ...)\\ \label{cod
 \label{code:tiling-inspector}
 \end{algorithm}
 
-Using the example in Listing~\ref{code:tiling-runningexample} -- a plain C implementation of the unstructured mesh OP2 program illustrated in Listing~\ref{code:op2program} -- we describe the actions performed by a sparse tiling inspector. The inspector takes as input a loop chain, as illustrated in Listing~\ref{code:tiling-inspector}. We will show two variants of inspection, for shared-memory and distributed-memory parallelism. Which variant is executed depends on the value of the variable \texttt{mode} at line~\ref{code:tiling-inspector:run} in Listing~\ref{code:tiling-inspector}.
+Using the example in Listing~\ref{code:tiling-runningexample} -- a plain C implementation of the OP2 program in Listing~\ref{code:op2program} -- we describe the actions performed by a sparse tiling inspector. The inspector takes as input the loop chain illustrated in Listing~\ref{code:tiling-inspector}. We show two variants, for shared-memory and distributed-memory parallelism. The value of the variable \texttt{mode} at line~\ref{code:tiling-inspector:run} in Listing~\ref{code:tiling-inspector} determines the variant to be executed.
 
 \subsection*{Overview}
-The inspector starts with partitioning the iteration space of a \textit{seed loop}, for example $L_0$. Partitions are used to initialize tiles: the iterations of $L_0$ falling in $P_i$ -- or, in other words, the edges in partition $P_i$ -- are assigned to the tile $T_i$. Figure~\ref{fig:st-initial-part-sm} displays the situation after the initial partitioning of $L_0$ for a given input mesh. There are four partitions, two of which are not connected through any edge or cell. These four partitions correspond to four tiles, $[T_0,\ T_1,\ T_2,\ T_3]$.
+The inspector starts with partitioning the iteration space of a \textit{seed loop}, for example $L_0$. Partitions are used to initialize tiles: the iterations of $L_0$ falling in $P_i$ -- or, in other words, the edges in partition $P_i$ -- are assigned to the tile $T_i$. Figure~\ref{fig:st-initial-part-sm} displays the situation after the initial partitioning of $L_0$ for a given input mesh. There are four partitions, two of which ($P_0$ and $P_3$) are not connected through any edge or cell. These four partitions correspond to four tiles, $[T_0,\ T_1,\ T_2,\ T_3]$, with $P_i = T_i$.
 
 \begin{figure}
 \centering
-\includegraphics[scale=0.7]{sparsetiling/figures/partiotioned.pdf}
-\caption{Partitioning of the seed loop.}
+\includegraphics[scale=0.6]{sparsetiling/figures/partiotioned.pdf}
+\caption{Partitioning of the seed loop. The vertices are illustrated to make the connectivity of the mesh clear, although they do not belong to any partition yet.}
 \label{fig:st-initial-part-sm}
 \end{figure}
 
-In the later stages of the inspection, $T_i$ is populated with iterations from $L_1$ and $L_2$. The challenge in scheduling iterations from $L_j$ to $T_i$ is to guarantee that all data dependencies -- read after write, write after read, write after write -- are honored. In the next two sections, we use the running example to illustrate how iterations are assigned to tiles to enable shared-memory and distributed-memory parallelism.
-
-The result of the inspection is eventually passed to the executor. The inspection carries sufficient information for a parallel computation of different tiles. A given tile $T_i$ is always executed by a single thread/process ``atomically''; that is, without ever communicating with other threads/processes. When executing $T_i$, first all iterations from $L_0$ are executed, then all iterations from $L_1$ and finally those from $L_2$.
+As explained in the next two sections, the inspection proceeds by populating $T_i$ with iterations from $L_1$ and $L_2$. The challenge of this task is guaranteeing that all data dependencies -- read after write, write after read, write after write -- are honored. The output of the inspector is eventually passed to the executor. The inspection carries sufficient information for computing sets of tiles in parallel. $T_i$ is always executed by a single thread/process and the execution is atomic; that is, it does not require communication with other threads/processes. When executing $T_i$, first all iterations from $L_0$ are executed, then all iterations from $L_1$ and finally those from $L_2$.
 
 \subsection*{Inspection for Shared-Memory Parallelism}
 \label{sec:tiling:ex-sm}
 Similarly to OP2, to achieve shared-memory parallelism we use coloring. Two tiles that are given the same color can be executed in parallel by different threads. Two tiles can have the same color if they are not connected, because this ensures the absence of race conditions through indirect memory accesses during parallel execution. In the example we can use three colors: red (R), green (G), and blue (B). $T_0$ and $T_3$ are not connected, so they are assigned the same color. The colored tiles are shown in Figure~\ref{fig:st-loop-0}. In the following, with the notation $T_i^c$ we indicate that the $i$-th tile has color $c$. 
 
-\begin{figure}[b]
+\begin{figure}
 \centering
-\includegraphics[scale=0.7]{sparsetiling/figures/loop_0.pdf}
-\caption{Tiling $L_0$.}
+\includegraphics[scale=0.6]{sparsetiling/figures/loop_0.pdf}
+\caption{A snapshot of the mesh after tiling $L_0$.}
 \label{fig:st-loop-0}
 \end{figure}
 
-To populate the tiles with iterations from $L_1$ and $L_2$, we first have to establish a total ordering for the execution of partitions with different colors. Here, we assume the following order: green (G), blue (B), and red (R). This means, for instance, that \textit{all iterations} assigned to $T_1^B$ must be executed \textit{before all iterations} assigned to $T_2^R$. By ``all iterations'' we mean the iterations from $L_0$ (determined by the seed partitioning) as well as the iterations that will later be assigned from $L_1$ and $L_2$. We assign integer positive numbers to colors to reflect their ordering, where a smaller number means higher execution priority. In this case, we can assign 0 to green, 1 to blue, and 2 to red.
+To populate $[T_0^G,\ T_1^B,\ T_2^R,\ T_3^G]$ with iterations from $L_1$ and $L_2$, we first have to establish a total ordering for the execution of partitions with different colors. Here, we assume the following order: green (G), blue (B), and red (R). This implies, for instance, that \textit{all iterations} assigned to $T_1^B$ must be executed \textit{before all iterations} assigned to $T_2^R$. By ``all iterations'' we mean the iterations from $L_0$ (determined by the seed partitioning) as well as the iterations that will later be assigned from tiling $L_1$ and $L_2$. We assign integer positive numbers to colors to reflect their ordering, where a smaller number means higher execution priority. We can assign, for example, 0 to green, 1 to blue, and 2 to red.
 
+To schedule the iterations of $L_1$ to $[T_0^G,\ T_1^B,\ T_2^R,\ T_3^G]$, we need to compute a \textit{projection} for any write or local reduction performed by $L_0$. The projection required by $L_0$ is a function $\phi : V \rightarrow \mathbb{T}$ mapping the vertices in $V$ -- as indirectly incremented during the execution of $L_0$, see Listing~\ref{code:tiling-runningexample} -- to a tile $T_i^c \in \mathbb{T}$. Consider the vertex $v_0$ in Figure~\ref{fig:st-loop-0-proj}. $v_0$ has 7 incident edges, 2 of which belong to $T_0^G$, while the remaining 5 to $T_1^B$. Since we established that $G \prec B$, $v_0$ can only be read after $T_1^B$ has finished executing the iterations from $L_0$ (i.e., the 5 incident blue edges). We express this condition by setting $\phi(v_0) = T_1^B$. Observe that we can compute $\phi$ by iterating over $V$ and, for each vertex, applying the maximum function ($MAX$) to the color of the adjacent edges. 
 
-\begin{figure}[h]
+\begin{figure}
 \centering
-\includegraphics[scale=0.7]{sparsetiling/figures/loop_0_with_vertices.pdf}
-\caption{Projection of $L_0$ to $L_1$.}
+\includegraphics[scale=0.6]{sparsetiling/figures/loop_0_with_vertices.pdf}
+\caption{Illustration of the projection function computed after tiling $L_0$. The projection is used by $L_1$ for a correct scheduling of cells.}
 \label{fig:st-loop-0-proj}
 \end{figure}
 
-\begin{figure}[h]
+\begin{figure}
 \centering
-\includegraphics[scale=0.7]{sparsetiling/figures/loop_1.pdf}
-\caption{Tiling $L_1$.}
+\includegraphics[scale=0.6]{sparsetiling/figures/loop_1.pdf}
+\caption{A snapshot of the mesh after tiling $L_1$.}
 \label{fig:st-loop-1}
 \end{figure}
 
-To schedule the iterations of $L_1$ to $[T_0^G,\ T_1^B,\ T_2^R,\ T_3^G]$, we first need to compute a \textit{projection} of any write or local reduction performed within $L_0$.  A projection for $L_0$ is a function $\phi : V \rightarrow \mathbb{T}$ mapping a vertex indirectly incremented during the execution of $L_0$ (see Listing~\ref{code:tiling-runningexample}) to a tile. Consider the vertex $v_0$ in Figure~\ref{fig:st-loop-0-proj}. $v_0$ has 7 incident edges, 2 of which belong to $T_0^G$, while the remaining 5 to $T_1^B$. Since we established that $G \prec B$, $v_0$ can only be read after $T_1^B$ has finished executing the iterations from $L_0$ (i.e., the 5 incident blue edges). We express this condition by setting $\phi(v_0) = T_1^B$. Observe that we can compute $\phi$ by iterating over $V$ and, for each vertex, applying the maximum function ($MAX$) to the color of the adjacent edges. 
-
-We now use $\phi$ to schedule $L_1$, a loop over cells, to the tiles. Consider again $v_0$ and the adjacent cells $[c_0,\ c_1,\ c_2]$. These three cells have in common the fact that they are adjacent to both green and blue vertices. For $c_1$, and similarly with the other cells, we compute $MAX(\phi(v_0),\ \phi(v_1),\ \phi(v_2)) = MAX(B, G, G) = B = 1$. This establishes that $c_1$ must be assigned to $T_1^B$, because otherwise ($c_1$ assigned instead to $T_0^G$) a read to $v_0$ would occur before the last increment from $T_1^B$ took place. We indeed reiterate once more that the execution order is ``all iterations from $[L_0, L_1, L_2]$ in the green tiles before all iterations from $[L_0, L_1, L_2]$ in the blue tiles''. The result of scheduling $L_1$ to tiles is displayed in Figure~\ref{fig:st-loop-1}.
-
-To schedule $L_2$ to $[T_0^G,\ T_1^B,\ T_2^R,\ T_3^G]$ we employ a similar process. Vertices are again written by $L_1$, so a new projection over $V$ will be computed and will be used in place of $\phi$ to schedule the edges in $L_2$. Figure~\ref{fig:st-loop-2} shows the result of this last phase. 
+We now use $\phi$ to schedule $L_1$, a loop over cells, to the tiles. Consider again $v_0$ and the adjacent cells $[c_0,\ c_1,\ c_2]$, as in Figure~\ref{fig:st-loop-1-c0c1c2}. These three cells have in common the fact that they are adjacent to both green and blue vertices. For $c_1$, and similarly for the other cells, we compute $MAX(\phi(v_0),\ \phi(v_1),\ \phi(v_2)) = MAX(B, G, G) = B = 1$. This establishes that $c_1$ must be assigned to $T_1^B$, because otherwise ($c_1$ assigned instead to $T_0^G$) a read to $v_0$ would occur before the last increment from $T_1^B$ took place. We indeed reiterate that the execution order, for correctness, must be ``all iterations from $[L_0, L_1, L_2]$ in the green tiles before all iterations from $[L_0, L_1, L_2]$ in the blue tiles''. The result of scheduling $L_1$ to tiles is displayed in Figure~\ref{fig:st-loop-1}.
 
 \begin{figure}[h]
 \centering
-\includegraphics[scale=0.7]{sparsetiling/figures/loop_2.pdf}
-\caption{Tiling $L_2$.}
+\includegraphics[scale=0.6]{sparsetiling/figures/loop_2.pdf}
+\caption{A snapshot of the mesh after tiling $L_2$.}
 \label{fig:st-loop-2}
 \end{figure}
 
+To schedule $L_2$ to $[T_0^G,\ T_1^B,\ T_2^R,\ T_3^G]$ we employ a similar process. Vertices are again written by $L_1$, so a new projection over $V$ is necessary to correctly schedule $L_2$. Figure~\ref{fig:st-loop-2} shows the result of this last phase. 
 
-\subsubsection*{Conflicting Colors}
-It is worth noting how $T_2^R$ ``consumed'' the frontier elements of all other tiles every time a new loop was scheduled. Tiling a loop chain consisting of $k$ loops had the effect of expanding the frontier of a tile of at most $k$ vertices. With this in mind, we re-inspect the loop chain of the running example, although this time with different execution order -- blue (B), red (R), and green (G) -- and initial partitioning. We recall that the total ordering of colors is indeed arbitrary. By applying the same inspection procedure that we just described, $T_0^G$ and $T_3^G$ will eventually become connected (see Figure~\ref{fig:st-conflicts}), thus violating the precondition ``tiles/partitions with the same color can run in parallel''. Race conditions during the execution of iterations belonging to $L_2$ are now theoretically possible. We will solve this problem in Section~\ref{sec:tiling:inspector}.
+
+
+\paragraph{Conflicting Colors}
+It is worth noting how $T_2^R$ ``consumed'' the frontier elements of all other tiles every time a new loop was scheduled. Tiling a loop chain consisting of $k$ loops has the effect of expanding the frontier of a tile of at most $k$ vertices. With this in mind, we re-inspect the loop chain of the running example, although this time with different execution order -- blue (B), red (R), and green (G) -- and initial partitioning. Figure~\ref{fig:st-conflicts} shows that, by applying the procedure described in this section, $T_0^G$ and $T_3^G$ can become adjacent. This violates the precondition: {\it tiles can be given the same color, and thus run in parallel, as long as they are not adjacent}. Race conditions during the execution of iterations belonging to $L_2$ are now possible. We will solve this problem in Section~\ref{sec:tiling:inspector}.
 
 \begin{figure}[h]
 \centering
@@ -348,7 +348,7 @@ It is worth noting how $T_2^R$ ``consumed'' the frontier elements of all other t
 \label{fig:st-conflicts-c}
 \end{subfigure}%
 
-\caption{Tiling the program in Listing~\ref{code:tiling-runningexample} for shared memory parallelism can lead to conflicts. Here, the two green tiles eventually become adjacent, exposing potential race conditions.}
+\caption{Tiling the program in Listing~\ref{code:tiling-runningexample} for shared memory parallelism can lead to conflicts. Here, the two green tiles eventually become adjacent, creating race conditions.}
 \label{fig:st-conflicts}
 \end{figure}
 
@@ -356,28 +356,29 @@ It is worth noting how $T_2^R$ ``consumed'' the frontier elements of all other t
 \label{sec:tiling:ex-dist}
 If parallelism is achieved through message-passing, the mesh and its datasets are distributed to different processes. Similarly to the example in Listing~\ref{code:tiling-struct}, MPI calls now separate the execution of two consecutive loops in the chain. This means that our inspector/executor scheme will have to take extra care of data dependencies along the mesh partition boundaries.
 
-From Section~\ref{sec:tiling:lc-unstruct} we know that all sets are logically split into three regions, \textit{core}, \textit{boundary}, and \textit{non-exec}. The boundary region includes all iterations that cannot be executed until the MPI communications have successfully been accomplished. With this in mind, we take again $L_0$ as seed loop and make the following adjustments to the procedure illustrated in the previous section:
+From Section~\ref{sec:tiling:lc-unstruct} we know that all sets are logically split into three regions, \textit{core}, \textit{boundary}, and \textit{non-exec}. The boundary region includes all iterations that cannot be executed until the MPI communications have been accomplished. With this in mind, we take again $L_0$ as seed loop and make the following adjustments to the procedure illustrated in the previous section.
 \begin{enumerate}
-\item We take the core region of $L_0$ and partition it into tiles. Unless we aim for a mixed distributed/shared-memory parallelization scheme, there is no need to reassign the same color to unconnected tiles since we now have a single process executing sequentially a group of tiles . We can assign colors increasingly: $T_i$ is given color $i$. This allows us to uniquely identify a tile's color with its index, $i$. As long as tiles with contiguous ID are also physically contiguous in the mesh, this assignment retains spatial locality when ``jumping'' from executing $T_i$ to $T_{i+1}$.
-\item We replicate for the boundary region of $L_0$ what we just did for the core. By neatly separating the core and boundary regions, we prevent tiles from crossing the two regions by construction. Further, all tiles within boundary have greater color than those in core, which poses a constraint on the execution order: no boundary tiles can be executed until all core tiles have been scheduled.
-\item We map the whole non-exec region of $L_0$ to a single special tile, $T_{ne}$. This tile has highest color and will actually never be executed. Its role will be explained in later sections.
+\item We take the core region of $L_0$ and partition it into tiles. Unless we aim for a mixed distributed/shared-memory parallelization scheme, there is no need to reassign the same color to unconnected tiles: now a single process executes sequentially its own tiles. We can assign colors increasingly, with $T_i$ given color $i$. As long as tiles with contiguous ID are also physically contiguous in the mesh, this assignment retains spatial locality when ``jumping'' from executing $T_i$ to $T_{i+1}$.
+\item We replicate for the boundary region of $L_0$ what we just did for the core. By separating the core and boundary regions, we are preventing, by construction, a situation in which a tile crosses the two regions. Further, all tiles within the boundary region are given a color greater than those in core. This constrains the execution order: no boundary tiles will be executed until all core tiles have been computed.
+\item We map the whole non-exec region of $L_0$ to a single special tile, $T_{ne}$. This tile has the highest color and will actually never be executed. 
 \end{enumerate}
 
-In Figure~\ref{fig:st-mpi-init}, the same mesh of Figure~\ref{fig:st-initial-part-sm} has been distributed to two processes and the output of the initialization phase is displayed. The inspection then proceeds as in the case of shared memory parallelism. The application of the $MAX$ function when scheduling iterations from $L_1$ and $L_2$ to tiles makes higher color tiles (i.e., those that will be scheduled later at execution time) ``grow over'' lower color ones. The whole boundary region ``expands'' over core, and so does $T_{ne}$ over boundary (see Figure~\ref{fig:st-mpi-growth}). 
+From now on, the inspection proceeds as in the case of shared memory parallelism. The application of the $MAX$ function when scheduling $L_1$ and $L_2$ makes higher color tiles (i.e., those having lower priority) ``grow over'' lower color ones. 
 
-\begin{figure}[h]
+Figure~\ref{fig:st-mpi-init} shows a distribution of the same mesh used in Figure~\ref{fig:st-initial-part-sm} to two processes, as well as a possible partitioning into tiles. Figure~\ref{fig:st-mpi-growth} displays the scheduling of $L_1$ to tiles. It is worth observing that: (i) the whole boundary region is expanding over core, which is an essential requirement for correctness; (ii) the boundary region was sized to enable enough redundant computation, which in turn avoids synchronization.
+
+\begin{figure}
 \centering
 \includegraphics[width=\textwidth]{sparsetiling/figures/base_mesh_doppio.pdf}
 \caption{Seed partitioning for distributed memory execution.}
 \label{fig:st-mpi-init}
 \end{figure}
 
-On each process, the executor starts with triggering the MPI communications required for the execution of (all tiles over) the boundary regions; it proceeds to scheduling the core tiles, thus overlapping communication with computation; eventually, as soon as all core tiles have been executed and the MPI communications been accomplished, it computes the boundary tiles.
-
-Finally, we observe that:
+We finally observe that:
 \begin{description}
-\item[Correctness] This inspector/executor scheme relies on redundant computation along the boundaries of mesh partitions. The depth of the boundary region -- a parameter of the loop chain, as explained in Section~\ref{sec:tiling:lc-unstruct} -- grows proportionally with the number of loops that are fused. Roughly speaking, if the loop chain consists of $n$ loops, then the boundary region needs $n-1$ extra layers of elements. In Figure~\ref{fig:st-mpi-init}, the elements $[...]$ belong to $R_1$, although they also need be executed by $R_0$ in order for $[...]$ to be correctly computed when $T_x$ executes iterations from $L_2$. This is a conceptually simple expedient, although it poses a big challenge on software engineering. 
-\item[Efficiency] The underlying hypothesis is that the increase in data locality achieved through sparse tiling will outweigh the overhead introduced by the redundant computation. This is based on the consideration that, in real applications, the core region tends to be way larger than the boundary one. In addition, not all iterations along the boundary region need be redundantly executed at every loop. For example, if we consider Figure~\ref{fig:st-mpi-nonexec}, we see that the strip of elements $[...]$ is not relevant any more for the correct computation of $[...]$. The non-exec tile $T_{ne}$, which we recall is not scheduled by the executor, is deliberately given the highest color to grow over the boundary region: this will leave dirty values in some datasets until the next round of MPI communications, but will not hurt correctness. 
+\item[Executor] On each process, the executor starts with triggering the MPI communications required for executing the boundary tiles. It proceeds to scheduling the core tiles, thus overlapping communication with computation. As all core tiles have finished executing and the MPI communications have terminated, the boundary tiles are computed.
+\item[Correctness] This inspector/executor scheme relies on redundant computation along the boundaries of mesh partitions. The depth of the boundary region -- a parameter of the loop chain, as explained in Section~\ref{sec:tiling:lc-unstruct} -- grows proportionally with the number of loops that are fused. Roughly speaking, if the loop chain consists of $n$ loops, then the boundary region needs $n-1$ extra layers of elements. In Figure~\ref{fig:st-mpi-growth}, the elements $[...]$ belong to $R_1$, although they also need be executed by $R_0$ in order for $[...]$ to be correctly computed when $T_x$ executes iterations from $L_2$.  
+\item[Efficiency] The underlying hypothesis is that the increase in data locality achieved through sparse tiling will outweigh the cost of redundant computation. This is based on the consideration that the core region tends to be way larger than the boundary region. Moreover, not all iterations along the boundary region need be redundantly executed at every loop. For example, if we consider Figure~\ref{fig:st-mpi-nonexec}, we see that the strip of elements $[...]$ is not anymore necessary for computing $[...]$. The non-exec tile $T_{ne}$ is given the highest color, so it expands over the boundary region. This creates dirty values (until the next round of MPI communications), which however will never be accessed anymore. 
 \end{description}
 
 
