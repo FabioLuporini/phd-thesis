@@ -204,7 +204,7 @@ Another important difference is the characterization of sets into the three regi
 % (we simply have that both $S^{b}$ and $S^{ne}$  contain no elements in the special case of execution entirely based on shared-memory parallelism). 
 
 \section{Loop Chain and Inspection Examples}
-
+\label{sec:tiling:examples}
 
 \begin{algorithm}
 \scriptsize\ttfamily
@@ -282,7 +282,6 @@ The inspector starts with partitioning the iteration space of a \textit{seed loo
 As explained in the next two sections, the inspection proceeds by populating $T_i$ with iterations from $L_1$ and $L_2$. The challenge of this task is guaranteeing that all data dependencies -- read after write, write after read, write after write -- are honored. The output of the inspector is eventually passed to the executor. The inspection carries sufficient information for computing sets of tiles in parallel. $T_i$ is always executed by a single thread/process and the execution is atomic; that is, it does not require communication with other threads/processes. When executing $T_i$, first all iterations from $L_0$ are executed, then all iterations from $L_1$ and finally those from $L_2$.
 
 \subsection*{Inspection for Shared-Memory Parallelism}
-\label{sec:tiling:ex-sm}
 Similarly to OP2, to achieve shared-memory parallelism we use coloring. Two tiles that are given the same color can be executed in parallel by different threads. Two tiles can have the same color if they are not connected, because this ensures the absence of race conditions through indirect memory accesses during parallel execution. In the example we can use three colors: red (R), green (G), and blue (B). $T_0$ and $T_3$ are not connected, so they are assigned the same color. The colored tiles are shown in Figure~\ref{fig:st-loop-0}. In the following, with the notation $T_i^c$ we indicate that the $i$-th tile has color $c$. 
 
 \begin{figure}
@@ -348,12 +347,11 @@ It is worth noting how $T_2^R$ ``consumed'' the frontier elements of all other t
 \label{fig:st-conflicts-c}
 \end{subfigure}%
 
-\caption{Tiling the program in Listing~\ref{code:tiling-runningexample} for shared memory parallelism can lead to conflicts. Here, the two green tiles eventually become adjacent, creating race conditions.}
+\caption{Tiling the program in Listing~\ref{code:tiling-runningexample} for shared-memory parallelism can lead to conflicts. Here, the two green tiles eventually become adjacent, creating race conditions.}
 \label{fig:st-conflicts}
 \end{figure}
 
 \subsection*{Inspection for Distributed-Memory Parallelism}
-\label{sec:tiling:ex-dist}
 If parallelism is achieved through message-passing, the mesh and its datasets are distributed to different processes. Similarly to the example in Listing~\ref{code:tiling-struct}, MPI calls now separate the execution of two consecutive loops in the chain. This means that our inspector/executor scheme will have to take extra care of data dependencies along the mesh partition boundaries.
 
 From Section~\ref{sec:tiling:lc-unstruct} we know that all sets are logically split into three regions, \textit{core}, \textit{boundary}, and \textit{non-exec}. The boundary region includes all iterations that cannot be executed until the MPI communications have been accomplished. With this in mind, we take again $L_0$ as seed loop and make the following adjustments to the procedure illustrated in the previous section.
@@ -378,7 +376,7 @@ We finally observe that:
 \begin{description}
 \item[Executor] On each process, the executor starts with triggering the MPI communications required for executing the boundary tiles. It proceeds to scheduling the core tiles, thus overlapping communication with computation. As all core tiles have finished executing and the MPI communications have terminated, the boundary tiles are computed.
 \item[Correctness] This inspector/executor scheme relies on redundant computation along the boundaries of mesh partitions. The depth of the boundary region -- a parameter of the loop chain, as explained in Section~\ref{sec:tiling:lc-unstruct} -- grows proportionally with the number of loops that are fused. Roughly speaking, if the loop chain consists of $n$ loops, then the boundary region needs $n-1$ extra layers of elements. In Figure~\ref{fig:st-mpi-growth}, the elements $[...]$ belong to $R_1$, although they also need be executed by $R_0$ in order for $[...]$ to be correctly computed when $T_x$ executes iterations from $L_2$.  
-\item[Efficiency] The underlying hypothesis is that the increase in data locality achieved through sparse tiling will outweigh the cost of redundant computation. This is based on the consideration that the core region tends to be way larger than the boundary region. Moreover, not all iterations along the boundary region need be redundantly executed at every loop. For example, if we consider Figure~\ref{fig:st-mpi-nonexec}, we see that the strip of elements $[...]$ is not anymore necessary for computing $[...]$. The non-exec tile $T_{ne}$ is given the highest color, so it expands over the boundary region. This creates dirty values (until the next round of MPI communications), which however will never be accessed anymore. 
+\item[Efficiency] The underlying hypothesis is that the increase in data locality achieved through sparse tiling will outweigh the cost of redundant computation. This is based on the consideration that the core region tends to be way larger than the boundary region. Moreover, not all iterations along the boundary region need be redundantly executed at every loop. For example, if we consider Figure~\ref{fig:st-mpi-nonexec}, we see that the strip of elements $[...]$ is not anymore necessary for computing $[...]$. The non-exec tile $T_{ne}$ is given the highest color, so it expands over the boundary region. This creates dirty values (until the next round of MPI communications), which however will never be accessed. 
 \end{description}
 
 
@@ -418,7 +416,7 @@ There are local reductions, or ``reduction dependencies'' between two or more it
 \]
 The reduction dependencies between two iterations within the same loop indicates that those two iterations must be executed atomically with respect to each other.
 
-As seen in the example in Section~\ref{sec:tiling:ex-sm}, our inspector algorithm handles data dependencies, including those between non-adjacent loops, by tracking \textit{projections}. In the next section we explain how projections are constructed and used.
+As seen in the example in Section~\ref{sec:tiling:examples}, our inspector algorithm handles data dependencies, including those between non-adjacent loops, by tracking \textit{projections}. In the next section we explain how projections are constructed and used.
 
 %In order to schedule $L$ to tiles, an up-to-date projection for each set $S$ accessed by $L$ must be available. For example, assume that $S$ is read by $L_k$ and is written by both $L_i$ and $L_j$. In the loop chain, the loops are in the order $L_i \prec ... \prec L_j \prec ... \prec L_k$. Let us denote by $\phi_S$ the projection for $S$. Each time that a loop accessing $S$ in write mode is inspected for scheduling, $\phi_S$ must be updated. When eventually scheduling $L_k$, therefore, an up-to-date snapshot of $\phi_S$ (i.e., the one produced right after tiling $L_j$) will be used to compute a legal tiling.
 
@@ -648,7 +646,7 @@ end$\_$MPI$\_$communications()\;
 
 The sparse tiling executor is illustrated in Algorithm~\ref{algo:st-executor}. It consists of four main phases: triggering of MPI communications; execution of core tiles (in overlap with communication); waiting for the termination of all MPI communications; execution of boundary tiles.
 
-As seen in the example in Section~\ref{sec:tiling:ex-dist} and based on the explanation in Section~\ref{sec:tiling:inspector}, we know that the core tiles do not require any off-process information to execute as long as the boundary regions are (i) up-to-date and (ii) ``sufficiently deep''. If both conditions hold, the execution is semantically correct and it is safe to overlap computation of core tiles with the communication of boundary data. 
+As seen in the example in Section~\ref{sec:tiling:examples} and based on the explanation in Section~\ref{sec:tiling:inspector}, we know that the core tiles do not require any off-process information to execute as long as the boundary regions are (i) up-to-date and (ii) ``sufficiently deep''. If both conditions hold, the execution is semantically correct and it is safe to overlap computation of core tiles with the communication of boundary data. 
 
 
 \paragraph{The depth of the boundary region}
