@@ -54,6 +54,9 @@
 \SetKwInput{kwInput}{Input}
 \SetKwInput{kwOutput}{Output}
 \SetKw{Not}{not}
+\SetKw{True}{true}
+\SetKw{False}{false}
+\SetKw{Skip}{skip}
 \SetKwRepeat{Do}{do}{while}
 \SetKwComment{Comment}{// }{}
 \let\oldnl\nl% Store \nl in \oldnl
@@ -209,3 +212,15 @@
 %\setlist[itemize]{itemsep=0pt,topsep=7pt,leftmargin=12pt}
 %\setlist[enumerate]{itemsep=0pt,topsep=0pt}
 %\setlist[description]{itemsep=0pt,topsep=0pt,leftmargin=0pt}
+
+% To overwrite Latex's stupid rules for floats
+\renewcommand{\topfraction}{.85}
+\renewcommand{\bottomfraction}{.7}
+\renewcommand{\textfraction}{.15}
+\renewcommand{\floatpagefraction}{.66}
+\renewcommand{\dbltopfraction}{.66}
+\renewcommand{\dblfloatpagefraction}{.66}
+\setcounter{topnumber}{9}
+\setcounter{bottomnumber}{9}
+\setcounter{totalnumber}{20}
+\setcounter{dbltopnumber}{9}
