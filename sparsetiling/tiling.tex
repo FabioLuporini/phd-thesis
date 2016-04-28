@@ -12,7 +12,7 @@
 
 
 
-Many numerical methods for partial differential equations (PDEs) are structured as sequences of parallel loops. This exposes parallelism well, but does not convert data reuse between loops into data locality, since their working set is usually too big to fit some level of cache. In Section~\ref{sec:bkg:poly} we have explained that loop fusion and loop tiling may be used to retain some of this potential data locality. As we elaborate in this chapter, however, it is extremely challenging to implement these optimizations in real-world applications. 
+Many numerical methods for partial differential equations (PDEs) are structured as sequences of parallel loops. This exposes parallelism well, but does not convert data reuse between loops into data locality, since their working set is usually too big to fit some level of cache. In Section~\ref{sec:bkg:poly} we have explained that loop fusion and loop tiling may be used to retain some of this potential data locality. As we elaborate in this chapter, it is however extremely challenging to implement these optimizations in real-world applications. 
 
 Our focus is on unstructured mesh PDE solvers, like those based on the finite volume or the finite element methods. Here, the  loop-to-loop dependence structure is data-dependent due to
 indirect references such as \texttt{A[map[i]]}; the \texttt{map} array stores connectivity information, for example from elements in the mesh to degrees of freedom. A similar pattern occurs in molecular dynamics simulations and graph processing, so both the theory and the tools that we will develop in this chapter are generalizable to these domains. 
@@ -22,32 +22,32 @@ Because of the irregular memory access pattern, our approach to loop transformat
 Summarizing, the three main issues that we tackle in this chapter are:
 
 \begin{itemize}
-\item Previous approaches to sparse tiling were all based upon ``ad-hoc'' inspector/executor strategies; that is, developed ``by hand'', per application. We seek for a general technique, applicable to arbitrary computations on unstructured meshes.
+\item Previous approaches to sparse tiling were all based upon ``ad-hoc'' inspector/executor strategies; that is, developed ``by hand'', per application. We seek a general technique, applicable to arbitrary computations on unstructured meshes.
 \item Automation is more than a desired feature because application specialists will avoid complicated optimizations that may harm the comprehensibility of source code. We therefore aim for a fully-automated framework, based upon a mixed compiler/library approach.
-\item Very few studies have addressed the problem of fusing loops when these need be interleaved by routines for message passing. We are aware of none for the case in which the memory accesses pattern is irregular, as in unstructured mesh applications. We will fill this gap by introducing a mixed split/overlapped sparse tiling scheme. The importance of this contribution stems from the fact that most scientific simulations require distributed-memory architectures.
+\item Very few studies have addressed the problem of fusing loops when these need be interleaved by routines for message passing. We are aware of none for the scenario in which the memory accesses pattern is irregular. We fill this gap by introducing a sparse tiling scheme that uses redundant computation over partition boundaries to delay communication. The importance of this contribution stems from the fact that most scientific simulations require distributed-memory parallelism.
 \end{itemize}
 
 \section{Open Problems, Questions, Hypotheses}
 \label{sec:tiling:struct}
-Loop fusion and loop tiling have widely been studied in the literature. Over the years, a considerable number of compilers and techniques have been proposed for automating these transformations. Their evaluation, however, has mostly been limited to a small set of benchmarks (or ``mini-applications'') and single-node performance. This unfortunately does not shed light on the applicability in real-world applications, where the loop nests are often deeper, less structured, and characterized by irregular control flow. On the other hand, it is true that simple stencil codes arising in finite difference methods~\citep{vect-tiled-ho-fd,ics-stencil-tiling,cohen-timetiling}, linear algebra routines~\citep{qr-fact-tiled,blas-tiling}, and image processing kernels~\citep{Halide} can really benefit from transformations like fusion and tiling. Since numerical methods for PDEs are often structured as sequences of parallelizable loops (or ``sweeps'') over the discretized equation domain, the following questions arise naturally: 
+Loop fusion and loop tiling have widely been studied in the literature. Over the years, a considerable number of compilers and techniques have been proposed for automating these transformations. Their evaluation, however, has traditionally been limited to a small set of benchmarks (or ``mini-applications'') and single-node performance. This unfortunately does not shed light on their applicability in real-world applications, where the loop nests are often deeper, less structured, and characterized by irregular control flow. On the other hand, it is true that simple stencil codes arising in finite difference methods~\citep{vect-tiled-ho-fd,ics-stencil-tiling,cohen-timetiling}, linear algebra routines~\citep{qr-fact-tiled,blas-tiling}, and image processing kernels~\citep{Halide} can benefit from transformations like fusion and tiling. Since numerical methods for PDEs are often structured as sequences of parallelizable loops (or ``sweeps'') over the discretized equation domain, the following questions arise naturally: 
 
 \begin{description}
 \item[Applicability] Can we adopt sparse tiling in real-life numerical methods for solving PDEs, and should we expect any gain in performance?
-\item[Lack of evidence] Why, despite decades of research, loop transformations are rarely used in production code? 
+\item[Lack of evidence] Why, despite decades of research, loop transformations are rarely used in production code for scientific simulations? 
 \item[Challenges] What are the theoretical and technical challenges that we have to overcome to automate sparse tiling?
 \end{description}
 
 The context in which we tackle these questions is the following:
 \begin{description}
 \item[Irregular codes] Unstructured meshes are often used to discretize the computational domain, since they allow for an accurate representation of complex geometries. Their connectivity is stored by means of adjacency lists (or equivalent data structure). This leads to indirect memory accesses within loop nests. Indirections break static analysis, thus making compiler-based approaches to loop transformation (e.g., polyhedral optimization) unsuitable for our context. Runtime data dependence analysis enables dynamic loop optimization, although at the price of additional overhead.
-\item[Realistic datasets] Complex simulations usually operate on at least gigabytes of data, thus requiring multi-node execution. Any loop transformation we consider will have to support\ distributed-memory parallelism.
-\item[Automation, but no legacy code] Sparse tiling is an ``extreme optimization''. It requires a great deal of effort to be implemented as it imposes a thoughtful restructuring of the application. Similarly to many other low level transformations, it also tends to render the source code impenetrable, increasing the maintenance and the extension costs. We therefore aim for a fully automated system based on domain-specific languages, which abstracts sparse tiling through a simple interface (i.e., a simple construct that lets the users tell the compiler ``apply sparse tiling to the following sequence of loops'' ) and a tiny set of parameters for performance tuning (e.g., the tile size). We are not interested in supporting legacy code, where the key computational aspects (e.g., mesh iteration, distributed-memory parallelism) are usually hidden for software modularity, which makes automation almost impossible.
+\item[Realistic datasets] Complex simulations usually operate on at least terabytes of data, hence execution on multi-node systems is required. Any loop transformation we consider will have to support distributed-memory parallelism.
+\item[Automation, but no legacy code] Sparse tiling is an ``extreme optimization''. It requires a great deal of effort to be implemented as it imposes a thoughtful restructuring of the application. Similarly to many other low level transformations, it also tends to render the source code impenetrable, increasing the maintenance and the extension costs. We therefore aim for a fully automated system based on domain-specific languages, which abstracts sparse tiling through a simple interface (i.e., a single construct to tell the compiler ``transform the following sequence of loops'' ) and a tiny set of parameters for performance tuning (e.g., the tile size). We are not interested in supporting legacy code, where the key computational aspects (e.g., mesh iteration, distributed-memory parallelism) are usually hidden for software modularity, which makes automation almost impossible.
 \end{description}
 
 Based upon these observations and requirements, we decompose our problem into two tasks:
 \begin{enumerate}
-\item writing a library for expressing inspector/executor schemes (\cite{ST-Saltz91}) that enable sparse tiling in arbitrary computations on unstructured meshes;
-\item integrating the library with a multilayer framework based on domain-specific languages.
+\item writing a library for expressing inspector/executor schemes enabling sparse tiling in arbitrary computations on unstructured meshes;
+\item integrating the library with a multilayer framework that relies on domain-specific languages.
 \end{enumerate}
 Before addressing these two tasks, respectively in Sections~\ref{sec:tiling:lc}-\ref{sec:tiling:algo} and Section~\ref{sec:tiling:automation}, we elaborate on the theoretical and technical challenges that arise when applying loop fusion and loop tiling to real codes (Section~\ref{sec:tiling:difficult}), and review the related work (Section~\ref{sec:tiling:relatedwork}).  
 
@@ -70,7 +70,8 @@ We show in Listing~\ref{code:tiling-struct} the ``skeleton'' of a typical PDE so
 \KwSty{for} t = 1 \KwSty{to} T $\lbrace$\\
 ~~// 1st sweep over the $C$ cells of the mesh\\
 ~~\KwSty{for} i \KwSty{in} $C$ $\lbrace$\\
-~~~~buffer$\_$0 = gather$\_$data ( A[f(map[i])], ... )\\
+~~~~buffer$\_$0 = $\lbrace 0.0 \rbrace$  // will store the kernel output\\
+~~~~buffer$\_$1 = gather$\_$data ( A[f(map[i])], ... )\\
 ~~~~...\\
 ~~~~kernel$\_$1( buffer$\_$0, buffer$\_$1, ... );\\
 ~~~~scatter$\_$data ( buffer$\_$0, f(map[i]) )\\
@@ -90,7 +91,7 @@ We show in Listing~\ref{code:tiling-struct} the ``skeleton'' of a typical PDE so
 ~~MPI$\_$Comm (...); \\
 ~~...\\
 $\rbrace$
-\caption{The ``bare'' structure of a numerical method for solving a PDE. Three parallelizable sweeps over sets of mesh components -- cells, nodes, boundary nodes -- are executed within a time-stepping loop. In the cells loop, we show the invocation of a kernel: first, the memory indirections are resolved; the kernel, which receives data that is now contiguous in memory (this hopefully increases the chances of vectorisation),  is then invoked; finally, the computed values are ``scattered'' back to memory. Distributed-memory parallelism is achieved through MPI; messages are exchanged between processes (\texttt{MPI$\_$Comm (...)}) between different mesh sweeps. Additional computation (\texttt{Calc (...)}) could also be present (e.g., sparse linear algebra operations, as in the finite element method; checkpointing for fault tolerance).}
+\caption{The ``bare'' structure of a numerical method for solving a PDE. Three parallelizable sweeps over the mesh -- in particular, over cells, nodes, and boundary nodes -- are executed within a time-stepping loop. In the cells loop, the invocation of a kernel is shown. First, the memory indirections are resolved and data is moved into suitable buffers. The data passed to the kernel is now contiguous in memory, which hopefully maximizes the chances of vectorization. Once the kernel has been executed, the computed values are ``scattered'' back from a buffer to memory. Distributed-memory parallelism is achieved through MPI, in particular through the {\tt MPI$\_$Comm (...)} calls that separate different mesh sweeps. Additional calculations, for instance in {\tt Calc (...)}, could also interleave the execution of consecutive loops.}
 \label{code:tiling-struct}
 \end{algorithm}
 
@@ -100,15 +101,15 @@ We identify three classes of problems that are often neglected, or at least trea
 \item[Theoretical questions] We first wonder about the effectiveness of fusion and tiling in unstructured mesh applications.
 
 \begin{description}
-\item[Computational boundedness] Computational methods for PDEs are structured as sequences of loop nests, each loop nest characterized by its own operational intensity. In the same application, some loop nests may be memory-bound, while others CPU-bound. This clearly depends on the numerical method itself, particularly on aspects such as the arithmetic complexity of the operators and the type of discretization employed (e.g., polynomial order of function spaces). Obviously, if most loop nests are CPU-bound, the benefits of sparse tiling on data locality will provide marginal gains. Before even thinking about aggressive optimizations, it is fundamental to determine the bottlenecks of an application. This boils down to answering two questions: (i) what fraction of the execution time is due to memory-bound loop nests; (ii) can CPU-boundedness be relieved by applying other optimizations (e.g., vectorization).
+\item[Computational boundedness] Computational methods for PDEs are structured as sequences of loop nests, each loop nest characterized by its own operational intensity. Within the same application, some loop nests may be memory-bound, while others CPU-bound. This clearly depends on the numerical method itself, particularly on aspects such as the arithmetic complexity of the operators and the type of discretization employed (e.g., polynomial order of function spaces). Obviously, if most loop nests are CPU-bound, the benefits of sparse tiling on data locality will provide marginal gains. Before even thinking about aggressive optimizations, it is fundamental to determine the bottlenecks of an application. This boils down to answering two questions: (i) what fraction of the execution time is due to memory-bound loop nests; (ii) can CPU-boundedness be relieved by applying other optimizations (e.g., vectorization).
 \item[Loop tiling vs space filling curves] Loop tiling and space filling curves (SFCs) are two different attempts to solving the same problem: improving the performance of mesh-based computations by increasing data locality. SFCs provide an effective way of iterating over a mesh by guaranteeing that consecutive iterations correspond to neighboring elements; if these elements share some data values, data reuse is exploited. Just like loop tiling, SFCs can be considered loop reordering transformations (see Section~\ref{sec:bkg:loop-transf}). Unfortunately, there seems to be a lack of communication between the communities that have contributed to these two classes of transformations, since we could not find studies comparing their effectiveness. In this chapter, we will integrate SFCs with tiling.
 \end{description}
 
-\item[Practical issues] Recent work on fusion and tiling for structured mesh applications have addressed key problems such as automation (e.g., polyhedral compilers), composition of transformations (e.g., time tiling), techniques for minimizing communication (e.g., diamond tiling). However, the following issues were rarely given the attention they actually deserve.
+\item[Practical issues] Recent work on fusion and tiling for structured mesh applications have addressed automation (e.g., polyhedral compilers), composition of transformations (e.g., time tiling), techniques for minimizing communication (e.g., diamond tiling). However, the following issues were rarely given the attention they actually deserve.
 \begin{description}
-\item[Unstructured meshes] Although ad-hoc inspector-executor strategies for some proxy applications had previously been developed, a general technique to fuse and tile arbitrary computations on unstructured meshes has been missing until this thesis\footnote{We reinforce once more that the generalized sparse tiling algorithm is the result of a joint collaboration amongst the authors of~\citep{st-paper}.}. As already explained, the main problem with unstructured meshes is the presence of indirect memory accesses, which complicates the data dependence analysis needed for applying loop transformations.
+\item[Unstructured meshes] Although ad-hoc inspector-executor strategies for some proxy applications had previously been developed, general techniques for arbitrary computations on unstructured meshes have been missing until this thesis\footnote{We reinforce once more that the generalized sparse tiling algorithm is the result of a joint collaboration amongst the authors of~\citep{st-paper}.}. As already explained, the main problem with unstructured meshes is the presence of indirect memory accesses, which complicates the data dependence analysis needed for applying loop transformations.
 \item[Time tiling and distributed-memory parallelism] We reiterate the fact that real-world computations require large-scale distributed-memory architectures. As Listing~\ref{code:tiling-struct} shows, MPI calls are now necessary in between consecutive mesh sweeps. This poses a big challenge to time tiling, because now all tiles close to the boundary of a mesh partition require special handling.
-\item[Time tiling and extra code] The {\tt Comp(...)} function in Listing~\ref{code:tiling-struct} denotes the possibility that additional computation is performed between consecutive mesh sweeps. {\tt Comp} could represent, for instance, check-pointing, I/O, or the resolution of a linear system through a function call to an external library. Moreover, conditional execution of loops (e.g., through \texttt{if-then-else}) complicates time tiling. 
+\item[Time tiling and extra code] The {\tt Comp(...)} function in Listing~\ref{code:tiling-struct} denotes the possibility that additional computation is performed between consecutive mesh sweeps. {\tt Comp} could represent, for instance, check-pointing, I/O, or the resolution of a linear system through a function call to an external library. Moreover, conditional execution of loops (e.g., through \texttt{if-then-else}) may be present. The presence of additional code between loops make loop fusion extremely challenging. 
 \item[Legacy code is usually impenetrable] Loop transformation opportunities are often hidden in existing scientific codes. As explained in~\cite{strout-common-problems}, common problems are: 1) potentially fusible or tilable loop nests are separated for code modularity; 2) handling of boundary conditions; 3) source code not amenable for data dependency analysis (e.g., extensive use of pointers, function calls).
 \end{description}
 
@@ -309,7 +310,7 @@ To schedule the iterations of $L_1$ to $[T_0^G,\ T_1^B,\ T_2^R,\ T_3^G]$, we nee
 \label{fig:st-loop-1}
 \end{figure}
 
-We now use $\phi$ to schedule $L_1$, a loop over cells, to the tiles. Consider again $v_0$ and the adjacent cells $[c_0,\ c_1,\ c_2]$, as in Figure~\ref{fig:st-loop-1-c0c1c2}. These three cells have in common the fact that they are adjacent to both green and blue vertices. For $c_1$, and similarly for the other cells, we compute $\operatorname{MAX}(\phi(v_0),\ \phi(v_1),\ \phi(v_2)) = \operatorname{MAX}(B, G, G) = B = 1$. This establishes that $c_1$ must be assigned to $T_1^B$, because otherwise ($c_1$ assigned instead to $T_0^G$) a read to $v_0$ would occur before the last increment from $T_1^B$ took place. We indeed recall that the execution order, for correctness, must be ``all iterations from $[L_0, L_1, L_2]$ in the green tiles before all iterations from $[L_0, L_1, L_2]$ in the blue tiles''. The scheduling $L_1$ to tiles is displayed in Figure~\ref{fig:st-loop-1}.
+We now use $\phi$ to schedule $L_1$, a loop over cells, to the tiles. Consider again $v_0$ and the adjacent cells $[c_0,\ c_1,\ c_2]$ in Figure~\ref{fig:st-loop-0-proj}. These three cells have in common the fact that they are adjacent to both green and blue vertices. For $c_1$, and similarly for the other cells, we compute $\operatorname{MAX}(\phi(v_0),\ \phi(v_1),\ \phi(v_2)) = \operatorname{MAX}(B, G, G) = B = 1$. This establishes that $c_1$ must be assigned to $T_1^B$, because otherwise ($c_1$ assigned instead to $T_0^G$) a read to $v_0$ would occur before the last increment from $T_1^B$ took place. We indeed recall that the execution order, for correctness, must be ``all iterations from $[L_0, L_1, L_2]$ in the green tiles before all iterations from $[L_0, L_1, L_2]$ in the blue tiles''. The scheduling $L_1$ to tiles is displayed in Figure~\ref{fig:st-loop-1}.
 
 \begin{figure}[h]
 \centering
@@ -363,7 +364,7 @@ From Section~\ref{sec:tiling:lc-unstruct} we know that all sets are logically sp
 
 From now on, the inspection proceeds as in the case of shared-memory parallelism. The application of the $\operatorname{MAX}$ function when scheduling $L_1$ and $L_2$ makes higher color tiles (i.e., those having lower priority) ``grow over'' lower color ones. 
 
-Figure~\ref{fig:st-mpi-init} shows a distribution of the same mesh used in Figure~\ref{fig:st-initial-part-sm} to two processes, as well as a possible partitioning into tiles. Figure~\ref{fig:st-mpi-growth} displays the scheduling of $L_1$ to tiles. It is worth observing that: (i) the whole boundary region is expanding over core, which is an essential requirement for correctness; (ii) the boundary region was sized to enable enough redundant computation, which in turn avoids synchronization.
+Figure~\ref{fig:st-mpi-init} shows a distribution of the same mesh used in Figure~\ref{fig:st-initial-part-sm} to two processes, as well as a possible partitioning into tiles. It is worth observing that: (i) the whole boundary region is expanding over core, which is an essential requirement for correctness; (ii) the boundary region was sized to enable enough redundant computation, which in turn avoids synchronization.
 
 \begin{figure}
 \centering
@@ -375,8 +376,8 @@ Figure~\ref{fig:st-mpi-init} shows a distribution of the same mesh used in Figur
 We finally notice that:
 \begin{description}
 \item[Executor] On each process, the executor starts with triggering the MPI communications required for executing the boundary tiles. It proceeds to scheduling the core tiles, thus overlapping communication with computation. As all core tiles have finished executing and the MPI communications have terminated, the boundary tiles are computed.
-\item[Correctness] This inspector/executor scheme relies on redundant computation along the boundaries of mesh partitions. The depth of the boundary region -- a parameter of the loop chain, as explained in Section~\ref{sec:tiling:lc-unstruct} -- grows proportionally with the number of loops that are fused. Roughly speaking, if the loop chain consists of $n$ loops, then the boundary region needs $n-1$ extra layers of elements. In Figure~\ref{fig:st-mpi-growth}, the elements $[...]$ belong to $R_1$, although they also need be executed by $R_0$ in order for $[...]$ to be correctly computed when $T_x$ executes iterations from $L_2$.  
-\item[Efficiency] The underlying hypothesis is that the increase in data locality achieved through sparse tiling will outweigh the cost of redundant computation. This is based on the consideration that the core region tends to be way larger than the boundary region. Moreover, not all iterations along the boundary region need be redundantly executed at every loop. For example, if we consider Figure~\ref{fig:st-mpi-nonexec}, we see that the strip of elements $[...]$ is not anymore necessary for computing $[...]$. The non-exec tile $T_{ne}$ is given the highest color, so it expands over the boundary region. This creates dirty values (until the next round of MPI communications), which however will never be accessed. 
+\item[Correctness] This inspector/executor scheme relies on redundant computation along the boundaries of mesh partitions. The depth of the boundary region -- a parameter of the loop chain, as explained in Section~\ref{sec:tiling:lc-unstruct} -- grows proportionally with the number of loops that are fused. Roughly speaking, if the loop chain consists of $n$ loops, then the boundary region needs $n-1$ extra layers of elements. In Figure~\ref{fig:st-mpi-growth}, the elements in the green box belong to {\tt Process$_1$}, but they must also be accessed by {\tt Process$_0$} to update all elements in the yellow box correctly. The size of the green box (i.e., the amount of redundant computation) depends on $n$; that is, on how many loops one wants to fuse.
+\item[Efficiency] The underlying hypothesis is that the increase in data locality achieved through sparse tiling will outweigh the cost of redundant computation. This is based on the consideration that the core region tends to be way larger than the boundary region. Moreover, not all iterations along the boundary region need be redundantly executed at every loop. The non-exec tile $T_{ne}$ is given the highest color, so it expands over the boundary region as new loops are tiled. This will create some dirty values (until the next round of MPI communications), which however will never be touched since $T_{ne}$ will not be scheduled for execution. 
 \end{description}
 
 
@@ -515,7 +516,7 @@ $\sigma_{seed}$, $\mathbb{T} \gets$ \Partition{$S_{seed}$, $ts$}\;
 \paragraph{Choice of the seed loop}
 The seed loop $L_{seed}$ is used to initialize the tiles. Theoretically, any loop in the chain can be chosen as seed. Supporting distributed-memory parallelism, however, is cumbersome if $L_{seed} \neq L_0$. This is because more general schemes for partitioning and coloring would be needed to ensure that no iterations in any $S_j^{b}$ are assigned to a core tile. A limitation of our inspector algorithm in the case of distributed-memory parallelism is that it must be $L_{seed} = L_0$. 
 
-In the special case in which there is no need to distinguish between core and boundary tiles (because a program is executed on a single shared-memory system), $L_{seed}$ can be chosen arbitrarily. If we however pick $L_{seed}$ in the middle of the loop chain ($L_0 \prec ... \prec L_{seed} \prec ...$), a mechanism for constructing tiles in the reverse direction (``backwards''), from $L_{seed}$ towards $L_0$, is necessary. In~\cite{st-paper}, we propose two ``symmetric'' algorithms to solve this problem, \textit{forward tiling} and \textit{backward tiling}, with the latter using the $MIN$ function in place of $MAX$ when computing projections. For ease of exposition, and since in the fundamental case of distributed-memory parallelism we are imposing $L_{seed} = L_0$, we here neglect this distinction\footnote{The algorithm implemented in the library presented in Section~\ref{sec:tiling:impl-slope} supports backwards tiling for shared-memory parallelism.}. 
+In the special case in which there is no need to distinguish between core and boundary tiles (because a program is executed on a single shared-memory system), $L_{seed}$ can be chosen arbitrarily. If we however pick $L_{seed}$ in the middle of the loop chain ($L_0 \prec ... \prec L_{seed} \prec ...$), a mechanism for constructing tiles in the reverse direction (``backwards''), from $L_{seed}$ towards $L_0$, is necessary. In~\cite{st-paper}, we propose two ``symmetric'' algorithms to solve this problem, \textit{forward tiling} and \textit{backward tiling}, with the latter using the $\operatorname{MIN}$ function in place of $\operatorname{MAX}$ when computing projections. For ease of exposition, and since in the fundamental case of distributed-memory parallelism we are imposing $L_{seed} = L_0$, we here neglect this distinction\footnote{The algorithm implemented in the library presented in Section~\ref{sec:tiling:impl-slope} supports backwards tiling for shared-memory parallelism.}. 
 
 %\textit{Note: in real applications loops over ``subsets'' are possible; for instance, a loop over the exterior facets of the mesh. If one such loop is picked as seed, then the inspection is aborted.}
 
@@ -544,16 +545,16 @@ Let $ts$ be the user-specified average tile size. The algorithm starts with part
 A tile $T_i$ has four fields, as summarized in Table~\ref{table:st-tile-structure}. 
 
 \begin{itemize}
-\item The {\em region} is used by the executor to schedule tiles in a certain order. The value of this field can be determined right after the seed partitioning: by construction, a tile exclusively belongs to any of $S_{seed}^c$, $S_{seed}^b$, or $S_{seed}^{ne}$.
+\item The {\em region} is used by the executor to schedule tiles in a given order. This field is set right after the partitioning of $L_{seed}$, as a tile (by construction) exclusively belongs to $S_{seed}^c$, $S_{seed}^b$, or $S_{seed}^{ne}$.
 \item The {\em iterations lists} contain the iterations in $\mathbb{L}$ that $T_i$ will have to execute. There is one {\em iterations list} $[T_i]_j$ for each $L_j \in \mathbb{L}$. At this stage of the inspection we have $[T_i]_{seed} = [T_i]_0 = P_i$, whereas still $[T_i]_j = \emptyset$ for $j=1,...,n$.
 \item {\em Local maps} may be used for performance optimization by the executor in place of the global maps provided through the loop chain; this will be discussed in more detail in Section~\ref{sec:tiling:seigen}.
-\item The {\em color} gives a tile a scheduling priority. If shared-memory parallelism is requested, adjacent tiles are given different colors (the adjacency relation is determined through the maps available in $\mathbb{L}$). Otherwise, colors are assigned to tiles in increasing order (i.e., $T_i$ is given color $i$). The boundary tiles are always given colors higher than that of core tiles; the non-exec tile has the highest color. The assignment of colors is carried by the function {\tt color} in Listing~\ref{algo:st-inspector}.
+\item The {\em color} gives a tile a scheduling priority. If shared-memory parallelism is requested, adjacent tiles are given different colors (the adjacency relation is determined through the maps available in $\mathbb{L}$). Otherwise, colors are assigned in increasing order (i.e., $T_i$ is given color $i$). The boundary tiles are always given colors higher than that of core tiles; the non-exec tile has the highest color. The assignment of colors is carried by the function {\tt color} in Listing~\ref{algo:st-inspector}.
 \end{itemize}
 
 
 
 \paragraph{Populating tiles by tracking data dependencies}
-To schedule a loop to tiles we use projections. A projection is a function $\phi_S : S \rightarrow \mathbb{T}$. Initially, the projections set $\Phi$ is empty. Each time a loop is tiled, $\Phi$ may be added some new projections or old projections may be updated. $\Phi$, and consequently the tiling functions for all loops in $\mathbb{L}$, are derived incrementally (within the loop at line~\ref{algo:st-tiling-loop} in Listing~\ref{algo:st-inspector}) starting from $\sigma_{seed} : S_{seed} \rightarrow \mathbb{T}$, the tiling function of $L_{seed}$. $\sigma_{seed}$ obviously follows from the seed loop partitioning. In the following, we discuss in more detail how projections and tiling functions are constructed. 
+To schedule a loop to tiles we use projections. A projection is a function $\phi_S : S \rightarrow \mathbb{T}$. Initially, the projections set $\Phi$ is empty. Each time a loop is tiled, $\Phi$ may be added some new projections or old projections may be updated. $\Phi$, and consequently the tiling functions for all loops in $\mathbb{L}$, are derived incrementally (within the loop at line~\ref{algo:st-tiling-loop} in Listing~\ref{algo:st-inspector}) starting from $\sigma_{seed} : S_{seed} \rightarrow \mathbb{T}$, the tiling function of $L_{seed}$. In the following, we discuss in detail how projections and tiling functions are constructed. 
 
 
 \paragraph{Deriving a projection from a tiling function}
@@ -607,7 +608,7 @@ To schedule a loop to tiles we use projections. A projection is a function $\phi
 
 Algorithm~\ref{algo:st-projection} takes as input (the descriptors of) $L_{j}$ and its tiling function $\sigma_{j} :S_j \rightarrow \mathbb{T}$ to update $\Phi$. The algorithm also updates the conflicts matrix $C \in \mathbb{N}^{m \times m}$, which indicates whether two tiles having the same color will become adjacent once $L_{j+1}$ is tiled. 
 
-A projection tells what tile a set element logically belongs to at a given point of the inspection. A new projection $\phi_{S}$ is needed if the elements of $S$ are written by a loop. Let us consider the non-trivial case in which writes or increments occur indirectly through a map $M : S_j \rightarrow S_t^0 \times S_t^1 \times ... \times S_t^{a-1}$. To compute $\phi_{S_{t}}$, we first determine the inverse map (an example is shown in Figure~\ref{fig:st-inverse-map}). Then, we iterate over all elements of $S_t$ and, given $e \in S_t$, we determine the last tile that writes to $e$, say $T_{last}$, through the application of the $\operatorname{MAX}$ function over the color of the tiles accessing $e$. We finally simply set $\phi_{S_{t}}[e] = T_{last}$. 
+A projection tells what tile a set element logically belongs to at a given point of the inspection. A new projection $\phi_{S}$ is needed if the elements of $S$ are written by a loop. Let us consider the non-trivial case in which writes or increments occur indirectly through a map $M : S_j \rightarrow S_t^0 \times S_t^1 \times ... \times S_t^{a-1}$. To compute $\phi_{S_{t}}$, we first determine the inverse map (an example is shown in Figure~\ref{fig:st-inverse-map}). Then, we iterate over all elements of $S_t$ and, for each $e \in S_t$, we determine the last tile that writes to $e$, say $T_{last}$. This is accomplished by applying the $\operatorname{MAX}$ function over the color of the tiles accessing $e$. We finally simply set $\phi_{S_{t}}[e] = T_{last}$. 
 
 
 \begin{figure}[h]
@@ -672,24 +673,31 @@ If $C$ indicates the presence of at least one conflict, say between $T_{i_1}$ an
 \subsection{The Generalized Sparse Tiling Executor}
 
 \begin{algorithm}[htpb]
+\SetKwData{Color}{color}
+\SetKwData{T}{T}
+\SetKwFunction{SMC}{start$\_$MPI$\_$comm}
+\SetKwFunction{EMC}{end$\_$MPI$\_$comm}
+\SetKwFunction{GTBR}{group$\_$tiles$\_$by$\_$region}
+\SetKwFunction{ET}{execute$\_$tile}
+
 \kwInput{A set of tiles $\mathbb{T}$}
-\KwResult{Execute the loop chain, thus modifying the data sets written or incremented within $\mathbb{L}$}
+\KwResult{Execute the loop chain}
 \nonl ~\\
-$\mathbb{T}^{c}$, $\mathbb{T}^{b}$ $\gets$ group$\_$tiles$\_$byregion($\mathbb{T}$)\;
+$\mathbb{T}^{c}$, $\mathbb{T}^{b}$ $\gets$ \GTBR{$\mathbb{T}$}\;
 \nonl ~\\
-start$\_$MPI$\_$communications()\;
+\SMC{}\;
 \nonl ~\\
-\ForEach{available color $c$}{
-  \ForEach{$T \in \mathbb{T}^{c}$ s.t. $T$.color $== c$}{ \label{algo:st-executor:parallel1}
-    execute$\_$tile($T$)\;
+\ForEach{\Color}{
+  \ForEach{$\T \in \mathbb{T}^{c}$ s.t. \T .\Color $==$ \Color}{ \label{algo:st-executor:parallel1}
+    \ET{\T}\;
   }
 }
 \nonl ~\\
-end$\_$MPI$\_$communications()\;
+\EMC{}\;
 \nonl ~\\
-\ForEach{available color $c$}{
-  \ForEach{$T \in \mathbb{T}^{b}$ s.t. $T$.color $== c$}{ \label{algo:st-executor:parallel2}
-    execute$\_$tile($T$)\;
+\ForEach{\Color}{
+  \ForEach{$T \in \mathbb{T}^{b}$ s.t. \T .\Color $==$ \Color}{ \label{algo:st-executor:parallel2}
+    \ET{\T}\;
   }
 }
 \caption{The executor algorithm}
@@ -697,7 +705,7 @@ end$\_$MPI$\_$communications()\;
 \end{algorithm}
 
 
-The sparse tiling executor is illustrated in Algorithm~\ref{algo:st-executor}. It consists of four main phases: (i) triggering the MPI communications, (ii) execution of core tiles (in overlap with communication), (iii) waiting for the termination of all MPI communications, (iv) execution of boundary tiles.
+The sparse tiling executor is illustrated in Algorithm~\ref{algo:st-executor}. It consists of four main phases: (i) boundary exchange between processes through non-blocking MPI communications, (ii) execution of core tiles (in overlap with communication), (iii) waiting for the termination of all MPI communications, (iv) execution of boundary tiles.
 
 As seen in the example in Section~\ref{sec:tiling:examples} and based on the explanation in Section~\ref{sec:tiling:inspector}, we know that the core tiles do not require any off-process information to execute as long as the boundary regions are (i) up-to-date and (ii) ``sufficiently deep''. If both conditions hold, the execution is semantically correct and it is safe to overlap computation of core tiles with the communication of boundary data. 
 
@@ -750,11 +758,11 @@ The implementation of generalized sparse tiling is distributed over three softwa
 \end{description}
 The interaction among these modules is illustrated in Figure~\ref{fig:st-implementation}.
 
-There are several reasons behind the choice of this three-layer structuring:
+The reasons behind the choice of this three-layer structuring are:
 \begin{description}
-\item[Simpler analysis] The abstractions used in Firedrake and PyOP2 simplify the analysis required for automation. For example, from the parallel loop construct in PyOP2 we can derive sufficient information to build a loop chain (see Section~\ref{sec:tiling:lc-unstruct}).
-\item[User base] We wish generalized sparse tiling to be used in real scientific software, so we targeted a system with a user base in steady expansion. This increased the implementation effort, but it has also made sparse tiling promptly available to a wide audience.
-\item[Flexibility] Adopting sparse tiling in a Firedrake program is the simplest option, because the generation of inspector/executor schemes is fully automated. If we instead have a PyOP2 program, the generation of inspector/executor schemes is only partly automated, since the separation of a set into the core, boundary and non-exec regions for distributed-memory parallelism must be coded explicitly. Users can also write an inspector-executor scheme from scratch, in which case the entire loop chain must be provided through direct calls to the SLOPE library (an example was provided in Listing~\ref{code:tiling-inspector}). This is clearly the most flexible yet complicated option. 
+\item[Simplicity of analysis] The abstractions used in Firedrake and PyOP2 simplify the analysis on the input programs required for automation. For example, from the parallel loop construct in PyOP2 (reviewed in Section~\ref{sec:bkg:op2}) we can derive useful information to build a loop chain.
+\item[Flexibility] As shown in the next sections, it is very simple to use sparse tiling in a Firedrake program. It is sufficient to declare which regions of code should be transformed, and inspector/executor schemes will be derived automatically at the level of the run-time support. In the case of a PyOP2 program, the generation of inspector/executor schemes is only partly automated: the separation of a set into the core, boundary and non-exec regions for distributed-memory parallelism is now user's responsibility. An inspector-executor scheme can also be written from scratch, for instance in a plain C program. In this case, the loop chain must be provided explicitly through direct calls to the SLOPE library. 
+\item[User base] We want generalized sparse tiling to be usable in real software. We therefore chose a framework, Firedrake, with a user base in rapid expansion. This, obviously, increased the implementation effort.
 \end{description}
 
 
@@ -763,16 +771,16 @@ There are several reasons behind the choice of this three-layer structuring:
 
 In the next sections, we describe the interplay between these three frameworks and how this leads to automation.
 
-\subsection{SLOPE: a Library for Tiling Irregular Computations}
+\subsection{SLOPE: a Library for Sparse Tiling Irregular Computations}
 \label{sec:tiling:impl-slope}
-SLOPE is an open source software that provides a set of functions to build a loop chain and to write inspector/executor schemes for sparse tiling\footnote{SLOPE is freely available at \url{https://github.com/coneoproject/SLOPE}}. 
+SLOPE is an open source software that provides an interface to build loop chains and to express inspector/executor schemes for sparse tiling\footnote{SLOPE is available at \url{https://github.com/coneoproject/SLOPE}}. 
 
-The loop chain abstraction implemented by SLOPE is the one described in Section~\ref{sec:tiling:lc-unstruct}. In essence, a loop chain comprises some sets (including the separation into core, boundary, and non-exec regions), maps between sets, and a sequence of loops. Each loop has one or more descriptors specifying what and how dataset are accessed. The example in Listing~\ref{code:tiling-inspection} illustrates the interface exposed by SLOPE for constructing loop chains. 
+The loop chain abstraction implemented by SLOPE is the one described in Section~\ref{sec:tiling:lc-unstruct}. In essence, a loop chain comprises some sets (including the separation into core, boundary, and non-exec regions), maps between sets, and a sequence of loops. Each loop has one or more descriptors specifying what and how different sets are accessed. The example in Listing~\ref{code:tiling-inspector} illustrates the interface exposed by SLOPE. 
 
-SLOPE implements all of the algorithms in Section~\ref{sec:tiling:inspector}. It also provides features to verify the effectiveness and the correctness of the transformations:
+SLOPE implements the algorithms in Section~\ref{sec:tiling:inspector}. Further, it provides additional features to estimate the effectiveness and to verify the correctness of sparse tiling:
 \begin{description}
-\item[VTK file generator] For each tiled loop, a file showing the mesh and the repartition into colored tiles is generated. The file is suitable for visualization in Paraview~\cite{paraview}.
-\item[The summary routine] The inspector returns useful information concerning the tiling process, including: the number and the average size of tiles, the total number of colors used (which can give an indication of how effective a shared-memory parallelization will be), times for the most critical inspection phases. 
+\item[VTK file generator] For each tiled loop, a file showing the mesh and the repartition into colored tiles is generated. The file is suitable for visualization in Paraview~\citep{paraview}.
+\item[Inspection summary] The inspector returns useful information concerning the tiling process, including: the number and the average size of tiles, the total number of colors used (which can give an indication of how effective a shared-memory parallelization will be), times for the most critical inspection phases. 
 \end{description}
 
 In the case of shared-memory parallelism, the following sections of code are parallelized through OpenMP:
@@ -782,29 +790,39 @@ In the case of shared-memory parallelism, the following sections of code are par
 \end{itemize}
 
 
-\subsection{PyOP2: a Runtime Library for Mesh Iteration based on Lazy Evaluation}
-PyOP2 has been described in Section~\ref{sec:bkg:op2}. This section focuses on three complementary aspects: (i) the interface with the user for identifying sequences of ``chainable'' loops; (ii) the lazy evaluation mechanism that allows building loop chains; (iii) the interface with SLOPE to run an inspector/executor scheme.
+\subsection{PyOP2: Lazy Evaluation and Interfaces}
+PyOP2 has been described in Section~\ref{sec:bkg:op2}. This section focuses on three complementary aspects: (i) the interface offered for identifying loop chains; (ii) the lazy evaluation mechanism that allows building loop chains; (iii) the interface with SLOPE to execute inspector/executor schemes.
 
-To trigger the creation of a loop chain, PyOP2 provides the {\em loop$\_$chain} construct. The use of this interface is exemplified in Listing~\ref{code:loop-chain-interface}. The {\em loop$\_$chain} interface is exposed to both users and higher layers of abstraction. Thus, in Firedrake we define a loop chain in a way analogous to PyOP2's, with the only difference being that loops are not visible in the source code because they are automatically generated from the mathematical notation.
+To apply sparse tiling to a sequence of loops, PyOP2 provides the {\em loop$\_$chain} interface, exemplified in Listing~\ref{code:loop-chain-interface}. This interface is exposed to both users and Firedrake. In a Firedrake program, parallel loops may actually not appear at all in the source code because they will automatically be generated from the mathematical specification.
 
-The second fundamental aspect is that PyOP2 implements lazy evaluation of parallel loops. The parallel loops encountered or generated by Firedrake are first pushed into a queue. The sequence of parallel loops in the queue is called {\em trace}. If a field $f$ needs be read, for example because a user wants to inspect its values or a global linear algebra operation is about to be performed, the trace is traversed -- from the most recent parallel loop to the oldest one -- and a new sub-trace produced. The sub-trace, which includes all parallel loops that need be executed for a correct update of $f$, is finally executed. 
+\begin{algorithm}[htpb]
+\scriptsize\ttfamily
+\SetAlgorithmName{LISTING}{}
+\KwSty{with} {\em loop$\_$chain} (name, tile$\_$size, split$\_$mode, ...):\\
+~~~~Any Python code here, including UFL of PyOP2 loops\\
+\caption{Illustration of the {\em loop$\_$chain} interface in PyOP2. Apart from the {\tt name} and the {\tt tile$\_$size}, all other parameters are optional, and only useful for performance evaluation (e.g., logging) and tuning. Among the options for performance tuning, there is {\tt split$\_$mode}: this allows the user to specify how an excessively long loop chain should be split into smaller loop chains, for instance imposing a maximum number of loops.}
+\label{code:loop-chain-interface}
+\end{algorithm}
 
-All loops in the trace that are created within a {\em loop$\_$chain} scope are sparse tiled through SLOPE. In detail, the interaction between PyOP2 and SLOPE is as follows:
+PyOP2 exploits lazy evaluation of parallel loops to generate an inspector/executor scheme. The parallel loops encountered during interpretation of the input program -- or, analogously, those generated through Firedrake -- are not executed immediately; rather, they are first pushed into a queue. The sequence of parallel loops in the queue is called {\em trace}. If a dataset $f$ needs be read, for example because a user wants to inspect its values or a global linear algebra operation needs be performed, the trace is traversed -- from the most recent parallel loop to the oldest one -- and a new sub-trace produced. The sub-trace includes all parallel loops that must be executed for computing $f$. At this point, the sub-trace can be executed or further pre-processed.
+
+The rule that we employ is that all loops in a trace that were created within a {\em loop$\_$chain} scope are candidates for sparse tiling. In detail, the interaction between PyOP2 and SLOPE is as follows:
 \begin{enumerate}
-\item As seen in the examples in Listing~\ref{code:loop-chain-interface}, the {\em loop$\_$chain} defines a new scope. As this scope is entered, a stamp $s_1$ of the loop chain is generated. This happens ``behind the scenes'', because the {\em loop$\_$chain} is a Python context manager, which executes pre-specified routines prior and after the execution of the body. As the {\em loop$\_$chain} is exited, a new stamp $s_2$ of the trace is computed, and all parallel loops generated between $s_1$ and $s_2$ are placed into a list for pre-processing.
-\item The pre-processing consists of two main steps: ``simple'' fusion of all consecutive parallel loops iterating over the same iteration space that do not present read-after-write or write-after-read dependencies through indirections/maps; generation of a loop chain suitable for SLOPE.
-\item SLOPE provides a thin Python interface to ease integration with other frameworks. PyOP2 inspects the sequence of loops and translates all relevant data structures (sets, maps, loops) into a format suitable for SLOPE. Eventually, a string of C code implementing an inspector for the loops in the {\em loop$\_$chain} is returned. PyOP2 just-in-time compiles this code and runs it, obtaining the {\em inspection} data structure.
-\item A ``software cache'' mapping {\em loop$\_$chain}s to {\em inspection} data structures is used. This whole process is therefore executed only once for each unique {\em loop$\_$chain} encountered in the code. 
-\item The executor is built analogously, and invoked each time a {\em loop$\_$chain} is exited.
+\item The examples in Listing~\ref{code:loop-chain-interface} shows that a {\em loop$\_$chain} defines a new scope. As this scope is entered, a stamp $s_1$ of the trace is generated. This happens ``behind the scenes'', because the {\em loop$\_$chain} is a Python context manager, which can execute pre-specified routines prior and after the execution of the body. As the {\em loop$\_$chain}'s scope is exited, a new stamp $s_2$ of the trace is computed. All parallel loops generated between $s_1$ and $s_2$ are placed into a list for pre-processing.
+\item The pre-processing consists of two main steps: (i) ``simple'' fusion -- all consecutive parallel loops iterating over the same iteration space that do not present data dependencies through indirections are merged into a single loop; (ii) generation of a loop chain suitable for SLOPE.
+\item SLOPE provides a thin Python interface to ease integration with other frameworks. PyOP2 inspects the sequence of loops and translates all relevant data structures (sets, maps, loops) into a format suitable for SLOPE. C code implementing an inspector for the loops in the {\em loop$\_$chain} is returned by SLOPE. PyOP2 compiles this code and executes it; this produces an {\em inspection} for the loop chain.
+\item A ``software cache'' mapping {\em loop$\_$chain}s to {\em inspection}s is used. This whole process is therefore executed only once for each unique {\em loop$\_$chain} encountered in the code. 
+\item The executor is built in an analogous way to the inspector. It is executed, taking as input an {\em inspection}, each time a {\em loop$\_$chain} is exited .
 \end{enumerate}
+
 
 \subsection{Firedrake/DMPlex: the S-depth mechanism for MPI}
 \label{sec:tiling:impl-firedrake}
-Firedrake uses DMPlex~\citep{dmplex-cite} to handle meshes. In particular, DMPlex is responsible for partitioning, distributing over multiple processes, and locally reordering a mesh. The MPI parallelization, therefore, is completely handled in Firedrake.
+Firedrake uses DMPlex~\citep{dmplex-cite} to handle meshes. In particular, DMPlex is responsible for partitioning, distributing over multiple processes, and locally reordering a mesh. The MPI parallelization, therefore, is managed through Firedrake/DMPlex.
 
-During the start-up phase, each MPI process receives a contiguous partition of the original mesh from DMPlex. It then creates various PyOP2 sets, representing either mesh components (e.g., cells, vertices) or function spaces. As seen in Section~\ref{sec:bkg:op2}, PyOP2 sets distinguish between different regions: core, owned, exec, and non-exec. Firedrake is directly responsible for setting these regions and creating data structures enabling message passing among different processes.
+During the start-up phase, each MPI process receives a contiguous partition of the original mesh from DMPlex. An MPI process creates the required PyOP2 sets, which represent either topological components (e.g., cells, vertices) or function spaces. As seen in Section~\ref{sec:bkg:op2}, PyOP2 sets distinguish between different regions: core, owned, exec, and non-exec. Firedrake sets these regions based on the information provided by DMPlex, and creates the data structures that will enable communication.
 
-To support our loop chain abstraction, Firedrake must be able to allocate arbitrarily deep halo regions; both Firedrake and DMPlex have been extended with this feature\footnote{Michael Lange carried out the bulk of the implementation.}. A parameter called {\em S-depth} (for historical reasons, see~\cite{s-depth-paper}), used for initializing a mesh, specifies the extent of the halo regions. A value of {\em S-depth} equal to $n$ indicates the presence of $n$ strips of off-process data elements in each set. The default value for {\em S-depth} is $1$, which corresponds to the standard execution model of Firedrake/PyOP2. Even in absence of sparse tiling, this value enables overlap of computation with communication, at the price of a small amount of redundant computation along partition boundaries.
+To support our loop chain abstraction, Firedrake must be able to allocate arbitrarily deep halo regions. Both Firedrake and DMPlex have been extended with this feature\footnote{The implementation received invaluable contributions from Dr. Michael Lange.}. A parameter called {\em S-depth} (the name derives from~\cite{s-depth-paper}), used for initializing a mesh, specifies the extent of the halo regions. A value of {\em S-depth} equal to $n$ indicates the presence of $n$ strips of off-process data elements in each set. The default value for {\em S-depth} is $1$, which corresponds to the standard execution model of Firedrake/PyOP2. In absence of sparse tiling, this value enables overlap of computation with communication when executing a loop, at the price of a small amount of redundant computation along partition boundaries.
 
 
 \section{Performance Evaluation}
