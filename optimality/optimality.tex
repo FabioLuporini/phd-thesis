@@ -219,7 +219,11 @@ Finally, we observe that the $\sigma_{ei}$ sub-expressions can sometimes be cons
 
 \subsection{The dichotomy between Sharing Elimination and Common Sub-expressions Elimination}
 %TODO CSE
-%A typical optimization to reduce the arithmetic complexity of a code is common sub-expression elimination (CSE). This often revolves around searching, possibly across different statements, and replacing with temporaries, sub-expressions that are (i) symbolically identical and (ii) reduce to the same value.  We observe that ``classic CSE'' (CCSE) can straightforwardly be applied without the need for data dependence analysis, since the body of a finite element integration loop nest is an independent basic block. More interestingly, we observe that in the ``special case'' (SCSE) in which test and trial functions are in the same function space, there may exist $w_1$ and $w_2$ such that $\alpha_{eij}^{w1} = \beta_{eik}^{w2}$, in which case common sub-expressions will arise along different loops ($L_j$ and $L_k$). General-purpose compilers cannot detect this (very domain-specific) property. Our algorithm for sharing elimination will exploit this extra information. Although both CSE and factorization target spatial sharing, the latter may actually increase the operation count if preliminary transformations (e.g., expansion) are required. In such a case, CCSE will be preferred.
+Common sub-expressions elimination (CSE) is a transformation that aims to reduce the operation count in a code region. It consists of searching identical sub-expressions that reduce to the same value and replacing them with suitable temporary variables. 
+
+The normal form of the expressions guarantees ...
+Since expressions are in normal form,  and are located within independent basic blocks. These two properties maximize the applicability of CSE: 
+
 %TODO MCS = minimal common sub-expression
 
 %\textit{Note: the last check ensures the flop-decreasing nature of the transformation. In the cases in which expansion outweighs code motion, Strategy~\ref{strategy:i} is preferred.}\\
@@ -448,7 +452,7 @@ Let $c_\Lambda$ denote the operation count for $\Lambda$ and let $\Lambda_I \sub
 \item \textit{pre-evaluating any $m \in Y$ would result in $c_{\Lambda''_I} > c_{\Lambda'_I}$}
 \item \textit{not pre-evaluating any $m \in X$ would result in $c_{\Lambda''_I} > c_{\Lambda'_I}$}
 \end{enumerate}
-\item \textit{Sharing elimination leads to a (at least) local optimum.}\\
+\item \textit{Sharing elimination leads to (at least) a local optimum.}\\
 \end{enumerate}
 
 We discuss these points separately
