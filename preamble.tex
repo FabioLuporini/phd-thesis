@@ -159,7 +159,7 @@
 
 
 \usepackage{color}
-\usepackage{enumerate}
+\usepackage{enumitem}
 
 \usepackage{listings}
 \lstset{
@@ -183,13 +183,28 @@
 \let\endproof\relax
 \usepackage{amsthm}
 
+\newtheoremstyle{rest} % name
+    {\topsep}                    % Space above
+    {\topsep}                    % Space below
+    {}                   % Body font
+    {}                           % Indent amount
+    {\scshape}                   % Theorem head font
+    {.}                          % Punctuation after theorem head
+    {.5em}                       % Space after theorem head
+    {}  % Theorem head spec (can be left empty, meaning ‘normal’)
 
 % Theorems, definitions, lemmas, etc
-\newtheorem{Def}{Definition}
-\newtheorem{Prop}{Proposition}
 \newtheorem{Algo}{Algorithm}
+
+\theoremstyle{rest}
 \newtheorem{Const}{Constraint}
 \newtheorem{Strategy}{Strategy}
+
+\theoremstyle{definition}
+\newtheorem{Def}{Definition}
+
+\theoremstyle{proposition}
+\newtheorem{Prop}{Proposition}
 
 
 \DeclareMathOperator*{\argmin}{arg\,min}

@@ -6,13 +6,13 @@
 \chapter{Minimizing Operations in Finite Element Integration Loops}
 \label{ch:optimality}
 
-In this chapter, we present an algorithm for the optimization of a class of finite element integration loop nests. This algorithm, which exploits fundamental mathematical properties of finite element operators, is proven to achieve a locally optimal operation count. In specified circumstances the optimum achieved is global. Extensive numerical experiments demonstrate significant performance improvements over the state of the art in finite element code generation in almost all cases. This validates the effectiveness of the algorithm presented here, and illustrates its limitations. The algorithm, as explained in later sections, is implemented in Firedrake, the framework for the automated resolution of PDEs via the finite element method reviewed in Section~\ref{sec:bkg:fenics-and-firedrake}.
+In this chapter, we present an algorithm for the optimization of a class of finite element integration loop nests. This algorithm, which exploits fundamental mathematical properties of finite element operators, is proven to achieve a locally optimal operation count. In specified circumstances the optimum achieved is global. Extensive numerical experiments demonstrate significant performance improvements over the state of the art in finite element code generation in almost all cases. This validates the effectiveness of the algorithm presented here, and illustrates its limitations. The algorithm, as documented in later sections, is implemented in Firedrake.
 
 \section{Motivation and Related Work}
 
-The need for rapid implementation of high performance, robust, and portable finite element methods has led to approaches based on automated code generation. This has been proven successful in the context of the FEniCS  and Firedrake projects. In these frameworks, the weak variational form of a problem is expressed in a high level mathematical syntax by means of the domain-specific language UFL \cite{UFL}. This mathematical specification is used by a domain-specific compiler, known as a form compiler, to generate low-level C or C++ code for the integration over a single element of the computational mesh of the variational problem's left and right hand side operators. The code for assembly operators must be carefully optimized: as the complexity of a variational form increases, in terms of number of derivatives, pre-multiplying functions, or polynomial order of the chosen function spaces, the operation count increases, with the result that assembly often accounts for a significant fraction of the overall runtime. This aspect has previously been introduced in Section~\ref{sec:bkg:math-to-code}.
+The need for rapid implementation of high performance, robust, and portable finite element methods has led to approaches based on automated code generation. This has been proven successful in the context of the FEniCS  and Firedrake projects. We recall from Section~\ref{sec:bkg:fenics-and-firedrake} that, in these frameworks, the weak variational form of a problem is expressed in a high level mathematical syntax by means of the domain-specific language UFL. This mathematical specification is used by a domain-specific compiler, known as a form compiler, to generate low-level C or C++ code for the integration over a single element of the computational mesh of the variational problem's left and right hand side operators. The code for assembly operators must be carefully optimized: as the complexity of a variational form increases, in terms of number of derivatives, pre-multiplying functions, or polynomial order of the chosen function spaces, the operation count increases, with the result that assembly often accounts for a significant fraction of the overall runtime. This aspect has previously been introduced in Section~\ref{sec:bkg:math-to-code}.
 
-As demonstrated by the substantial body of research on the topic, automating the generation of such high performance implementations poses several challenges. This is a result of the complexity inherent in the mathematical expressions involved in the numerical integration, which varies from problem to problem, and the particular structure of the loop nests enclosing the integrals. General-purpose compilers, such as those by \emph{GNU} and \emph{Intel}, fail to exploit the structure inherent in the expressions, thus producing sub-optimal code (i.e., code which performs more floating-point operations, or ``flops'', than necessary; we show this in Section~\ref{sec:perf-results}). Research compilers, for instance those based on polyhedral analysis of loop nests, such as PLUTO \citep{pluto}, focus on parallelization and optimization for cache locality, treating issues orthogonal to the question of minimising flops. The lack of suitable third-party tools has led to the development of a number of domain-specific code transformation (or synthesizer) systems. \cite{quadrature1} show how automated code generation can be leveraged to introduce optimizations that a user should not be expected to write ``by hand''. \cite{FFC-TC} and~\cite{Francis} employ mathematical reformulations of finite element integration with the aim of minimizing the operation count. In~\cite{Luporini} -- as well as in Chapter~\ref{ch:lowlevelopt}, from which the article has been derived -- the effects and the interplay of generalized code motion and a set of low level optimizations are analysed. It is also worth mentioning two new new form compilers, UFLACS \cite{Uflacs} and TSFC \cite{TSFC}, which particularly target the compilation time challenges of the more complex variational forms. The performance evaluation in Section~\ref{sec:perf-results} includes most of these systems.
+As demonstrated by the substantial body of research on the topic, automating the generation of such high performance implementations poses several challenges. This is a result of the complexity inherent in the mathematical expressions involved in the numerical integration, which varies from problem to problem, and the particular structure of the loop nests enclosing the integrals. General-purpose compilers, such as those by \emph{GNU} and \emph{Intel}, fail to exploit the structure inherent in the expressions, thus producing sub-optimal code (i.e., code which performs more floating-point operations, or ``flops'', than necessary; we show this in Section~\ref{sec:perf-results}). Research compilers, for instance those based on polyhedral analysis of loop nests, such as PLUTO \citep{pluto}, focus on parallelization and optimization for cache locality, treating issues orthogonal to the question of minimising flops. The lack of suitable third-party tools has led to the development of a number of domain-specific code transformation (or synthesizer) systems. \cite{quadrature-olegaard} show how automated code generation can be leveraged to introduce optimizations that a user should not be expected to write ``by hand''. \cite{FFC-TC} and~\cite{Francis} employ mathematical reformulations of finite element integration with the aim of minimizing the operation count. In~\cite{Luporini-coffee} (and in Chapter~\ref{ch:lowlevelopt}, from which the article is extracted), the effects and the interplay of generalized code motion and a set of low level optimizations are analysed. It is also worth mentioning two new form compilers, UFLACS \citep{Uflacs} and TSFC \citep{TSFC}, which particularly target the compilation time challenges of the more complex variational forms. The performance evaluation in Section~\ref{sec:perf-results} includes most of these systems.
 
 However, in spite of such a considerable research effort, there is still no answer to one fundamental question: can we automatically generate an implementation of a form which is optimal in the number of flops executed? In this chapter, we formulate an approach that solves this problem for a particular class of forms and provides very good approximations in all other cases. In particular, we will define ``local optimality'', which relates operation count with inner loops. In summary, our contributions are as follows:
 
@@ -35,13 +35,10 @@ In Section~\ref{sec:lnopt} we introduce a set of definitions mapping mathematica
 
 %TODO : need somehow to put the definition of a monomial
 
-\section{Transformation Space}
-\label{sec:optimal-impl}
-In this section, we characterize global and local optimality for finite element integration as well as the space of legal transformations that needs be explored to achieve them. The method by which exploration is performed is discussed in Section~\ref{sec:optimal-synthesis}. 
 
-\subsection{Loop nests, expressions and optimality}
+\section{Loop Nests, Expressions and Optimality}
 \label{sec:lnopt}
-In order to make the article self-contained, we start with reviewing basic compiler terminology.
+In this section, we characterize global and local optimality for finite element integration. In order to make the article self-contained, we start with reviewing basic compiler terminology.
 
 \begin{Def}[Perfect and imperfect loop nests]
 A perfect loop nest is a loop whose body either 1) comprises only a sequence
@@ -79,7 +76,14 @@ A multilinear loop nest of arity $n$ is a perfect nest composed of $n$ loops, in
 
 We will show that multilinear loop nests, which arise naturally when translating bilinear or linear forms into code, are important because they have a structure that we can take advantage of to reach a local optimum.
 
-We define two other classes of loops. 
+\begin{Def}[Linear symbol]
+\label{def:linear-symbol}
+A symbol depends on a linear loop $L_i$ if its value varies in the iteration space of $L_i$ (e.g., an array $a[i]$). Such a symbol takes the name of {\em linear symbol}.
+\end{Def}
+
+Examples of linear symbols are test functions, trial functions, first order derivatives of test functions, and so on.
+
+We now define two different classes of loops. 
 
 \begin{Def}[Reduction loop]
 \label{def:i-loop}
@@ -99,7 +103,7 @@ A loop $L_i$ is said to be an order-free loop if its iterations can be executed 
 \lstinputlisting[basicstyle=\footnotesize\ttfamily]{optimality/listings/loopnest.code}
 \end{CenteredBox}\caption{The loop nest implementing a generic bilinear form.}\label{code:loopnest}\end{figure}
 
-Consider Equation~\ref{eq:quadrature} and the (abstract) loop nest implementing it illustrated in Figure~\ref{code:loopnest}. The imperfect nest $\Lambda=[L_e, L_i, L_j, L_k]$ comprises an order-free loop $L_e$ (over elements in the mesh), a reduction loop $L_i$ (performing numerical integration), and a multilinear loop nest $[L_j, L_k]$ (over test and trial functions). In the body of $L_k$, one or more statements evaluate the local tensor for the element $e$. Expressions (the right hand side of a statement) result from the translation of a form in high level matrix notation into code. In particular, $m$ is the number of monomials (a form is a sum of monomials), $\alpha_{eij}$ ($\beta_{eik}$) represents the product of a coefficient function (e.g., the inverse Jacobian matrix for the change of coordinates) with test  or trial functions, and $\sigma_{ei}$ is a function of coefficients and geometry. We do not pose any restrictions on function spaces (e.g., scalar- or vector-valued), coefficient expressions (linear or non-linear), differential and vector operators, so $\sigma_{ei}$ can be arbitrarily complex. We say that such an expression is in \textit{normal form}, because the algebraic structure of a variational form is intact: products have not yet been expanded, distinct monomials can still be identified, and so on. This brings us to formalize the class of loop nests that we aim to optimize.
+Consider Equation~\ref{eq:quadrature} and the (abstract) loop nest implementing it illustrated in Figure~\ref{code:loopnest}. The imperfect nest $\Lambda=[L_e, L_i, L_j, L_k]$ comprises an order-free loop $L_e$ (over elements in the mesh), a reduction loop $L_i$ (performing numerical integration), and a multilinear loop nest $[L_j, L_k]$ (over test and trial functions). In the body of $L_k$, one or more statements evaluate the local tensor for the element $e$. Expressions (the right hand side of a statement) result from the translation of a form in high level matrix notation into code. In particular, $m$ is the number of monomials (a form is a sum of monomials), $\alpha_{eij}$ and $\beta_{eik}$ represents the product of a coefficient function (e.g., the inverse Jacobian matrix for the change of coordinates) with some linear symbols, and $\sigma_{ei}$ is a function of coefficients and geometry. We do not pose any restrictions on function spaces (e.g., scalar- or vector-valued), coefficient expressions (linear or non-linear), differential and vector operators, so $\sigma_{ei}$ can be arbitrarily complex. We say that such an expression is in \textit{normal form}, because the algebraic structure of a variational form is intact: products have not yet been expanded, distinct monomials can still be identified, and so on. This brings us to formalize the class of loop nests that we aim to optimize.
 
 
 \begin{Def}[Finite element integration loop nest]
@@ -136,22 +140,23 @@ We also observe that Definitions~\ref{def:mln-optimality} and~\ref{def:mln-quasi
 Achieving optimality in polynomial time is not generally feasible, since the $\sigma_{ei}$ sub-expressions can be arbitrarily unstructured. However, multilinearity results in a certain degree of regularity in $\alpha_{eij}$ and $\beta_{eik}$. In the following sections, we will elaborate on these observations and formulate an approach that achieves: (i) at least a local optimum in all cases; (ii) global optimality whenever the monomials are ``sufficiently structured''. To this purpose, we will construct:
 \begin{itemize}
 \item the space of legal transformations impacting the operation count (Sections~\ref{sec:sharing-elimination} -- \ref{sec:mem-const})
-\item an algorithm to select points in the transformation space (Section~\ref{sec:optimal-synthesis})
+\item an algorithm to explore and select points in the transformation space (Section~\ref{sec:optimal-synthesis})
 \end{itemize}
 
-\subsection{Sharing elimination}
+
+\section{Transformation Space: Sharing Elimination}
 \label{sec:sharing-elimination}
 We start with introducing the fundamental notion of sharing.
 
 \begin{Def}[Sharing]
 A statement within a loop nest $\Lambda$ presents sharing if at least one of the following conditions hold:
-\begin{description}
-\item[Spatial sharing] There are at least two symbolically identical sub-expressions
+\begin{description}[labelindent=0.5cm,font=\bfseries]
+\item[Spatial sharing] There are at least two identical sub-expressions, possibly just two symbols.
 \item[Temporal sharing] There is at least one non-trivial sub-expression (e.g., an addition or a product) that is redundantly executed because it is independent of $\lbrace L_{i_1}, L_{i_1}, ...L_{i_n} \rbrace \subset \Lambda$.
 \end{description}
 \end{Def}
 
-To illustrate the definition, we show in Figure~\ref{code:multi_loopnest} how sharing evolves as factorization and code motion are applied to a trivial multilinear loop nest. In the original loop nest (Figure~\ref{code:multi_loopnest_a}), spatial sharing is induced by the symbol $b_j$. Factorization eliminates spatial sharing and creates temporal sharing (Figure~\ref{code:multi_loopnest_b}). Finally, generalized code motion \cite{Luporini}, which hoists sub-expressions that are redundantly executed by at least one loop in the nest\footnote{Traditional loop-invariant code motion, which is commonly applied by general-purpose compilers, only checks invariance with respect to the innermost loop.}, leads to optimality (Figure~\ref{code:multi_loopnest_c}). 
+To illustrate the definition, we show in Figure~\ref{code:multi_loopnest} how sharing evolves as factorization and code motion are applied to a trivial multilinear loop nest. In the original loop nest (Figure~\ref{code:multi_loopnest_a}), spatial sharing is induced by the symbol $b_j$. Factorization eliminates spatial sharing and creates temporal sharing (Figure~\ref{code:multi_loopnest_b}). Finally, generalized code motion \citep{Luporini-coffee}, which hoists sub-expressions that are redundantly executed by at least one loop in the nest\footnote{Traditional loop-invariant code motion, which is commonly applied by general-purpose compilers, only checks invariance with respect to the innermost loop.}, leads to optimality (Figure~\ref{code:multi_loopnest_c}). 
 
 \begin{figure}[h]
 \begin{CenteredBox}
@@ -161,13 +166,13 @@ To illustrate the definition, we show in Figure~\ref{code:multi_loopnest} how sh
 \lstinputlisting[basicstyle=\scriptsize\ttfamily]{optimality/listings/multilinear_loopnest.code}
 \subcaption{With spatial sharing}\label{code:multi_loopnest_a}
 \end{subfigure}
-~~~
+~~
 \begin{subfigure}{0.35\textwidth}
 \captionsetup{skip=20pt}
 \lstinputlisting[basicstyle=\scriptsize\ttfamily]{optimality/listings/multilinear_loopnest_int.code}
 \subcaption{With temporal sharing}\label{code:multi_loopnest_b}
 \end{subfigure}
-~~~
+~~
 \begin{subfigure}{0.34\textwidth}
 \captionsetup{skip=1pt}
 \lstinputlisting[basicstyle=\scriptsize\ttfamily]{optimality/listings/multilinear_loopnest_opt.code}
@@ -184,7 +189,7 @@ In this section, we study \textit{sharing elimination}, a transformation that ai
 
 %Section~\ref{sec:se-rln} discusses structural and algebraic properties characterizing our expressions. Section~\ref{sec:se-algo} presents the sharing elimination algorithm. Examples are provided in Section~\ref{sec:se-examples}. We recall that we are assuming a generic finite element integration loop nest $\Lambda=[L_e, L_i, L_j, L_k]$ with expressions in normal form.
 
-\subsubsection{Identification and exploitation of structure}
+\subsection{Identification and Exploitation of Structure}
 \label{sec:se-rln}
 Finite element expressions can be seen as composition of operations between tensors. Often, the optimal implementation strategy for these operations is to be determined out of two alternatives. For instance, consider $J^{-T} \nabla v \cdot J^{-T} \nabla v$, with $J^{-T}$ being the transposed inverse Jacobian matrix for the change of (two-dimensional) coordinates, and $v$ a generic two-dimensional vector. The tensor operation will reduce to the scalar expression $(a v^0_i + b v^1_i) (a v^0_i + b v^1_i) + ...$, in which $v^0_i$ and $v^1_i$ represent components of $v$ that depend on $L_i$. To minimize the operation count for expressions of this kind, we have two options:
 \begin{Strategy}
@@ -211,17 +216,19 @@ If $\Lambda$ were an arbitrary loop nest, a given symbol $s_{\Lambda}$ could app
 
 Finally, we observe that the $\sigma_{ei}$ sub-expressions can sometimes be considered ``weakly structured''. This happens when a relaxed version of Definition~\ref{def:struct-expr} applies, in which the factorization of $s_{\Lambda}$ only ``minimizes'' (rather than ``eliminates'') spatial sharing (for instance, in the complex hyperelastic model analyzed in Section~\ref{sec:perf-results}). Weak structure will be exploited by Algorithm~\ref{algo:sharing-elimination} in the attempt to achieve optimality.
 
-%.the application of Strategy~\ref{strategy:i} or Strategy~\ref{strategy:ii} to all sub-expressions in which $s_{\Lambda}$ appears
-% the spatial sharing induced by $s_{\Lambda}$ -- a generic symbol depending on at least one loop in $\Lambda$ -- can be eliminated through factorization of all instances of $s_{\Lambda}$.
 
-\subsubsection{Algorithm}
+\subsection{The dichotomy between Sharing Elimination and Common Sub-expressions Elimination}
+%TODO CSE
+%A typical optimization to reduce the arithmetic complexity of a code is common sub-expression elimination (CSE). This often revolves around searching, possibly across different statements, and replacing with temporaries, sub-expressions that are (i) symbolically identical and (ii) reduce to the same value.  We observe that ``classic CSE'' (CCSE) can straightforwardly be applied without the need for data dependence analysis, since the body of a finite element integration loop nest is an independent basic block. More interestingly, we observe that in the ``special case'' (SCSE) in which test and trial functions are in the same function space, there may exist $w_1$ and $w_2$ such that $\alpha_{eij}^{w1} = \beta_{eik}^{w2}$, in which case common sub-expressions will arise along different loops ($L_j$ and $L_k$). General-purpose compilers cannot detect this (very domain-specific) property. Our algorithm for sharing elimination will exploit this extra information. Although both CSE and factorization target spatial sharing, the latter may actually increase the operation count if preliminary transformations (e.g., expansion) are required. In such a case, CCSE will be preferred.
+%TODO MCS = minimal common sub-expression
+
+%\textit{Note: the last check ensures the flop-decreasing nature of the transformation. In the cases in which expansion outweighs code motion, Strategy~\ref{strategy:i} is preferred.}\\
+%\textit{Note: the expansion cost is a function of the products wrapping a symbol (how many of them and their arity), so it can be determined through tree visits.}
+
+
+\subsection{The Sharing Elimination Algorithm}
 \label{sec:se-algo}
-Algorithm~\ref{algo:sharing-elimination} describes sharing elimination assuming as input a tree representation of the loop nest. It makes use of the following notation and terminology:
-\begin{itemize}
-\item \textit{multilinear operand}: any $\alpha_{eij}$ or $\beta_{eik}$ in the input expression.
-\item \textit{multilinear symbol}: a symbol appearing within a multilinear operand depending on $L_j$ or $L_k$ (e.g., test functions, first order derivatives of test functions, etc.).
-\end{itemize}
-Examples will be provided in Section~\ref{sec:se-examples}.
+Algorithm~\ref{algo:sharing-elimination} describes sharing elimination assuming as input a tree representation of the loop nest. Examples will be provided in Section~\ref{sec:se-examples}.
 
 \noindent\rule[0.01ex]{\linewidth}{0.7pt}
 
@@ -230,14 +237,18 @@ Examples will be provided in Section~\ref{sec:se-examples}.
 \normalfont 
 The input of the algorithm is a tree representation a finite element integration loop nest.
 \begin{enumerate}
-\item Perform a depth-first visit of the loop tree to collect and partition multilinear operands into disjoint sets, $\mathbb{P} = \lbrace P_1, ..., P_p\rbrace$. $\mathbb{P}$ is such that all multilinear operands in each $P \in \mathbb{P}$ share the same set of multilinear symbols $S_P$, whereas there is no sharing across different partitions. For all multilinear operands in $P \in \mathbb{P}$ such that $|P| \leq |S_P|$, apply Strategy~\ref{strategy:i}. \\
-\textit{Note: as a consequence of Proposition~\ref{prop:multi-struct}, $|P|$ and $|S_P|$ represent the number of products in the innermost loop induced by $P$ if Strategy~\ref{strategy:i} or Strategy~\ref{strategy:ii} were applied}
+\item Perform a depth-first visit of the loop tree to collect all {\em MCS}s. Apply Strategy~\ref{strategy:i} to these sub-expressions. This implies creating temporaries and replacing the hoisted common sub-expressions with the corresponding temporaries. Repeat this process until there are no more {\em MCS}s.
 
-\item For each sub-expression $\operatorname{expr}$ depending on exactly one linear loop, collect the multilinear symbols and the temporaries produced at step (1). Partition them into disjoint sets, $\mathbb{T} = \lbrace T_1, ..., T_t\rbrace$, such that $T_i$ includes all instances of a given symbol in $\operatorname{expr}$. Apply Strategy~\ref{strategy:ii} factorizing the symbols in each $T_i$, provided that this leads to a reduction in operation count; otherwise, apply Strategy~\ref{strategy:i} \\
-\textit{Note: the last check ensures the flop-decreasing nature of the transformation. In the cases in which expansion outweighs code motion, Strategy~\ref{strategy:i} is preferred.}\\
-\textit{Note: the expansion cost is a function of the products wrapping a symbol (how many of them and their arity), so it can be determined through tree visits.}
+\item Group the temporaries based on the linear loop they depend on. We have two disjoint sets in the case of bilinear forms and, trivially, a single set for linear forms. For each of these sets, build a {\em temporaries graph} and apply the {\em Strategy Selection Analysis} discussed earlier. 
+ 
+%\item Perform a depth-first visit of the loop tree to collect and partition multilinear operands into disjoint sets, $\mathbb{P} = \lbrace P_1, ..., P_p\rbrace$. $\mathbb{P}$ is such that all multilinear operands in each $P \in \mathbb{P}$ share the same set of linear symbols $S_P$, whereas there is no sharing across different partitions. For all multilinear operands in $P \in \mathbb{P}$ such that $|P| \leq |S_P|$, apply Strategy~\ref{strategy:i}. \\
+%\textit{Note: as a consequence of Proposition~\ref{prop:multi-struct}, $|P|$ and $|S_P|$ represent the number of products in the innermost loop induced by $P$ if Strategy~\ref{strategy:i} or Strategy~\ref{strategy:ii} were applied}
+%
+%\item For each sub-expression {\em expr} depending on exactly one linear loop, collect the linear symbols and the temporaries produced at step (1). Partition them into disjoint sets, $\mathbb{T} = \lbrace T_1, ..., T_t\rbrace$, such that $T_i$ includes all instances of a given symbol in {\em expr}. Apply Strategy~\ref{strategy:ii} factorizing the symbols in each $T_i$, provided that this leads to a reduction in operation count; otherwise, apply Strategy~\ref{strategy:i} \\
+%\textit{Note: the last check ensures the flop-decreasing nature of the transformation. In the cases in which expansion outweighs code motion, Strategy~\ref{strategy:i} is preferred.}\\
+%\textit{Note: the expansion cost is a function of the products wrapping a symbol (how many of them and their arity), so it can be determined through tree visits.}
 
-\item Build the \textit{sharing graph} $G = (S, E)$. Each $s \in S$ represents a multilinear symbol or a temporary produced by the previous steps. An edge $(s_i$, $s_j)$ indicates that a product $s_i s_j$ would appear if the sub-expressions including $s_i$ and $s_j$ were expanded.\\
+\item For each expression in the body of the multilinear loop nest, build the \textit{sharing graph} $G = (S, E)$. Each $s \in S$ represents a linear symbol or a temporary produced by the previous steps. An edge $(s_i$, $s_j)$ indicates that a product $s_i s_j$ would appear if the sub-expressions including $s_i$ and $s_j$ were expanded.\\
 \textit{Note: the following steps will only impact bilinear forms, since otherwise $E = \emptyset$.}
 
 \item Partition $S$ into disjoint sets, $\mathbb{S} = \lbrace S_1, ..., S_n\rbrace$, such that $S_i$ includes all instances of a given symbol $s$ in the expression. Transform $G$ by merging $\lbrace s_1, ..., s_m \rbrace \subset S_i$ into a unique vertex $s$ (taking the union of the edges), provided that factorizing $[s_1, ..., s_m]$ would not cause an increase in operation count.
@@ -255,21 +266,22 @@ n_i \text{: the number of edges incident to } x_i \\
 \end{gather*}
 
 
-\item Perform a depth-first visit of the loop tree and, for each yet unhandled or hoisted expression, apply the most profitable between Strategy~\ref{strategy:i} and Strategy~\ref{strategy:ii}. \\
+\item Perform a depth-first visit of the loop tree and, for each expression independent of the multilinear loop nest, apply the most profitable between Strategy~\ref{strategy:i} and Strategy~\ref{strategy:ii}. \\
 \textit{Note: this pass speculatively assumes that expressions are (weakly) structured along the reduction loop. If the assumption does not hold, the operation count will generally be sub-optimal because only a subset of factorizations and code motion opportunities may eventually be considered.}
 \end{enumerate}
 \end{Algo}
 
 \noindent\rule[1.0ex]{\linewidth}{0.7pt}
 
-Although the primary goal of Algorithm~\ref{algo:sharing-elimination} is operation count minimization within the multilinear loop nest, the enforcement of flop-decreasing transformations (steps (2) and (4)) and the re-scheduling of sub-expressions within outer loops (last step) also attempt to optimize the loop nest globally. We will further elaborate this aspect in Section~\ref{sec:proof}.
+Although the primary goal of Algorithm~\ref{algo:sharing-elimination} is operation count minimization within the multilinear loop nest, the enforcement of flop-decreasing transformations (steps (2) and (5)) and the re-scheduling of sub-expressions within outer loops (last step) also attempt to optimize the loop nest globally. We will further elaborate this aspect in Section~\ref{sec:proof}.
 
 
-\subsubsection{Examples}
+\subsection{Examples}
 \label{sec:se-examples}
-Consider again Figure~\ref{code:multi_loopnest_a}. We have $\mathbb{P} = \lbrace P_0, P_1, P_2\rbrace$, with $P_0 = \lbrace b_j\rbrace$, $P_1 = \lbrace c_i\rbrace$, and $P_2 = \lbrace d_i\rbrace$. For all $P_i$, we have $|P_i| = 1 = |S_{P_i}|$, although applying Strategy~\ref{strategy:i} in step (1) has no effect. The sharing graph is $G = (\lbrace b_j, c_i, d_i \rbrace, \lbrace (b_j, c_i), (b_j, d_i) \rbrace$, and $T = \lbrace c_i, d_i \rbrace$. The ILP formulation leads to the code in Figure~\ref{code:multi_loopnest_c}.
-
-In Figure~\ref{code:poisson}, Algorithm~\ref{algo:sharing-elimination} is executed in a very simple realistic scenario, which originates from the bilinear form of a Poisson equation in two dimensions. We observe that $\mathbb{P} = \lbrace P_0, P_1\rbrace$, with $P_0 = \lbrace (z_0 a_{ik} + z_2 b_{ik}), (z_1 a_{ik} + z_3 b_{ik})\rbrace$ and $P_1 = \lbrace (z_0 a_{ij} + z_2 b_{ij}), (z_1 a_{ij} + z_3 b_{ij})\rbrace$. In addition, $|P_i| = |S_{P_i}| = 2$, so Strategy~\ref{strategy:i} is applied to both partitions (step (1)). We then have (step (3)) $G = (\lbrace t_0, t_1, t_2, t_3 \rbrace, \lbrace (t_0, t_2), (t_1, t_3) \rbrace)$. Since there are no more factorization opportunities, the ILP formulation becomes irrelevant.
+...
+%Consider again Figure~\ref{code:multi_loopnest_a}. We have $\mathbb{P} = \lbrace P_0, P_1, P_2\rbrace$, with $P_0 = \lbrace b_j\rbrace$, $P_1 = \lbrace c_i\rbrace$, and $P_2 = \lbrace d_i\rbrace$. For all $P_i$, we have $|P_i| = 1 = |S_{P_i}|$, although applying Strategy~\ref{strategy:i} in step (1) has no effect. The sharing graph is $G = (\lbrace b_j, c_i, d_i \rbrace, \lbrace (b_j, c_i), (b_j, d_i) \rbrace$, and $T = \lbrace c_i, d_i \rbrace$. The ILP formulation leads to the code in Figure~\ref{code:multi_loopnest_c}.
+%
+%In Figure~\ref{code:poisson}, Algorithm~\ref{algo:sharing-elimination} is executed in a very simple realistic scenario, which originates from the bilinear form of a Poisson equation in two dimensions. We observe that $\mathbb{P} = \lbrace P_0, P_1\rbrace$, with $P_0 = \lbrace (z_0 a_{ik} + z_2 b_{ik}), (z_1 a_{ik} + z_3 b_{ik})\rbrace$ and $P_1 = \lbrace (z_0 a_{ij} + z_2 b_{ij}), (z_1 a_{ij} + z_3 b_{ij})\rbrace$. In addition, $|P_i| = |S_{P_i}| = 2$, so Strategy~\ref{strategy:i} is applied to both partitions (step (1)). We then have (step (3)) $G = (\lbrace t_0, t_1, t_2, t_3 \rbrace, \lbrace (t_0, t_2), (t_1, t_3) \rbrace)$. Since there are no more factorization opportunities, the ILP formulation becomes irrelevant.
 
 
 \begin{figure}[h]
@@ -294,7 +306,7 @@ In Figure~\ref{code:poisson}, Algorithm~\ref{algo:sharing-elimination} is execut
 %TODO : fix this
 %For reasons of space, further examples, including the hyperelastic model evaluated in Section~\ref{sec:perf-results} and other non-trivial ILP instances, are made available online\footnote{Sharing elimination examples: \url{https://gist.github.com/FabioLuporini/14e79457d6b15823c1cd}}.
 
-\subsection{Pre-evaluation of reductions}
+\section{Transformation Space: Pre-evaluation of Reductions}
 \label{sec:pre-evaluation}
 Sharing elimination uses three operators: expansion, factorization, and code motion. In this section, we discuss the role and legality of a fourth operator: reduction pre-evaluation. We will see that what makes this operator special is the fact that there exists a single point in the transformation space of a monomial (i.e., a specific factorization of test, trial, and coefficient functions) ensuring its correctness.
 
@@ -319,15 +331,17 @@ We start with an example. Consider again the loop nest and the expression in Fig
 \caption{Exposing (through factorization) and pre-evaluating a reduction.}\label{code:loopnest_rednored}
 \end{figure}
 
-Pre-evaluation can be seen as the generalization of tensor contraction (Section~\ref{sec:tc}) to a wider class of sub-expressions. We know that multilinear forms can be seen as sums of monomials, each monomial being an integral over the equation domain of products (of derivatives) of functions from discrete spaces. A monomial can always be reduced to the product between a ``reference'' and a ``geometry'' tensor. In our model, a reference tensor is simply represented by one or more sub-expressions independent of $L_e$, exposed after particular transformations of the expression tree. This leads to the following algorithm. 
+Pre-evaluation can be seen as the generalization of tensor contraction (reviewed in Section~\ref{sec:bkg:math-to-code}) to a wider class of sub-expressions. We know that multilinear forms can be seen as sums of monomials, each monomial being an integral over the equation domain of products (of derivatives) of functions from discrete spaces. A monomial can always be reduced to the product between a ``reference'' and a ``geometry'' tensor. In our model, a reference tensor is simply represented by one or more sub-expressions independent of $L_e$, exposed after particular transformations of the expression tree. This leads to the following algorithm. 
 
 \noindent\rule[0.01ex]{\linewidth}{0.7pt}
 
 \begin{Algo}[Pre-evaluation]
 \label{algo:pre-evaluation}
 \normalfont
-Consider a finite element integration loop nest $\Lambda = [L_e, L_i, L_j, L_k]$. We dissect the normal form input expression into distinct sub-expressions, each of them representing a monomial. Each sub-expression is then factorized so as to split constants from $[L_i, L_j, L_k]$-dependent terms. This transformation is feasible\footnote{For reasons of space, we omit the detailed sequence of steps (e.g., expansion, factorization), which is however available at \url{https://github.com/coneoproject/COFFEE/blob/master/coffee/optimizer.py} in \cite{fabio_luporini_2016_49279}.}, as a consequence of the results in~\cite{Kirby:TC}. These $[L_i, L_j, L_k]$-dependent terms are hoisted outside of $\Lambda$ and stored into temporaries. As part of this process, the reduction induced by $L_i$ is computed by means of symbolic execution. Finally, $L_i$ is removed from $\Lambda$. 
+Consider a finite element integration loop nest $\Lambda = [L_e, L_i, L_j, L_k]$. We dissect the normal form input expression into distinct sub-expressions, each of them representing a monomial. Each sub-expression is then factorized so as to split constants from $[L_i, L_j, L_k]$-dependent terms. This transformation is feasible\footnotemark, as a consequence of the results in~\cite{Kirby:TC}. These $[L_i, L_j, L_k]$-dependent terms are hoisted outside of $\Lambda$ and stored into temporaries. As part of this process, the reduction induced by $L_i$ is computed by means of symbolic execution. Finally, $L_i$ is removed from $\Lambda$. 
 \end{Algo}
+
+\footnotetext{For reasons of space, we omit the detailed sequence of steps (e.g., expansion, factorization), which is however available at \url{https://github.com/coneoproject/COFFEE/blob/master/coffee/optimizer.py} in \cite{fabio_luporini_2016_49279}.}
 
 \noindent\rule[1.0ex]{\linewidth}{0.7pt}
 
@@ -340,7 +354,7 @@ The pre-evaluation of a monomial introduces some critical issues:
 
 We expand on point (1) in the next section, while we address points (2) and (3) in Section~\ref{sec:optimal-synthesis}. 
 
-\subsection{Memory constraints}
+\section{Transformation Space: Memory Constraints}
 \label{sec:mem-const}
 We have just observed that the code motion induced by monomial pre-evaluation may dramatically increase the working set size. Even more aggressive code motion strategies are theoretically conceivable. Imagine $\Lambda$ is enclosed in a time stepping loop. One could think of exposing (through some transformations) and hoisting time-invariant sub-expressions for minimizing redundant computation at each time step. The working set size would then increase by a factor $E$, and since $E \gg I, J, K$, the gain in operation count would probably be outweighed, from a runtime viewpoint, by a much larger memory pressure.
 
@@ -361,11 +375,11 @@ Constraint~\ref{const:Le} is a policy decision that the compiler should not sile
 
 
 
-\section{Selection and composition of transformations}
+\section{Selection and Composition of Transformations}
 \label{sec:optimal-synthesis}
 In this section, we build a transformation algorithm that, given a memory bound, systematically reaches a local optimum for finite element integration loop nests. 
 
-\subsection{Transformation algorithm}
+\subsection{Transformation Algorithm}
 We address the two following issues: 
 \begin{enumerate}
 \item \textit{Coordination of pre-evaluation and sharing elimination.} Recall from Section~\ref{sec:pre-evaluation} that pre-evaluation could either increase or decrease the operation count in comparison with that achieved by sharing elimination.
@@ -398,7 +412,7 @@ The output of the transformation algorithm is provided in Figure~\ref{code:loopn
 \end{CenteredBox}\caption{The loop nest produced by the algorithm for an input as in Figure~\ref{code:loopnest}.}\label{code:loopnest-opt}\end{figure}
 
 
-\subsection{The cost function $\theta$}
+\subsection{The Cost Function $\theta$}
 \label{sec:op_count}
 We tie up the remaining loose end: the construction of the cost function $\theta$.
 
@@ -443,9 +457,9 @@ We discuss these points separately
 \item 
 \begin{enumerate}
 \item Let $T_m$ represent the set of tables resulting from applying pre-evaluation to a monomial $m$. Consider two monomials $m_1, m_2 \in Y$ and the respective sets of pre-evaluated tables, $T_{m_{1}}$ and $T_{m_{2}}$. If $T_{m_{1}} \cap\ T_{m_{2}} \neq \emptyset$, at least one table is assignable to the same temporary. $\Gamma$, therefore, may not be optimal, since $\theta$ only distinguishes monomials in ``isolation''. We neglect this scenario (see assumptions) because of its purely pathological nature and its -- with high probability -- negligible impact on the operation count.
-\item Let $m_1 \in X$ and $m_2 \in Y$ be two monomials sharing some generic multilinear symbols. If $m_1$ were carelessly pre-evaluated, there may be a potential gain in sharing elimination that is lost, potentially leading to a non-optimum. This situation is prevented by construction, because $\Gamma$ exhaustively searches all possible bipartitions on order to determine an optimum which satisfies Constraint~\ref{const:TH}\footnote{Note that the problem can be seen as an instance of the well-known Knapsack problem}. Recall that since the number of monomials is in practice very small, this pass can rapidly be accomplished.
+\item Let $m_1 \in X$ and $m_2 \in Y$ be two monomials sharing some generic linear symbols. If $m_1$ were carelessly pre-evaluated, there may be a potential gain in sharing elimination that is lost, potentially leading to a non-optimum. This situation is prevented by construction, because $\Gamma$ exhaustively searches all possible bipartitions on order to determine an optimum which satisfies Constraint~\ref{const:TH}\footnote{Note that the problem can be seen as an instance of the well-known Knapsack problem}. Recall that since the number of monomials is in practice very small, this pass can rapidly be accomplished.
 \end{enumerate}
-\item Consider Algorithm~\ref{algo:sharing-elimination}. Proposition~\ref{prop:multi-struct} ensures that there are only two ways of scheduling the multilinear operands in $P \in \mathbb{P}$: through generalized code motion (Strategy~\ref{strategy:i}) or factorization of multilinear symbols (via Strategy~\ref{strategy:ii}). If applied, these two strategies would lead, respectively, to performing $|P|$ and $|S_P|$ multiplications at every loop iteration. Since Strategy~\ref{strategy:i} is applied if and only if $|P| < |S_P|$ and does not change the structure of the expression (it requires neither expansion nor factorization), step (1) cannot prune the optimum from the search space. 
+\item Consider Algorithm~\ref{algo:sharing-elimination}. Proposition~\ref{prop:multi-struct} ensures that there are only two ways of scheduling the multilinear operands in $P \in \mathbb{P}$: through generalized code motion (Strategy~\ref{strategy:i}) or factorization of linear symbols (via Strategy~\ref{strategy:ii}). If applied, these two strategies would lead, respectively, to performing $|P|$ and $|S_P|$ multiplications at every loop iteration. Since Strategy~\ref{strategy:i} is applied if and only if $|P| < |S_P|$ and does not change the structure of the expression (it requires neither expansion nor factorization), step (1) cannot prune the optimum from the search space. 
 
 After structuring the sharing graph $G$ in such a way that only flop-decreasing transformations are possible, the ILP model is instantiated. At this point, proving optimality reduces to establishing the correctness of the model, which is relatively straightforward because of its simplicity. The model aims to minimize the operation count by selecting the most promising factorizations. The second set of constraints is to select all edges (i.e., all multiplications), exactly once. The first set of inequalities allows multiplications to be scheduled: once a vertex $s$ is selected (i.e., once a symbol is decided to be factorized), all multiplications involving $s$ can be grouped. 
 \end{enumerate}
@@ -465,30 +479,30 @@ Throughout the paper we have reiterated the claim that Algorithm~\ref{algo:gamma
 \label{sec:codegen}
 Sharing elimination and pre-evaluation, as well as the transformation algorithm, have been implemented in COFFEE, the compiler for finite element integration routines adopted in Firedrake. In this section, we briefly discuss the aspects of the compiler that are relevant for this article.
 
-\subsection{Expressing transformations through the COFFEE language}
+\subsection{Expressing Transformations with COFFEE}
 COFFEE implements sharing elimination and pre-evaluation by composing building block transformation operators, which we refer to as \emph{rewrite operators}. This has several advantages. The first is extensibility. New transformations, such as sum factorization in spectral methods, could be expressed by composing the existing operators, or with small effort building on what is already available. Second, generality: COFFEE can be seen as a lightweight, low level computer algebra system, not necessarily tied to finite element integration. Third, robustness: the same operators are exploited, and therefore tested, by different optimization pipelines. The rewrite operators, whose (Python) implementation is based on manipulation of abstract syntax trees (ASTs), comprise the COFFEE language. A non-exhaustive list of such operators includes expansion, factorization, re-association, generalized code motion.
 
-\subsection{Independence from form compilers}
+\subsection{Independence from Form Compilers}
 COFFEE aims to be independent of the high level form compiler. It provides an interface to build generic ASTs and only expects expressions to be in normal form (or sufficiently close to it). For example, Firedrake has transitioned from a version of the FEniCS Form Compiler \cite{FFC-TC} modified to produce ASTs rather than strings, to a newly written compiler\footnote{TSFC, the two-stage form compiler \url{https://github.com/firedrakeproject/tsfc}}, while continuing to emply COFFEE. Thus, COFFEE decouples the mathematical manipulation of a form from code optimization; or, in other words, relieves form compiler developers of the task of fine scale loop optimization of generated code.
 
-\subsection{Handling block-sparse tables}
+\subsection{Handling Block-sparse Tables}
 \label{sec:zeros}
-For several reasons, basis function tables may be block-sparse (e.g., containing zero-valued columns). For example, the FEniCS Form Compiler implements vector-valued functions by adding blocks of zero-valued columns to the corresponding tabulations; this extremely simplifies code generation (particularly, the construction of loop nests), but also affects the performance of the generated code due to the execution of ``useless'' flops (e.g., operations like \texttt{a + 0}). In~\cite{quadrature1}, a technique to avoid iteration over zero-valued columns based on the use of indirection arrays (e.g. \texttt{A[B[i]]}, in which \texttt{A} is a tabulated basis function and \texttt{B} a map from loop iterations to non-zero columns in A) was proposed. This technique, however, produces non-contiguous memory loads and stores, which nullify the potential benefits of vectorization. COFFEE, instead, handles block-sparse basis function tables by restructuring loops in such a manner that low level optimization (especially vectorization) is only marginally affected. This is based on symbolic execution of the code, which enables a series of checks on array indices and loop bounds which determine the zero-valued blocks which can be skipped without affecting data alignment.
+For several reasons, basis function tables may be block-sparse (e.g., containing zero-valued columns). For example, the FEniCS Form Compiler implements vector-valued functions by adding blocks of zero-valued columns to the corresponding tabulations; this extremely simplifies code generation (particularly, the construction of loop nests), but also affects the performance of the generated code due to the execution of ``useless'' flops (e.g., operations like \texttt{a + 0}). In~\cite{quadrature-olegaard}, a technique to avoid iteration over zero-valued columns based on the use of indirection arrays (e.g. \texttt{A[B[i]]}, in which \texttt{A} is a tabulated basis function and \texttt{B} a map from loop iterations to non-zero columns in A) was proposed. This technique, however, produces non-contiguous memory loads and stores, which nullify the potential benefits of vectorization. COFFEE, instead, handles block-sparse basis function tables by restructuring loops in such a manner that low level optimization (especially vectorization) is only marginally affected. This is based on symbolic execution of the code, which enables a series of checks on array indices and loop bounds which determine the zero-valued blocks which can be skipped without affecting data alignment.
 
 \section{Performance Evaluation}
 \label{sec:perf-results}
 
-\subsection{Experimental setup}
+\subsection{Experimental Setup}
 
 Experiments were run on a single core of an Intel I7-2600 (Sandy Bridge) CPU, running at 3.4GHz, 32KB L1 cache (private), 256KB L2 cache (private) and 8MB L3 cache (shared). The Intel Turbo Boost and Intel Speed Step technologies were disabled. The Intel \texttt{icc 15.2} compiler was used. The compilation flags used were \texttt{-O3, -xHost}. The compilation flag \texttt{xHost} tells the Intel compiler to generate efficient code for the underlying platform.
 
-The Zenodo system was used to archive all packages used to perform the experiments: Firedrake \cite{lawrence_mitchell_2016_49284}, PETSc \cite{barry_smith_2016_49285}, petsc4py \cite{firedrake_2016_49283}, FIAT \cite{marie_e_rognes_2016_49280}, UFL \cite{martin_sandve_alnaes_2016_49282}, FFC \cite{anders_logg_2016_49276}, PyOP2 \cite{florian_rathgeber_2016_49281} and COFFEE \cite{fabio_luporini_2016_49279}. The experiments can be reproduced using a publicly available benchmark suite~\cite{florian_rathgeber_2016_49290}.
+The Zenodo system was used to archive all packages used to perform the experiments: Firedrake \citep{lawrence_mitchell_2016_49284}, PETSc \citep{barry_smith_2016_49285}, petsc4py \citep{firedrake_2016_49283}, FIAT \citep{marie_e_rognes_2016_49280}, UFL \citep{martin_sandve_alnaes_2016_49282}, FFC \citep{anders_logg_2016_49276}, PyOP2 \citep{florian_rathgeber_2016_49281} and COFFEE \citep{fabio_luporini_2016_49279}. The experiments can be reproduced using a publicly available benchmark suite~\citep{florian_rathgeber_2016_49290}.
 
 We analyze the execution time of four real-world bilinear forms of increasing complexity, which comprise the differential operators that are most common in finite element methods. In particular, we study the mass matrix (``\texttt{Mass}'') and the bilinear forms arising in a Helmholtz equation (``\texttt{Helmholtz}''), in an elastic model (``\texttt{Elasticity}''), and in a hyperelastic model (``\texttt{Hyperelasticity}''). The complete specification of these forms is made publicly available\footnote{\url{https://github.com/firedrakeproject/firedrake-bench/blob/experiments/forms/firedrake_forms.py}}. 
 
 We evaluate the speed-ups achieved by a wide variety of transformation systems over the ``original'' code produced by the FEniCS Form Compiler (i.e., no optimizations applied). We analyze the following transformation systems:
 \begin{description}
-\item[quad] Optimized quadrature mode. Work presented in~\cite{quadrature1}, implemented in  in the FEniCS Form Compiler. 
+\item[quad] Optimized quadrature mode. Work presented in~\cite{quadrature-olegaard}, implemented in  in the FEniCS Form Compiler. 
 \item[tens] Tensor contraction mode. Work presented in~\cite{FFC-TC}, implemented in the FEniCS Form Compiler.
 \item[auto] Automatic choice between \texttt{tens} and \texttt{quad} driven by heuristic (detailed in~\cite{Fenics} and summarized in Section~\ref{sec:qualitative}). Implemented in the FEniCS Form Compiler.
 \item[ufls] UFLACS, a novel back-end for the FEniCS Form Compiler whose primary goals are improved code generation and execution times.
@@ -502,7 +516,7 @@ For a fair comparison, small patches were written to the make \texttt{quad}, \te
 
 For Constraint~\ref{const:TH}, discussed in Section~\ref{sec:mem-const}, we set $T_H = \operatorname{size}(\mathrm{L2})$; that is, the size of the processor L2 cache (the last level of private cache). When the threshold had an impact on the transformation process, the experiments were repeated with $T_H = \operatorname{size}(\mathrm{L3})$. The results are documented later, individually for each problem.
 
-Following the methodology adopted in~\cite{quadrature1}, we vary the following parameters:
+Following the methodology adopted in~\cite{quadrature-olegaard}, we vary the following parameters:
 \begin{itemize}
 \item the polynomial degree of test, trial, and coefficient (or ``pre-multiplying'') functions, $q \in \lbrace1, 2, 3, 4\rbrace$
 \item the number of coefficient functions $\mathrm{nf} \in \lbrace0, 1, 2, 3\rbrace$
@@ -514,7 +528,7 @@ While constants of our study are
 \item exact numerical quadrature (we employ the same scheme used in~\cite{quadrature1}, based on the Gauss-Legendre-Jacobi rule)
 \end{itemize}
 
-\subsection{Performance results}
+\subsection{Performance Results}
 \label{sec:perf-results-forms}
 
 \begin{figure}
@@ -580,7 +594,7 @@ In the experiments on the hyperelastic model, shown in Figure~\ref{fig:hyperelas
 \label{sec:conclusions}
 We have developed a theory for the optimization of finite element integration loop nests. The article details the domain properties which are exploited by our approach (e.g., linearity) and how these translate to transformations at the level of loop nests. All of the algorithms shown in this paper have been implemented in COFFEE, a compiler publicly available fully integrated with the Firedrake framework. The correctness of the transformation algorithm was discussed. The performance results achieved suggest the effectiveness of our methodology. 
 
-\section{Limitations and future work}
+\section{Limitations and Future Work}
 \label{sec:completeness}
 We have defined sharing elimination and pre-evaluation as high level transformations on top of a specific set of rewrite operators, such as code motion and factorization, and we have used them to construct the transformation space. There are three main limitations in this process. First, we do not have a systematic strategy to optimize sub-expressions which are independent of linear loops. Although we have a mechanism to determine how much computation should be hoisted to the level of the integration (reduction) loop, it is not clear how to effectively improve the heuristics used at step (6) in Algorithm~\ref{algo:sharing-elimination}. Second, lower operation counts may be found by exploiting domain-specific properties, such as redundancies in basis functions; this aspect is completely neglected in this article. Third, with Constraint~\ref{const:Le} we have limited the applicability of code motion. This constraint was essential given the complexity of the problem tackled. 
 
