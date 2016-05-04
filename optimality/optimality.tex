@@ -200,7 +200,7 @@ Eliminating temporal sharing through generalized code motion.
 \label{strategy:ii}
 Eliminating spatial sharing first -- through product expansion and factorization -- and temporal sharing afterwards, again through generalized code motion.
 \end{Strategy}
-In the current example, we observe that, depending on the size of $L_i$, applying Strategy~\ref{strategy:ii} could reduce the operation count since the expression would be recast as $v^0_i v^0_i a a + v^0_i v^1_i (ab + ab) + v^1_i v^1_i c c + ...$ and some hoistable sub-expressions would be exposed. On the other hand, Strategy~\ref{strategy:i} would have no effect as $v$ only depends on a single loop, $L_i$. In general, the choice between the two strategies depends on multiple factors: the loop sizes, the increase in operation count due to expansion (in Strategy~\ref{strategy:ii}), and the gain due to code motion. A second application of Strategy~\ref{strategy:ii} was provided in Figure~\ref{code:multi_loopnest}. These examples motivate the introduction of a particular class of expressions, for which the two strategies assume notable importance.
+In the current example, we observe that, depending on the size of $L_i$, applying Strategy~\ref{strategy:ii} could reduce the operation count since the expression would be recast as $v^0_i v^0_i a a + v^0_i v^1_i (ab + ab) + v^1_i v^1_i c c + ...$ and some hoistable sub-expressions would be exposed. On the other hand, Strategy~\ref{strategy:i} would have no effect as $v$ only depends on a single loop, $L_i$. In general, the choice between the two strategies depends on multiple factors: the loop sizes, the increase in operation count due to expansion (in Strategy~\ref{strategy:ii}), the gain due to code motion, and the presence of common sub-expressions. A second application of Strategy~\ref{strategy:ii} was provided in Figure~\ref{code:multi_loopnest}. These examples motivate the introduction of a particular class of expressions, for which the two strategies assume notable importance.
 \begin{Def}[Structured expression]
 \label{def:struct-expr}
 We say that an expression is ``structured along a loop nest $\Lambda$'' if and only if,  for every symbol $s_{\Lambda}$ depending on at least one loop in $\Lambda$, the spatial sharing of $s_{\Lambda}$ may be eliminated by factorizing all occurrences of $s_{\Lambda}$ in the expression.
@@ -212,19 +212,34 @@ An expression along a multilinear loop nest is structured.
 \begin{proof}
 This follows directly from Definition~\ref{def:linear-loop} and Definition~\ref{def:multi-linear-loop}, which essentially restrict the number of occurrences of a symbol $s_{\Lambda}$ in a summand to at most 1.
 \end{proof}
-If $\Lambda$ were an arbitrary loop nest, a given symbol $s_{\Lambda}$ could appear everywhere (e.g., $n$ times in a summand and $m$ times in another summand with $n \neq m$, as argument of a higher level function, in the denominator of a division), thus posing the challenge of finding the factorization that maximizes temporal sharing. If $\Lambda$ is instead a finite element integration loop nest, thanks to Proposition~\ref{prop:multi-struct} the space of flop-decreasing transformations is constructed by ``composition'' of Strategy~\ref{strategy:i} and Strategy~\ref{strategy:ii}, as illustrated in Algorithm~\ref{algo:sharing-elimination}.
+If $\Lambda$ were an arbitrary loop nest, a given symbol $s_{\Lambda}$ could appear everywhere (e.g., $n$ times in a summand and $m$ times in another summand with $n \neq m$, as argument of a higher level function, in the denominator of a division), thus posing the challenge of finding the factorization that maximizes temporal sharing. If $\Lambda$ is instead a finite element integration loop nest, thanks to Proposition~\ref{prop:multi-struct} the space of flop-decreasing transformations is constructed by ``composition'' of Strategy~\ref{strategy:i} and Strategy~\ref{strategy:ii}, as discussed in the next sections.
 
 Finally, we observe that the $\sigma_{ei}$ sub-expressions can sometimes be considered ``weakly structured''. This happens when a relaxed version of Definition~\ref{def:struct-expr} applies, in which the factorization of $s_{\Lambda}$ only ``minimizes'' (rather than ``eliminates'') spatial sharing (for instance, in the complex hyperelastic model analyzed in Section~\ref{sec:perf-results}). Weak structure will be exploited by Algorithm~\ref{algo:sharing-elimination} in the attempt to achieve optimality.
 
 
-\subsection{The dichotomy between Sharing Elimination and Common Sub-expressions Elimination}
-%TODO CSE
-Common sub-expressions elimination (CSE) is a transformation that aims to reduce the operation count in a code region. It consists of searching identical sub-expressions that reduce to the same value and replacing them with suitable temporary variables. 
+\subsection{Driving the Transformation}
+In this section, we introduce a data structure -- the {\em temporaries graph} -- that relates the sub-expressions in a finite element integration loop nest. This will enable us to analyze the global impact on the operation count of Strategy~\ref{strategy:i} and Strategy~\ref{strategy:ii}.
 
-The normal form of the expressions guarantees ...
-Since expressions are in normal form,  and are located within independent basic blocks. These two properties maximize the applicability of CSE: 
+It is useful to start with introducing the notion of a {\em minimal common sub-expression}.
 
-%TODO MCS = minimal common sub-expression
+\begin{Def}[Minimal common sub-expression]
+A sub-expression $m$ within an expression $e$ is said to be a minimal common sub-expression (MCS) if:
+\begin{itemize}
+\item $m$ occurs at least twice in $e$, and
+\item by removing a given operation from $m$, no other common sub-expressions are created.
+\end{itemize}
+\end{Def}
+
+For example, in $(a b) + (a b c) + (a b c d)$ the sub-expression $(a b)$ is an MCS, whereas $(a b c)$ is not, despite occurring twice. 
+
+A temporaries graph is a directed acyclic graph in which the vertices are MCSs determined by successive applications of Strategy~\ref{strategy:i}. An edge from $e_1$ to $e_2$ indicates that $e_1$ is read by $e_2$. As in a finite element integration loop nest the expressions are in normal form, there usually is ample scope for capturing common sub-expressions. The normal form guarantees that the algebraic structure of an expression arising from a variational form has not been altered. Hence, if the same inner product occurs multiple times in the input form, it is sure that its operands will represent common sub-expressions. 
+
+As an example, consider an excerpt from a real problem: $...$. The corresponding temporaries graph is shown in Figure~\ref{fig:opt:tg}. 
+
+%Common sub-expressions elimination (CSE) is a transformation that aims to reduce the operation count by replacing identical sub-expressions with suitable temporary variables. As in a finite element integration loop nest the expressions are in normal form, there may be ample scope for CSE. The normal form guarantees that the algebraic structure of an expression arising from a variational form has not been altered. Hence, if the same inner product occurs multiple times in the input form, it is sure that its operands will represent common sub-expressions. 
+
+%Since sharing elimination may transform an expression by exploiting mathematical properties such as distributivity, it is possible that some CSE opportunities are lost. The natural question that follows from this picture is whether and to what extent one should prefer CSE over sharing elimination. In this section, we address this problem. 
+
 
 %\textit{Note: the last check ensures the flop-decreasing nature of the transformation. In the cases in which expansion outweighs code motion, Strategy~\ref{strategy:i} is preferred.}\\
 %\textit{Note: the expansion cost is a function of the products wrapping a symbol (how many of them and their arity), so it can be determined through tree visits.}
