@@ -200,7 +200,7 @@ Eliminating spatial and temporal sharing through generalized code motion. Spatia
 \label{strategy:ii}
 Eliminating spatial sharing first -- through product expansion and factorization -- and temporal sharing afterwards, again through generalized code motion.
 \end{Strategy}
-In the current example, we observe that, depending on the size of $L_i$, applying Strategy~\ref{strategy:ii} could reduce the operation count since the expression would be recast as $v^0_i v^0_i a a + v^0_i v^1_i (ab + ab) + v^1_i v^1_i c c + ...$ and some hoistable sub-expressions would be exposed. On the other hand, Strategy~\ref{strategy:i} would have no effect as $v$ only depends on a single loop, $L_i$. In general, the choice between the two strategies depends on multiple factors: the loop sizes, the increase in operation count due to expansion (in Strategy~\ref{strategy:ii}), the gain due to code motion, and the presence of common sub-expressions. A second application of Strategy~\ref{strategy:ii} was provided in Figure~\ref{code:multi_loopnest}. These examples motivate the introduction of a particular class of expressions, for which the two strategies assume notable importance.
+In the current example, we observe that, depending on the size of $L_i$, applying Strategy~\ref{strategy:ii} could reduce the operation count since the expression would be recast as $v^0_i v^0_i a a + v^0_i v^1_i (ab + ab) + v^1_i v^1_i c c + ...$ and some hoistable sub-expressions would be exposed. On the other hand, Strategy~\ref{strategy:i} would have no effect as $v$ only depends on a single loop, $L_i$. A second application of Strategy~\ref{strategy:ii} was provided in Figure~\ref{code:multi_loopnest}. In general, the choice between the two strategies depends on multiple factors: the loop sizes, the increase in operation count due to expansion (in Strategy~\ref{strategy:ii}), the gain due to code motion, and the presence of common sub-expressions. These examples motivate the introduction of a particular class of expressions, for which the two strategies assume notable importance.
 \begin{Def}[Structured expression]
 \label{def:struct-expr}
 We say that an expression is ``structured along a loop nest $\Lambda$'' if and only if,  for every symbol $s_{\Lambda}$ depending on at least one loop in $\Lambda$, the spatial sharing of $s_{\Lambda}$ may be eliminated by factorizing all occurrences of $s_{\Lambda}$ in the expression.
@@ -243,14 +243,12 @@ The {\em Strategy Selection Analysis} uses a temporaries graph to determine whet
 \item track the new operation count and iterate the process until $i=i_2$.
 \end{enumerate}
 
-It is finally straightforward to determine for which range of levels the application of Strategy~\ref{strategy:ii} improved the operation count. The cost and the effectiveness of the {\em Strategy Selection Analysis} obviously depend on the number $n$ of pairs ${<}i_1, i_2{>}$ that are evaluated (at most $k^2$). Since during our experiments setting $n = k^2$ never led to unacceptable code generation times\footnote{Even in the case of complex hyperelastic models, the code generation time never exceed a few seconds on a relatively old Sandy Bridge architecture.}, in the following we assume that the {\em Strategy Selection Analysis} always considers all possible pairs.
-
-
+It is finally straightforward to determine in which range of levels (if any) the application of Strategy~\ref{strategy:ii} improved the operation count. The cost and the effectiveness of the {\em Strategy Selection Analysis} obviously depend on the number $n$ of pairs ${<}i_1, i_2{>}$ that are evaluated (at most $k^2$). Since during our experiments setting $n = k^2$ never led to unacceptable code generation times\footnote{Even in the case of complex hyperelastic models, the code generation time never exceed a few seconds on a relatively old Sandy Bridge architecture.}, in the following we assume that the {\em Strategy Selection Analysis} always considers all possible pairs.
 
 
 \subsection{The Sharing Elimination Algorithm}
 \label{sec:se-algo}
-Algorithm~\ref{algo:sharing-elimination} describes sharing elimination assuming as input a tree representation of the loop nest. Examples will be provided in Section~\ref{sec:se-examples}.
+Algorithm~\ref{algo:sharing-elimination} gathers the considerations from the previous sections and describes sharing elimination in its entirety. Examples will be provided in Section~\ref{sec:se-examples}.
 
 \noindent\rule[0.01ex]{\linewidth}{0.7pt}
 
@@ -261,19 +259,12 @@ The input of the algorithm is a tree representation a finite element integration
 \begin{enumerate}
 \item Perform a depth-first visit of the loop tree to collect all {\em MCS}s. Apply Strategy~\ref{strategy:i} to these sub-expressions. This implies creating temporaries and replacing the hoisted common sub-expressions with the corresponding temporaries. Repeat this process until there are no more {\em MCS}s.
 
-\item Group the temporaries based on the linear loop they depend on. We have two disjoint sets in the case of bilinear forms and, trivially, a single set for linear forms. For each of these sets, build a {\em temporaries graph} and apply the {\em Strategy Selection Analysis} discussed earlier. 
- 
-%\item Perform a depth-first visit of the loop tree to collect and partition multilinear operands into disjoint sets, $\mathbb{P} = \lbrace P_1, ..., P_p\rbrace$. $\mathbb{P}$ is such that all multilinear operands in each $P \in \mathbb{P}$ share the same set of linear symbols $S_P$, whereas there is no sharing across different partitions. For all multilinear operands in $P \in \mathbb{P}$ such that $|P| \leq |S_P|$, apply Strategy~\ref{strategy:i}. \\
-%\textit{Note: as a consequence of Proposition~\ref{prop:multi-struct}, $|P|$ and $|S_P|$ represent the number of products in the innermost loop induced by $P$ if Strategy~\ref{strategy:i} or Strategy~\ref{strategy:ii} were applied}
-%
-%\item For each sub-expression {\em expr} depending on exactly one linear loop, collect the linear symbols and the temporaries produced at step (1). Partition them into disjoint sets, $\mathbb{T} = \lbrace T_1, ..., T_t\rbrace$, such that $T_i$ includes all instances of a given symbol in {\em expr}. Apply Strategy~\ref{strategy:ii} factorizing the symbols in each $T_i$, provided that this leads to a reduction in operation count; otherwise, apply Strategy~\ref{strategy:i} \\
-%\textit{Note: the last check ensures the flop-decreasing nature of the transformation. In the cases in which expansion outweighs code motion, Strategy~\ref{strategy:i} is preferred.}\\
-%\textit{Note: the expansion cost is a function of the products wrapping a symbol (how many of them and their arity), so it can be determined through tree visits.}
+\item Group the temporaries based on the linear loop they depend on. We have two disjoint sets in the case of bilinear forms and, trivially, a single set for linear forms. For each of these sets, build a {\em temporaries graph} and apply the {\em Strategy Selection Analysis} discussed earlier.
 
 \item For each expression in the body of the multilinear loop nest, build the \textit{sharing graph} $G = (S, E)$. Each $s \in S$ represents a linear symbol or a temporary produced by the previous steps. An edge $(s_i$, $s_j)$ indicates that a product $s_i s_j$ would appear if the sub-expressions including $s_i$ and $s_j$ were expanded.\\
-\textit{Note: the following steps will only impact bilinear forms, since otherwise $E = \emptyset$.}
+\textit{Note: this and the following steps will only impact bilinear forms, since otherwise, due to linearity, $E = \emptyset$.}
 
-\item Partition $S$ into disjoint sets, $\mathbb{S} = \lbrace S_1, ..., S_n\rbrace$, such that $S_i$ includes all instances of a given symbol $s$ in the expression. Transform $G$ by merging $\lbrace s_1, ..., s_m \rbrace \subset S_i$ into a unique vertex $s$ (taking the union of the edges), provided that factorizing $[s_1, ..., s_m]$ would not cause an increase in operation count.
+\item Partition $S$ into $n$ disjoint sets $\lbrace S_1, ..., S_n\rbrace$, such that $S_i$ includes all instances of a given symbol $s$ in the expression. Transform $G$ by merging $\lbrace s_1, ..., s_m \rbrace \subset S_i$ into a unique vertex $s$ (taking the union of the edges), provided that their factorization would not cause an increase in operation count.
 
 \item Map $G$ to an Integer Linear Programming (ILP) model for determining how to optimally apply Strategy~\ref{strategy:ii}. The solution is the set of symbols that will be factorized by Strategy~\ref{strategy:ii}. Let $|S| = n$; the ILP model then is as follows:
 \begin{gather*}
@@ -295,15 +286,18 @@ n_i \text{: the number of edges incident to } x_i \\
 
 \noindent\rule[1.0ex]{\linewidth}{0.7pt}
 
-Although the primary goal of Algorithm~\ref{algo:sharing-elimination} is operation count minimization within the multilinear loop nest, the enforcement of flop-decreasing transformations (steps (2) and (5)) and the re-scheduling of sub-expressions within outer loops (last step) also attempt to optimize the loop nest globally. We will further elaborate this aspect in Section~\ref{sec:proof}.
+Although the primary goal of Algorithm~\ref{algo:sharing-elimination} is operation count minimization within the multilinear loop nest, the enforcement of flop-decreasing transformations (steps (2) and (4)) and the re-scheduling of sub-expressions within outer loops (step (6)) also attempt to optimize the loop nest globally. We will further elaborate this aspect in Section~\ref{sec:proof}.
 
 
 \subsection{Examples}
 \label{sec:se-examples}
-...
-%Consider again Figure~\ref{code:multi_loopnest_a}. We have $\mathbb{P} = \lbrace P_0, P_1, P_2\rbrace$, with $P_0 = \lbrace b_j\rbrace$, $P_1 = \lbrace c_i\rbrace$, and $P_2 = \lbrace d_i\rbrace$. For all $P_i$, we have $|P_i| = 1 = |S_{P_i}|$, although applying Strategy~\ref{strategy:i} in step (1) has no effect. The sharing graph is $G = (\lbrace b_j, c_i, d_i \rbrace, \lbrace (b_j, c_i), (b_j, d_i) \rbrace$, and $T = \lbrace c_i, d_i \rbrace$. The ILP formulation leads to the code in Figure~\ref{code:multi_loopnest_c}.
-%
-%In Figure~\ref{code:poisson}, Algorithm~\ref{algo:sharing-elimination} is executed in a very simple realistic scenario, which originates from the bilinear form of a Poisson equation in two dimensions. We observe that $\mathbb{P} = \lbrace P_0, P_1\rbrace$, with $P_0 = \lbrace (z_0 a_{ik} + z_2 b_{ik}), (z_1 a_{ik} + z_3 b_{ik})\rbrace$ and $P_1 = \lbrace (z_0 a_{ij} + z_2 b_{ij}), (z_1 a_{ij} + z_3 b_{ij})\rbrace$. In addition, $|P_i| = |S_{P_i}| = 2$, so Strategy~\ref{strategy:i} is applied to both partitions (step (1)). We then have (step (3)) $G = (\lbrace t_0, t_1, t_2, t_3 \rbrace, \lbrace (t_0, t_2), (t_1, t_3) \rbrace)$. Since there are no more factorization opportunities, the ILP formulation becomes irrelevant.
+In this section, we present a series of examples of increasing complexity.
+
+\subsubsection{Example 1}
+Consider again Figure~\ref{code:multi_loopnest_a}. There are no common sub-expressions, so the {\em Strategy Selection Analysis} has no effect. The sharing graph is $G = (\lbrace b_j, c_i, d_i \rbrace, \lbrace (b_j, c_i), (b_j, d_i) \rbrace$. The ILP formulation leads to the code in Figure~\ref{code:multi_loopnest_c}.
+
+\subsubsection{Example 2}
+In Figure~\ref{code:poisson}, Algorithm~\ref{algo:sharing-elimination} is executed in a simple yet realistic scenario, which originates from the bilinear form of a Poisson equation in two dimensions. The temporaries graph, which consists of a single level, is used by the {\em Strategy Selection Analysis}. This leads to the synthesis in Figure~\ref{code:poisson_b}. The sharing graph is $G = (\lbrace t_0, t_1, t_2, t_3 \rbrace, \lbrace (t_0, t_2), (t_1, t_3) \rbrace)$, but since there are no factorization opportunities the ILP formulation has no impact.
 
 
 \begin{figure}[h]
@@ -324,6 +318,12 @@ Although the primary goal of Algorithm~\ref{algo:sharing-elimination} is operati
 \caption{Applying sharing elimination to the bilinear form arising from a Poisson equation in 2D. The operation counts are $E(f(z_0, z_1, ...) + IJK \cdot 18)$ (left) and $E(f(z_0, z_1, ...) + I(J \cdot 6 + K \cdot 9 + JK \cdot 4)$ (right), with $f(z_0, z_1, ...)$ representing the operation count for evaluating $z_0, z_1, ...$, and common sub-expressions being counted once. The synthesis in Figure~\ref{code:poisson_b} is globally optimal apart from the pathological case  $I, J, K = 1$.}
 \label{code:poisson}
 \end{figure}
+
+\subsubsection{Example 3}
+pressure equation
+
+\subsubsection{Example 4}
+hyperelasticity
 
 %TODO : fix this
 %For reasons of space, further examples, including the hyperelastic model evaluated in Section~\ref{sec:perf-results} and other non-trivial ILP instances, are made available online\footnote{Sharing elimination examples: \url{https://gist.github.com/FabioLuporini/14e79457d6b15823c1cd}}.
@@ -401,7 +401,7 @@ Constraint~\ref{const:Le} is a policy decision that the compiler should not sile
 \label{sec:optimal-synthesis}
 In this section, we build a transformation algorithm that, given a memory bound, systematically reaches a local optimum for finite element integration loop nests. 
 
-\subsection{Transformation Algorithm}
+\subsection{The Main Transformation Algorithm}
 We address the two following issues: 
 \begin{enumerate}
 \item \textit{Coordination of pre-evaluation and sharing elimination.} Recall from Section~\ref{sec:pre-evaluation} that pre-evaluation could either increase or decrease the operation count in comparison with that achieved by sharing elimination.
