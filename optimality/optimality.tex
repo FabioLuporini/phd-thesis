@@ -245,16 +245,7 @@ The {\em Strategy Selection Analysis} uses a temporaries graph to determine whet
 
 It is finally straightforward to determine for which range of levels the application of Strategy~\ref{strategy:ii} improved the operation count. The cost and the effectiveness of the {\em Strategy Selection Analysis} obviously depend on the number $n$ of pairs ${<}i_1, i_2{>}$ that are evaluated (at most $k^2$). Since during our experiments setting $n = k^2$ never led to unacceptable code generation times\footnote{Even in the case of complex hyperelastic models, the code generation time never exceed a few seconds on a relatively old Sandy Bridge architecture.}, in the following we assume that the {\em Strategy Selection Analysis} always considers all possible pairs.
 
-%Clearly, there can be edges between vertices in non-consecutive levels.
-%. This guarantees that the algebraic structure of an expression arising from a variational form has not been altered,
 
-%Common sub-expressions elimination (CSE) is a transformation that aims to reduce the operation count by replacing identical sub-expressions with suitable temporary variables. As in a finite element integration loop nest the expressions are in normal form, there may be ample scope for CSE. The normal form guarantees that the algebraic structure of an expression arising from a variational form has not been altered. Hence, if the same inner product occurs multiple times in the input form, it is sure that its operands will represent common sub-expressions. 
-
-%Since sharing elimination may transform an expression by exploiting mathematical properties such as distributivity, it is possible that some CSE opportunities are lost. The natural question that follows from this picture is whether and to what extent one should prefer CSE over sharing elimination. In this section, we address this problem. 
-
-
-%\textit{Note: the last check ensures the flop-decreasing nature of the transformation. In the cases in which expansion outweighs code motion, Strategy~\ref{strategy:i} is preferred.}\\
-%\textit{Note: the expansion cost is a function of the products wrapping a symbol (how many of them and their arity), so it can be determined through tree visits.}
 
 
 \subsection{The Sharing Elimination Algorithm}
