@@ -194,7 +194,7 @@ In this section, we study \textit{sharing elimination}, a transformation that ai
 Finite element expressions can be seen as composition of operations between tensors. Often, the optimal implementation strategy for these operations is to be determined out of two alternatives. For instance, consider $J^{-T} \nabla v \cdot J^{-T} \nabla v$, with $J^{-T}$ being the transposed inverse Jacobian matrix for the change of (two-dimensional) coordinates, and $v$ a generic two-dimensional vector. The tensor operation will reduce to the scalar expression $(a v^0_i + b v^1_i) (a v^0_i + b v^1_i) + ...$, in which $v^0_i$ and $v^1_i$ represent components of $v$ that depend on $L_i$. To minimize the operation count for expressions of this kind, we have two options:
 \begin{Strategy}
 \label{strategy:i}
-Eliminating temporal sharing through generalized code motion.
+Eliminating spatial and temporal sharing through generalized code motion. Spatial sharing is eliminated by capturing common sub-expressions; temporal sharing is eliminated by hoisting expressions out of some loops.
 \end{Strategy}
 \begin{Strategy}
 \label{strategy:ii}
@@ -218,7 +218,7 @@ Finally, we observe that the $\sigma_{ei}$ sub-expressions can sometimes be cons
 
 
 \subsection{Driving the Transformation}
-In this section, we introduce a data structure -- the {\em temporaries graph} -- that relates the sub-expressions in a finite element integration loop nest. This will enable us to analyze the global impact on the operation count of Strategy~\ref{strategy:i} and Strategy~\ref{strategy:ii}.
+In this section, we introduce a data structure -- the {\em temporaries graph} -- that relates the sub-expressions in a finite element integration loop nest. This will enable us to analyze the impact that Strategy~\ref{strategy:i} and Strategy~\ref{strategy:ii} have on the operation count.
 
 It is useful to start with introducing the notion of a {\em minimal common sub-expression}.
 
@@ -226,15 +226,27 @@ It is useful to start with introducing the notion of a {\em minimal common sub-e
 A sub-expression $m$ within an expression $e$ is said to be a minimal common sub-expression (MCS) if:
 \begin{itemize}
 \item $m$ occurs at least twice in $e$, and
-\item by removing a given operation from $m$, no other common sub-expressions are created.
+\item $m'$, the sub-expression obtained by removing an operation from $m$, has no common sub-expressions in $e$.
 \end{itemize}
 \end{Def}
 
-For example, in $(a b) + (a b c) + (a b c d)$ the sub-expression $(a b)$ is an MCS, whereas $(a b c)$ is not, despite occurring twice. 
+For example, in $a b + a b c + a b c$ the sub-expression $a b$ is an MCS, whereas $a b c$ is not, despite occurring twice. 
 
-A temporaries graph is a directed acyclic graph in which the vertices are MCSs determined by successive applications of Strategy~\ref{strategy:i}. An edge from $e_1$ to $e_2$ indicates that $e_1$ is read by $e_2$. As in a finite element integration loop nest the expressions are in normal form, there usually is ample scope for capturing common sub-expressions. The normal form guarantees that the algebraic structure of an expression arising from a variational form has not been altered. Hence, if the same inner product occurs multiple times in the input form, it is sure that its operands will represent common sub-expressions. 
+A temporaries graph is a directed $k$-partite graph in which vertices are MCSs and edges represent read-after-write dependencies between MCSs (e.g., an edge from $e_1$ to $e_2$ indicates that $e_1$ is read in $e_2$). The $k$ independent sets $\lbrace T_i \rbrace_{i=0}^{k-1}$ of vertices, or simply {\em level}s, are determined iteratively. Initially, Strategy~\ref{strategy:i} is applied to the input expression. This produces $T_0$ and modifies the input expression by replacing the MCSs in $T_0$ with appropriate temporaries. Strategy~\ref{strategy:i} is then applied to the modified expression, which results in $T_1$. The edges from $T_0$ to $T_1$ are also determined. This process is repeated $k$ times, until there are no more MCSs. An example of temporaries graph is provided in Figure~\ref{fig:opt:tg}. It is finally worth observing that $k$ can be quite large as the input is in normal form, which preserves the common sub-expressions when translating the variational form into a scalar expression. For instance, the operands of an inner product occurring multiple times in the variational form will become common sub-expressions.
 
-As an example, consider an excerpt from a real problem: $...$. The corresponding temporaries graph is shown in Figure~\ref{fig:opt:tg}. 
+The {\em Strategy Selection Analysis} uses a temporaries graph to determine whether applying Strategy~\ref{strategy:ii} to some subsets of levels would lower the overall operation count. If all MCSs are structured expressions (see Definition~\ref{def:struct-expr}), then this analysis can be accomplished in polynomial time. Given two levels $T_{i_1}$ and $T_{i_2}$ such that $i_1 < i_2$, one can easily:
+
+\begin{enumerate}
+\item calculate the operation count for the expressions in $\lbrace T_i \rbrace_{i=i_1}^{i_2}$;
+\item inline the MCSs within $T_{i_1}$ into $\lbrace T_i \rbrace_{i=i_1 + 1}^{i_2}$;
+\item exploiting Proposition~\ref{prop:multi-struct}, apply Strategy~\ref{strategy:ii};
+\item track the new operation count and iterate the process until $i=i_2$.
+\end{enumerate}
+
+It is finally straightforward to determine for which range of levels the application of Strategy~\ref{strategy:ii} improved the operation count. The cost and the effectiveness of the {\em Strategy Selection Analysis} obviously depend on the number $n$ of pairs ${<}i_1, i_2{>}$ that are evaluated (at most $k^2$). Since during our experiments setting $n = k^2$ never led to unacceptable code generation times\footnote{Even in the case of complex hyperelastic models, the code generation time never exceed a few seconds on a relatively old Sandy Bridge architecture.}, in the following we assume that the {\em Strategy Selection Analysis} always considers all possible pairs.
+
+%Clearly, there can be edges between vertices in non-consecutive levels.
+%. This guarantees that the algebraic structure of an expression arising from a variational form has not been altered,
 
 %Common sub-expressions elimination (CSE) is a transformation that aims to reduce the operation count by replacing identical sub-expressions with suitable temporary variables. As in a finite element integration loop nest the expressions are in normal form, there may be ample scope for CSE. The normal form guarantees that the algebraic structure of an expression arising from a variational form has not been altered. Hence, if the same inner product occurs multiple times in the input form, it is sure that its operands will represent common sub-expressions. 
 
