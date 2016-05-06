@@ -12,7 +12,7 @@ In this chapter, we present an algorithm for the optimization of a class of fini
 
 The need for rapid implementation of high performance, robust, and portable finite element methods has led to approaches based on automated code generation. This has been proven successful in the context of the FEniCS  and Firedrake projects. We recall from Section~\ref{sec:bkg:fenics-and-firedrake} that, in these frameworks, the weak variational form of a problem is expressed in a high level mathematical syntax by means of the domain-specific language UFL. This mathematical specification is used by a domain-specific compiler, known as a form compiler, to generate low-level C or C++ code for the integration over a single element of the computational mesh of the variational problem's left and right hand side operators. The code for assembly operators must be carefully optimized: as the complexity of a variational form increases, in terms of number of derivatives, pre-multiplying functions, or polynomial order of the chosen function spaces, the operation count increases, with the result that assembly often accounts for a significant fraction of the overall runtime. This aspect has previously been introduced in Section~\ref{sec:bkg:math-to-code}.
 
-As demonstrated by the substantial body of research on the topic, automating the generation of such high performance implementations poses several challenges. This is a result of the complexity inherent in the mathematical expressions involved in the numerical integration, which varies from problem to problem, and the particular structure of the loop nests enclosing the integrals. General-purpose compilers, such as those by \emph{GNU} and \emph{Intel}, fail to exploit the structure inherent in the expressions, thus producing sub-optimal code (i.e., code which performs more floating-point operations, or ``flops'', than necessary; we show this in Section~\ref{sec:perf-results}). Research compilers, for instance those based on polyhedral analysis of loop nests, such as PLUTO \citep{pluto}, focus on parallelization and optimization for cache locality, treating issues orthogonal to the question of minimising flops. The lack of suitable third-party tools has led to the development of a number of domain-specific code transformation (or synthesizer) systems. \cite{quadrature-olegaard} show how automated code generation can be leveraged to introduce optimizations that a user should not be expected to write ``by hand''. \cite{FFC-TC} and~\cite{Francis} employ mathematical reformulations of finite element integration with the aim of minimizing the operation count. In~\cite{Luporini-coffee} (and in Chapter~\ref{ch:lowlevelopt}, from which the article is extracted), the effects and the interplay of generalized code motion and a set of low level optimizations are analysed. It is also worth mentioning two new form compilers, UFLACS \citep{Uflacs} and TSFC \citep{TSFC}, which particularly target the compilation time challenges of the more complex variational forms. The performance evaluation in Section~\ref{sec:perf-results} includes most of these systems.
+As demonstrated by the substantial body of research on the topic, automating the generation of such high performance implementations poses several challenges. This is a result of the complexity inherent in the mathematical expressions involved in the numerical integration, which varies from problem to problem, and the particular structure of the loop nests enclosing the integrals. General-purpose compilers, such as those by \emph{GNU} and \emph{Intel}, fail to exploit the structure inherent in the expressions, thus producing sub-optimal code (i.e., code which performs more floating-point operations, or ``flops'', than necessary; we show this in Section~\ref{sec:opt:perf-results}). Research compilers, for instance those based on polyhedral analysis of loop nests, such as PLUTO \citep{pluto}, focus on parallelization and optimization for cache locality, treating issues orthogonal to the question of minimising flops. The lack of suitable third-party tools has led to the development of a number of domain-specific code transformation (or synthesizer) systems. \cite{quadrature-olegaard} show how automated code generation can be leveraged to introduce optimizations that a user should not be expected to write ``by hand''. \cite{FFC-TC} and~\cite{Francis} employ mathematical reformulations of finite element integration with the aim of minimizing the operation count. In~\cite{Luporini-coffee} (and in Chapter~\ref{ch:lowlevelopt}, from which the article is extracted), the effects and the interplay of generalized code motion and a set of low level optimizations are analysed. It is also worth mentioning two new form compilers, UFLACS \citep{Uflacs} and TSFC \citep{TSFC}, which particularly target the compilation time challenges of the more complex variational forms. The performance evaluation in Section~\ref{sec:opt:perf-results} includes most of these systems.
 
 However, in spite of such a considerable research effort, there is still no answer to one fundamental question: can we automatically generate an implementation of a form which is optimal in the number of flops executed? In this chapter, we formulate an approach that solves this problem for a particular class of forms and provides very good approximations in all other cases. In particular, we will define ``local optimality'', which relates operation count with inner loops. In summary, our contributions are as follows:
 
@@ -30,7 +30,7 @@ In addition, in order to place COFFEE on the same level as other code generation
 \item We introduce a transformation based on symbolic execution that allows irrelevant floating point operations to be skipped (for example those involving zero-valued quantities).
 \end{itemize}
 
-In Section~\ref{sec:lnopt} we introduce a set of definitions mapping mathematical properties to the level of loop nests. This step is an essential precursor to the definition of the two algorithms -- sharing elimination (Section~\ref{sec:sharing-elimination}) and pre-evaluation (Section~\ref{sec:pre-evaluation}) -- through which we construct the space of legal transformations. The main transformation algorithm in Section~\ref{sec:optimal-synthesis} delivers the local optimality claim by using a cost model to coordinate the application of sharing elimination and pre-evaluation. We elaborate on the correctness of the methodology in Section~\ref{sec:proof}. The numerical experiments are showed in Section~\ref{sec:perf-results}. We conclude discussing the limitations of the algorithms presented and future work. 
+In Section~\ref{sec:lnopt} we introduce a set of definitions mapping mathematical properties to the level of loop nests. This step is an essential precursor to the definition of the two algorithms -- sharing elimination (Section~\ref{sec:sharing-elimination}) and pre-evaluation (Section~\ref{sec:pre-evaluation}) -- through which we construct the space of legal transformations. The main transformation algorithm in Section~\ref{sec:optimal-synthesis} delivers the local optimality claim by using a cost model to coordinate the application of sharing elimination and pre-evaluation. We elaborate on the correctness of the methodology in Section~\ref{sec:proof}. The numerical experiments are showed in Section~\ref{sec:opt:perf-results}. We conclude discussing the limitations of the algorithms presented and future work. 
 
 
 %TODO : need somehow to put the definition of a monomial
@@ -214,7 +214,7 @@ This follows directly from Definition~\ref{def:linear-loop} and Definition~\ref{
 \end{proof}
 If $\Lambda$ were an arbitrary loop nest, a given symbol $s_{\Lambda}$ could appear everywhere (e.g., $n$ times in a summand and $m$ times in another summand with $n \neq m$, as argument of a higher level function, in the denominator of a division), thus posing the challenge of finding the factorization that maximizes temporal sharing. If $\Lambda$ is instead a finite element integration loop nest, Proposition~\ref{prop:multi-struct} guarantees that any sub-expression including at least two instances of the same linear symbol can be applied Strategy~\ref{strategy:ii}. As discussed in the next sections, this property will allow us to construct the space of flop-decreasing transformations by ``composition'' of Strategy~\ref{strategy:i} and Strategy~\ref{strategy:ii}.
 
-Finally, we observe that the $\sigma_{ei}$ sub-expressions can sometimes be considered ``weakly structured''. This happens when a relaxed version of Definition~\ref{def:struct-expr} applies, in which the factorization of $s_{\Lambda}$ only ``minimizes'' (rather than ``eliminates'') spatial sharing (for instance, in the complex hyperelastic model analyzed in Section~\ref{sec:perf-results}). Weak structure will be exploited by Algorithm~\ref{algo:sharing-elimination} in the attempt to achieve optimality.
+Finally, we observe that the $\sigma_{ei}$ sub-expressions can sometimes be considered ``weakly structured''. This happens when a relaxed version of Definition~\ref{def:struct-expr} applies, in which the factorization of $s_{\Lambda}$ only ``minimizes'' (rather than ``eliminates'') spatial sharing (for instance, in the complex hyperelastic model analyzed in Section~\ref{sec:opt:perf-results}). Weak structure will be exploited by Algorithm~\ref{algo:sharing-elimination} in the attempt to achieve optimality.
 
 
 \subsection{Driving the Transformation}
@@ -299,19 +299,16 @@ In this section, we present a series of examples of increasing complexity.
 Consider again Figure~\ref{code:multi_loopnest_a}. There are no common sub-expressions, so the {\em Strategy Selection Analysis} has no effect. The sharing graph is $G = (\lbrace b_j, c_i, d_i \rbrace, \lbrace (b_j, c_i), (b_j, d_i) \rbrace$. The ILP formulation leads to the code in Figure~\ref{code:multi_loopnest_c}.
 
 \subsubsection{Example 2}
-In Figure~\ref{code:poisson}, Algorithm~\ref{algo:sharing-elimination} is executed in a simple yet realistic scenario, which originates from the bilinear form of a Poisson equation in two dimensions. The temporaries graph, which consists of a single level, is used by the {\em Strategy Selection Analysis}. This leads to the synthesis in Figure~\ref{code:poisson_b}. The sharing graph is $G = (\lbrace t_0, t_1, t_2, t_3 \rbrace, \lbrace (t_0, t_2), (t_1, t_3) \rbrace)$, but since there are no factorization opportunities the ILP formulation has no impact.
-
+In Figure~\ref{code:poisson}, Algorithm~\ref{algo:sharing-elimination} is executed in a simple yet realistic scenario, which originates from the bilinear form of a Poisson equation in two dimensions. The temporaries graph, which consists of a single level, is used for performing {\em Strategy Selection Analysis}. This leads to the synthesis in Figure~\ref{code:poisson_b}. The sharing graph is $G = (\lbrace t_0, t_1, t_2, t_3 \rbrace, \lbrace (t_0, t_2), (t_1, t_3) \rbrace)$, but since there are no factorization opportunities the ILP formulation has no effect.
 
 \begin{figure}[h]
 \begin{CenteredBox}
 \begin{subfigure}{0.40\textwidth}
-\captionsetup{skip=7pt}
 \lstinputlisting[basicstyle=\scriptsize\ttfamily]{optimality/listings/poisson_pre_se.code}
 \subcaption{Normal form}\label{code:poisson_a}
 \end{subfigure}
 ~~~~~~~~~~
 \begin{subfigure}{0.40\textwidth}
-\captionsetup{skip=7pt}
 \lstinputlisting[basicstyle=\scriptsize\ttfamily]{optimality/listings/poisson_after_se.code}
 \subcaption{After sharing elimination}\label{code:poisson_b}
 \end{subfigure}
@@ -322,13 +319,51 @@ In Figure~\ref{code:poisson}, Algorithm~\ref{algo:sharing-elimination} is execut
 \end{figure}
 
 \subsubsection{Example 3}
-pressure equation
+In this example, we focus on the effects of the ILP formulation. We consider a bilinear form extracted from a model of temperature-dependent multiphase flow through porous media~\citep{quadrature-olegaard}, which we informally refer to as ``pressure equation''. Although the complete specification of the form is irrelevant for the purpose of this example, it is useful to know that (i) the problem is linear, (ii) there are in total six monomials, (iii) gradient and divergence of test and trial functions appear in some monomials. 
+
+\begin{figure}[htp]
+
+\begin{subfigure}{\textwidth}
+\lstinputlisting[basicstyle=\scriptsize\ttfamily]{optimality/listings/pressure_pre_se.code}
+\subcaption{Before the ILP-driven factorization}\label{code:pressure_a}
+\end{subfigure}
+~\\
+\begin{subfigure}{\textwidth}
+\lstinputlisting[basicstyle=\scriptsize\ttfamily]{optimality/listings/pressure_post_se.code}
+\subcaption{After the ILP-driven factorization}\label{code:pressure_b}
+\end{subfigure}
+
+\caption{Using the ILP model to factorize the expression arising from the pressure equation.}
+\label{code:pressure}
+\end{figure}
+
+Figure~\ref{code:pressure_a} shows the finite element integration loop nest right after step (2) of Algorithm~\ref{algo:sharing-elimination}; that is, once the {\em Strategy Selection Analysis} has been applied. The linear temporaries induce spatial sharing in the loop nest. We observe that it is not obvious to individuate the factorization that would result in a local optimum. One can derive the sharing graph directly from inspection of Figure~\ref{code:pressure_a}, obtaining $G = (\lbrace t_{10_{ik}}, t_{10_{ij}}, t_{11_{j}}, t_{12_{j}}, t_{13_{k}}, t_{14_{k}}, t_{15_{k}}\rbrace$, $\lbrace (t_{10_{ik}},t_{10_{ij}}), (t_{10_{ik}},t_{11_{j}}), (t_{10_{ik}},t_{12_{j}}), (t_{15_{k}},t_{11_{j}}), (t_{15_{k}},t_{12_{j}}), (t_{10_{ij}},t_{14_{k}}), (t_{10_{ij}},t_{13_{k}}),\\ (t_{11_{j}},t_{14_{k}}), (t_{11_{j}},t_{13_{k}}), (t_{12_{j}},t_{14_{k}}), (t_{12_{j}},t_{13_{k}}) \rbrace)$. The ILP formulation retrieves three factorization candidates; eventually, the code in Figure~\ref{code:pressure_b} is produced. 
 
 \subsubsection{Example 4}
-hyperelasticity
+In the last example, we show how the {\em Strategy Selection Analysis} impacts the operation count in the hyperelastic model employed for performance evaluation in Section~\ref{sec:opt:perf-results}. The code in Figure~\ref{code:hyper_a} is obtained by repeatedly applying Strategy~\ref{strategy:i} to the expression in normal form, as stated by step (1) in Algorithm~\ref{algo:sharing-elimination}. The temporaries graph, which consists of 6 levels, can easily be derived. For given values of $I$ and $K$, the {\em Strategy Selection Analysis} determines that applying Strategy~\ref{strategy:ii} to the temporaries between levels $T_0$ and $T_4$ would improve the operation count within the outer loops. Strategy~\ref{strategy:i} is instead preferable for $T_5$, which comprises the four temporaries $t_{59_k}$, $t_{60_k}$, $t_{65_k}$, $t_{66_k}$. The resulting synthesis is shown in Figure~\ref{code:hyper_b}. Intuitively, we have traded $N$ operations that had to be executed $I K$ times (Figure~\ref{code:hyper_a}) for $M$ operations that now need be executed only $I$ times (Figure~\ref{code:hyper_b}). It is true that $M > N$, but the analysis guarantees that $I$ and $K$ are such that the operation count has improved. 
 
-%TODO : fix this
-%For reasons of space, further examples, including the hyperelastic model evaluated in Section~\ref{sec:perf-results} and other non-trivial ILP instances, are made available online\footnote{Sharing elimination examples: \url{https://gist.github.com/FabioLuporini/14e79457d6b15823c1cd}}.
+In this example, depending on the values of $I$ and $K$, the application of Strategy~\ref{strategy:ii} through the {\em Strategy Selection Analysis} reduces the operation count by about $1.3 \times$. It is not rare, however, to encounter cases (e.g., more complex hyperelastic models) in which the reduction is even larger than $2 \times$. We emphasize that here we are discussing the improvement from applying Strategy~\ref{strategy:ii} ``on top of'' Strategy~\ref{strategy:i}; the overall gain due to the {\em Strategy Selection Analysis} (which clearly also has to include the effect of Strategy~\ref{strategy:i}) is obviously larger.
+
+\begin{figure}[htp]
+\begin{CenteredBox}
+
+\begin{subfigure}{0.55\textwidth}
+\lstinputlisting[basicstyle=\scriptsize\ttfamily]{optimality/listings/hyperelasticity_pre_se.code}
+\subcaption{Normal form}\label{code:hyper_a}
+\end{subfigure}
+~~~~~~
+\begin{subfigure}{0.65\textwidth}
+\lstinputlisting[basicstyle=\scriptsize\ttfamily]{optimality/listings/hyperelasticity_post_se.code}
+\subcaption{After sharing elimination}\label{code:hyper_b}
+\end{subfigure}
+
+\end{CenteredBox}
+
+\caption{Applying the {\em Strategy Selection Analysis} to the bilinear form arising from a hyperelastic model in 2D.}
+\label{code:hyperelasticity}
+\end{figure}
+
+\clearpage
 
 \section{Transformation Space: Pre-evaluation of Reductions}
 \label{sec:pre-evaluation}
@@ -340,13 +375,11 @@ We start with an example. Consider again the loop nest and the expression in Fig
 \begin{CenteredBox}
 
 \begin{subfigure}{0.40\textwidth}
-\captionsetup{skip=30pt}
 \lstinputlisting[basicstyle=\scriptsize\ttfamily]{optimality/listings/loopnest_red.code}
 \subcaption{With reduction}\label{code:loopnest_red}
 \end{subfigure}
 ~~~~~~~~~~
 \begin{subfigure}{0.40\textwidth}
-\captionsetup{skip=5pt}
 \lstinputlisting[basicstyle=\scriptsize\ttfamily]{optimality/listings/loopnest_nored.code}
 \subcaption{After pre-evaluation}\label{code:loopnest_nored}
 \end{subfigure}
@@ -514,7 +547,7 @@ COFFEE aims to be independent of the high level form compiler. It provides an in
 For several reasons, basis function tables may be block-sparse (e.g., containing zero-valued columns). For example, the FEniCS Form Compiler implements vector-valued functions by adding blocks of zero-valued columns to the corresponding tabulations; this extremely simplifies code generation (particularly, the construction of loop nests), but also affects the performance of the generated code due to the execution of ``useless'' flops (e.g., operations like \texttt{a + 0}). In~\cite{quadrature-olegaard}, a technique to avoid iteration over zero-valued columns based on the use of indirection arrays (e.g. \texttt{A[B[i]]}, in which \texttt{A} is a tabulated basis function and \texttt{B} a map from loop iterations to non-zero columns in A) was proposed. This technique, however, produces non-contiguous memory loads and stores, which nullify the potential benefits of vectorization. COFFEE, instead, handles block-sparse basis function tables by restructuring loops in such a manner that low level optimization (especially vectorization) is only marginally affected. This is based on symbolic execution of the code, which enables a series of checks on array indices and loop bounds which determine the zero-valued blocks which can be skipped without affecting data alignment.
 
 \section{Performance Evaluation}
-\label{sec:perf-results}
+\label{sec:opt:perf-results}
 
 \subsection{Experimental Setup}
 
@@ -553,7 +586,7 @@ While constants of our study are
 \end{itemize}
 
 \subsection{Performance Results}
-\label{sec:perf-results-forms}
+\label{sec:opt:perf-results-forms}
 
 \begin{figure}
  \makebox[\textwidth][c]{\includegraphics[scale=0.77]{optimality/perf-results/mass}}

@@ -1,12 +1,13 @@
 for (e = 0; e < E; e++)
   ...
   for (i = 0; i < I; i++)
+    $t_{\operatorname{det}}$ = $W_i*\operatorname{det}$
     for (k = 0; k < K; k++)
       $t_{0_k}$ = $(z_0 a_{ik} + z_2 b_{ik})$
       $t_{1_k}$ = $(z_1 a_{ik} + z_3 b_{ik})$
     for (j = 0; j < J; j++)
-      $t_{2_j}$ = $(z_0 c_{ij} + z_2 d_{ij})*W_i*\operatorname{det}$
-      $t_{3_j}$ = $(z_1 c_{ij} + z_3 d_{ij})*W_i*\operatorname{det}$
+      $t_{2_j}$ = $(z_0 c_{ij} + z_2 d_{ij})*t_{\operatorname{det}}$
+      $t_{3_j}$ = $(z_1 c_{ij} + z_3 d_{ij})*t_{\operatorname{det}}$
     for (j = 0; j < J; j++)
       for (k = 0; k < K; k++)
-        $a_{ejk}$ += $t_{0_k} * t_{2_j}$ + $t_{1_k} * t_{3_j}$
+        $A_{ejk}$ += $t_{0_k} * t_{2_j}$ + $t_{1_k} * t_{3_j}$

@@ -4,4 +4,4 @@ for (e = 0; e < E; e++)
     ...
     for (j = 0; j < J; j++)
       for (k = 0; k < K; k++)
-        $a_{ejk}$ += $\displaystyle \sum_{w=1}^m \alpha_{eij}^{w} \beta_{eik}^{w} \sigma_{ei}^{w}$
+        $A_{ejk}$ += $\displaystyle \sum_{w=1}^m \alpha_{eij}^{w} \beta_{eik}^{w} \sigma_{ei}^{w}$

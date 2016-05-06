@@ -7,7 +7,7 @@ for (e = 0; e < E; e++)
   // Loop nest for pre-evaluated monomials
   for (j = 0; j < J; j++)
     for (k = 0; k < K; k++)
-      $a_{ejk}$ += F$'$(...) + F$''$(...) + ...
+      $A_{ejk}$ += F$'$(...) + F$''$(...) + ...
 
   // Loop nest for monomials for which run-time
   // integration was determined to be faster
@@ -16,4 +16,4 @@ for (e = 0; e < E; e++)
     ...
     for (j = 0; j < J; j++)
       for (k = 0; k < K; k++)
-        $a_{ejk}$ += H(...)
+        $A_{ejk}$ += H(...)

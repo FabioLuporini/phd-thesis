@@ -1,4 +1,4 @@
 for (e = 0; e < E; e++)
   for (i = 0; i < I; i++)
     for (k = 0; k < K; k++)
-      $a_{ek}$ += $d_e b_{ik} c_i$ + $d_e b_{ik} d_i$
+      $A_{ek}$ += $d_e b_{ik} c_i$ + $d_e b_{ik} d_i$
