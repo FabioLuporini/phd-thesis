@@ -75,8 +75,8 @@ We discuss some simple examples (to relieve the notation, we set $a[i] \equiv a_
 \label{def:linear-loop}
 Let $L_i$ be a loop iterating over the space $I$ through the iteration variable $i$. $L_i$ is linear if in its body
 \begin{enumerate}
-\item $i$ appears only as an array index, and
-\item all arrays indexed by $i$ are linear symbols. 
+\item $i$ only appears as an array index, and
+\item all symbols in which $i$ appears are linear symbols.
 \end{enumerate}
 \end{Def}
 
@@ -223,7 +223,7 @@ Finally, we observe that the $\sigma_{ei}$ sub-expressions can sometimes be cons
 
 \subsection{Global Analysis of the Expression}
 \label{sec:opt:driving-se}
-To evaluate the global impact of a transformation, we perform a so called {\em Strategy Selection Analysis} on a {\em temporaries graph} derived from the input expression. As we shall see, this outperforms a simplistic approach in which sub-expressions are analyzed in ``isolation'', because the presence of common sub-expressions is now taken into account.
+To evaluate the global impact of a transformation, we perform a so called {\em Strategy Selection Analysis} on a {\em temporaries graph}, which represents a model of the input expression. As we shall see, this outperforms a simplistic approach in which sub-expressions are analyzed in ``isolation'', because the presence of common sub-expressions is now taken into account.
 
 It is useful to start with introducing the notion of a {\em minimal common sub-expression}.
 
@@ -447,7 +447,7 @@ We address the two following issues:
 \item \textit{Optimizing over composite operations.} Consider a form comprising two monomials $m_1$ and $m_2$. Assume that pre-evaluation is profitable for $m_1$ but not for $m_2$, and that $m_1$ and $m_2$ share at least one term (for example some basis functions). If pre-evaluation were applied to $m_1$, sharing between $m_1$ and $m_2$ would be lost. We then need a mechanism to understand which transformation -- pre-evaluation or sharing elimination -- results in the highest operation count reduction when considering the whole set of monomials (i.e., the expression as a whole).
 \end{enumerate}
 
-Let $\theta : M \rightarrow \mathbb{Z}$ be a cost function that, given a monomial $m \in M$, returns the gain/loss achieved by pre-evaluation over sharing elimination. In particular, we define $\theta(m) = \mathrm{\theta}^{pre}(m) - \mathrm{\theta}^{se}(m)$, where $\mathrm{\theta}^{se}$ and $\mathrm{\theta}^{pre}$ represent the operation counts resulting from applying sharing elimination and pre-evaluation, respectively. Thus pre-evaluation is profitable for $m$ if and only if $\theta(m) < 0$. We return to the issue of deriving $\mathrm{\theta}^{se}$ and $\mathrm{\theta}^{pre}$ in Section~\ref{sec:op_count}. Having defined $\theta$, we can now describe the transformation algorithm (Algorithm~\ref{algo:gamma}).
+Let $\theta : M \rightarrow \mathbb{Z}$ be a cost function that, given a monomial $m \in M$, returns the gain/loss achieved by pre-evaluation over sharing elimination. In particular, we define $\theta(m) = \theta^{pre}(m) - \theta^{se}(m)$, where $\theta^{se}$ and $\theta^{pre}$ represent the operation counts resulting from applying sharing elimination and pre-evaluation, respectively. Thus pre-evaluation is profitable for $m$ if and only if $\theta(m) < 0$. We return to the issue of deriving $\theta^{se}$ and $\theta^{pre}$ in Section~\ref{sec:op_count}. Having defined $\theta$, we can now describe the transformation algorithm (Algorithm~\ref{algo:gamma}).
 
 \noindent\rule[0.01ex]{\linewidth}{0.7pt}
 
@@ -458,7 +458,7 @@ The algorithm has three main phases: initialization (step 1); determination of t
 \begin{enumerate}
 \item Perform a depth-first visit of the expression tree and determine the set of monomials $M$. Let $S$ be the subset of monomials $m$ such that $\theta(m) > 0$. The set of monomials that will \textit{potentially} be pre-evaluated is $P = M \setminus S$. \\ \textit{Note: there are two fundamental reasons for not pre-evaluating $m_1 \in P$ straight away: 1) the potential presence of spatial sharing between $m_1$ and $m_2 \in S$, which impacts the search for the global optimum; 2) the risk of breaking Constraint~\ref{const:TH}.}
 \item Build the set $B$ of all possible bipartitions of $P$. Let $D$ be the dictionary that will store the operation counts of different alternatives.
-\item Discard $b = (b_S, b_P) \in B$ if the memory required after applying pre-evaluation to the monomials in $b_P$ exceeds $T_H$ (see Constraint~\ref{const:TH}); otherwise, add $D[b] = \mathrm{\theta}^{se}(S \cup b_S) + \mathrm{\theta}^{pre}(b_P)$. \\ \textit{Note: $\mathbb{B}$ is in practice very small, since even complex forms usually have only a few monomials. This pass can then be accomplished rapidly as long as the cost of calculating $\mathrm{\theta}^{se}$ and $\mathrm{\theta}^{pre}$ is negligible. We elaborate on this aspect in Section~\ref{sec:op_count}.}
+\item Discard $b = (b_S, b_P) \in B$ if the memory required after applying pre-evaluation to the monomials in $b_P$ exceeds $T_H$ (see Constraint~\ref{const:TH}); otherwise, add $D[b] = \theta^{se}(S \cup b_S) + \theta^{pre}(b_P)$. \\ \textit{Note: $\mathbb{B}$ is in practice very small, since even complex forms usually have only a few monomials. This pass can then be accomplished rapidly as long as the cost of calculating $\theta^{se}$ and $\theta^{pre}$ is negligible. We elaborate on this aspect in Section~\ref{sec:op_count}.}
 \item Take $\argmin_b D[b]$.
 \item Apply pre-evaluation to all monomials in $b_P$. Apply sharing elimination to all resulting expressions. \\ \textit{Note: because of the reuse of basis functions, pre-evaluation may produce some identical tables, which will be mapped to the same temporary variable. Sharing elimination is therefore transparently applied to all expressions, including those resulting from pre-evaluation.}
 \end{enumerate}
@@ -477,9 +477,9 @@ The output of the transformation algorithm is provided in Figure~\ref{code:loopn
 \label{sec:op_count}
 We tie up the remaining loose end: the construction of the cost function $\theta$.
 
-We recall that $\theta(m) = \mathrm{\theta}^{se}(m) - \mathrm{\theta}^{pre}(m)$, with $\mathrm{\theta}^{se}$ and $\mathrm{\theta}^{pre}$ representing the operation counts after applying sharing elimination and pre-evaluation. Since $\theta$ is deployed in a working compiler, simplicity and efficiency are essential characteristics. In the following, we explain how to derive these two values.
+We recall that $\theta(m) = \theta^{pre}(m) - \theta^{se}(m)$, with $\theta^{se}$ and $\theta^{pre}$ representing the operation counts after applying sharing elimination and pre-evaluation. Since $\theta$ is deployed in a working compiler, simplicity and efficiency are essential characteristics. In the following, we explain how to derive these two values.
 
-The most trivial way of evaluating $\mathrm{\theta}^{se}$ and $\mathrm{\theta}^{pre}$ would consist of applying the actual transformations and simply count the number of operations. This would be tolerable for $\mathrm{\theta}^{se}$, as Algorithm~\ref{algo:sharing-elimination} tends to have negligible cost. However, the overhead would be unacceptable if we applied pre-evaluation -- in particular, symbolic execution -- to all bipartitions analyzed by Algorithm~\ref{algo:gamma}. We therefore seek an analytic way of determining $\mathrm{\theta}^{pre}$.
+The most trivial way of evaluating $\theta^{se}$ and $\theta^{pre}$ would consist of applying the actual transformations and simply count the number of operations. This would be tolerable for $\theta^{se}$, as Algorithm~\ref{algo:sharing-elimination} tends to have negligible cost. However, the overhead would be unacceptable if we applied pre-evaluation -- in particular, symbolic execution -- to all bipartitions analyzed by Algorithm~\ref{algo:gamma}. We therefore seek an analytic way of determining $\theta^{pre}$.
 
 The first step consists of estimating the \textit{increase factor}, $\iota$. This number captures the increase in arithmetic complexity due to the transformations exposing pre-evaluation opportunities. For context, consider the example in Figure~\ref{code:increase_factor}. One can think of this as the (simplified) loop nest originating from the integration of the action of a mass matrix. The sub-expression \texttt{$f_0$*$B_{i0}$+$f_1$*$B_{i1}$+$f_2$*$B_{i2}$} represents the coefficient $f$ over (tabulated) basis functions (array $B$). In order to apply pre-evaluation, the expression needs be transformed to separate $f$ from all $[L_i, L_j, L_k]$-dependent quantities (see Algorithm~\ref{algo:pre-evaluation}). By product expansion, we observe an increase in the number of $[L_j, L_k]$-dependent terms of a factor $\iota = 3$.
 
@@ -489,7 +489,7 @@ The first step consists of estimating the \textit{increase factor}, $\iota$. Thi
 
 In general, however, determining $\iota$ is not so straightforward since redundant tabulations may result from common sub-expressions. Consider the previous example. One may add one coefficient in the same function space as $f$, repeat the expansion, and observe that multiple sub-expressions (e.g., $b_{10}*b_{01}*...$ and $b_{01}*b_{10}*...$) will reduce to identical tables. To evaluate $\iota$, we then use combinatorics. We calculate the $k$-combinations with repetitions of $n$ elements, where: (i) $k$ is the number of (derivatives of) coefficients appearing in a product; (ii) $n$ is the number of unique basis functions involved in the expansion. In the original example, we had $n=3$ (for $b_{i0}$, $b_{i1}$, and $b_{i2}$) and $k=1$, which confirms $\iota=3$. In the modified example, there are two coefficients, so $k=2$, which means $\iota=6$.
 
-If $\iota \geq I$ (the extent of the reduction loop), we already know that pre-evaluation will not be profitable. Intuitively, this means that we are introducing more operations than we are saving from pre-evaluating $L_i$. If $\iota < I$, we still need to find the number of terms $\rho$ such that $\mathrm{\theta}^{pre} = \rho \cdot \iota$. The mass matrix monomial in Figure~\ref{code:increase_factor} is characterized by the dot product of test and trial functions, so trivially $\rho = 1$. In the example in Figure~\ref{code:poisson}, instead, we have $\rho = 3$ after a suitable factorization of basis functions. In general, therefore, $\rho$ depends on both form and discretization. To determine this parameter, we look at the re-factorized expression (as established by Algorithm~\ref{algo:pre-evaluation}), and simply count the terms amenable to pre-evaluation.
+If $\iota \geq I$ (the extent of the reduction loop), we already know that pre-evaluation will not be profitable. Intuitively, this means that we are introducing more operations than we are saving from pre-evaluating $L_i$. If $\iota < I$, we still need to find the number of terms $\rho$ such that $\theta^{pre} = \rho \cdot \iota$. The mass matrix monomial in Figure~\ref{code:increase_factor} is characterized by the dot product of test and trial functions, so trivially $\rho = 1$. In the example in Figure~\ref{code:poisson}, instead, we have $\rho = 3$ after a suitable factorization of basis functions. In general, therefore, $\rho$ depends on both form and discretization. To determine this parameter, we look at the re-factorized expression (as established by Algorithm~\ref{algo:pre-evaluation}), and simply count the terms amenable to pre-evaluation.
 
 \section{Formalization}
 \label{sec:proof}
