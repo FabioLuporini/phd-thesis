@@ -6,7 +6,7 @@
 \chapter{Minimizing Operations in Finite Element Integration Loops}
 \label{ch:optimality}
 
-In this chapter, we present an algorithm for the optimization of a class of finite element integration loop nests. This algorithm, which exploits fundamental mathematical properties of finite element operators, is proven to achieve a locally optimal operation count. In specified circumstances the optimum achieved is global. Extensive numerical experiments demonstrate significant performance improvements over the state of the art in finite element code generation in almost all cases. This validates the effectiveness of the algorithm presented here, and illustrates its limitations. The algorithm, as documented in later sections, is implemented in Firedrake.
+In this chapter, we present an algorithm for the optimization of a class of finite element integration loop nests. This algorithm, which exploits fundamental mathematical properties of finite element operators, is proven to achieve a locally optimal operation count. In specified circumstances the optimum achieved is global. Extensive numerical experiments demonstrate significant performance improvements over the state of the art in finite element code generation in almost all cases. This validates the effectiveness of the algorithm presented here, and illustrates its limitations. The algorithm is implemented in COFFEE and currently in use in the Firedrake framework.
 
 \section{Motivation and Related Work}
 
@@ -57,31 +57,35 @@ expressions from the innermost to any of the outer loops or the preheader
 (i.e., the block that precedes the entry point of the nest) is always safe,
 as long as any dependencies on loop indices are honored. We will make use of this property. The results of this section could also be generalized to larger classes of loop nests, in which basic block independence does not hold, although this would require refinements beyond the scope of this paper. 
 
-By mapping mathematical properties to the loop nest level, we introduce the
-concepts of a \textit{linear loop} and, more generally, a (perfect) multilinear loop nest.
+By mapping mathematical properties to the loop nest level, we introduce some new concepts. We start with the notion of a {\em linear symbol}. This will allow us to define a {\em linear loop} and, more generally, a (perfect) {\em multilinear loop nest}.
+
+\begin{Def}[Linear symbol]
+\label{def:linear-symbol}
+A symbol $a$ within an expression is linear if
+\begin{enumerate}
+\item $a$ is an $n$-dimensional array, and
+\item all occurrences (or ``instances'') of $a$ in the expression are indexed through the same vector-valued access function $f = [f_0, ..., f_{n-1}]$ (e.g., $a[f_0(...)][f_1(...)]$), and
+\item all sub-expressions in which $a$ appears are affine in $a$.
+\end{enumerate}
+\end{Def}
+
+We discuss some simple examples (to relieve the notation, we set $a[i] \equiv a_i$). The symbol $a$ is {\it not} linear in any of $a_i b + a_k$, $a_i b + a_{i+2}$, and $a_{ji} b + a_{ki}$, as condition 2 is violated. Condition 3 is violated for $a$ in both $b/a_i$ and $a_i b + a_i a_i$. $a$ is instead linear in $a_i b + a_i$.
 
 \begin{Def}[Linear loop]
 \label{def:linear-loop}
-A loop $L$ defining the iteration space $I$ through the iteration variable $i$, or simply $L_i$, is linear if in its body
+Let $L_i$ be a loop iterating over the space $I$ through the iteration variable $i$. $L_i$ is linear if in its body
 \begin{enumerate}
 \item $i$ appears only as an array index, and
-\item whenever an array $a$ is indexed by $i$ ($a[i]$), all expressions in which this appears are affine in $a[i]$.
+\item all arrays indexed by $i$ are linear symbols. 
 \end{enumerate}
 \end{Def}
 
 \begin{Def}[Multilinear loop nest]
 \label{def:multi-linear-loop}
-A multilinear loop nest of arity $n$ is a perfect nest composed of $n$ loops, in which all of the expressions appearing in the body of the innermost loop are affine in each loop $L_i$ separately.
+A multilinear loop nest of arity $n$ is a perfect nest composed of $n$ linear loops.
 \end{Def}
 
 We will show that multilinear loop nests, which arise naturally when translating bilinear or linear forms into code, are important because they have a structure that we can take advantage of to reach a local optimum.
-
-\begin{Def}[Linear symbol]
-\label{def:linear-symbol}
-A symbol depends on a linear loop $L_i$ if its value varies in the iteration space of $L_i$ (e.g., an array $a[i]$). Such a symbol takes the name of {\em linear symbol}.
-\end{Def}
-
-Examples of linear symbols are test functions, trial functions, first order derivatives of test functions, and so on.
 
 We now define two different classes of loops. 
 
@@ -96,19 +100,19 @@ A loop $L_i$ is said to be a reduction loop if in its body
 
 \begin{Def}[Order-free loop]
 \label{def:e-loop}
-A loop $L_i$ is said to be an order-free loop if its iterations can be executed in any arbitrary order. 
+A loop is said to be an order-free loop if its iterations can be executed in any arbitrary order. 
 \end{Def}
 
 \begin{figure}\begin{CenteredBox}
 \lstinputlisting[basicstyle=\footnotesize\ttfamily]{optimality/listings/loopnest.code}
 \end{CenteredBox}\caption{The loop nest implementing a generic bilinear form.}\label{code:loopnest}\end{figure}
 
-Consider Equation~\ref{eq:quadrature} and the (abstract) loop nest implementing it illustrated in Figure~\ref{code:loopnest}. The imperfect nest $\Lambda=[L_e, L_i, L_j, L_k]$ comprises an order-free loop $L_e$ (over elements in the mesh), a reduction loop $L_i$ (performing numerical integration), and a multilinear loop nest $[L_j, L_k]$ (over test and trial functions). In the body of $L_k$, one or more statements evaluate the local tensor for the element $e$. Expressions (the right hand side of a statement) result from the translation of a form in high level matrix notation into code. In particular, $m$ is the number of monomials (a form is a sum of monomials), $\alpha_{eij}$ and $\beta_{eik}$ represents the product of a coefficient function (e.g., the inverse Jacobian matrix for the change of coordinates) with some linear symbols, and $\sigma_{ei}$ is a function of coefficients and geometry. We do not pose any restrictions on function spaces (e.g., scalar- or vector-valued), coefficient expressions (linear or non-linear), differential and vector operators, so $\sigma_{ei}$ can be arbitrarily complex. We say that such an expression is in \textit{normal form}, because the algebraic structure of a variational form is intact: products have not yet been expanded, distinct monomials can still be identified, and so on. This brings us to formalize the class of loop nests that we aim to optimize.
+Consider Equation~\ref{eq:quadrature} and the (abstract) loop nest implementing it illustrated in Figure~\ref{code:loopnest}. The imperfect nest $\Lambda=[L_e, L_i, L_j, L_k]$ comprises an order-free loop $L_e$ (over elements in the mesh), a reduction loop $L_i$ (performing numerical integration), and a multilinear loop nest $[L_j, L_k]$ (over test and trial functions). In the body of $L_k$, one or more statements evaluate the local tensor for the element $e$. Expressions (the right hand side of a statement) result from the translation of a form in high level matrix notation into code. In particular, $m$ is the number of monomials (a form is a sum of monomials), $\alpha_{eij}$ and $\beta_{eik}$ represents the product of a coefficient function (e.g., the inverse Jacobian matrix for the change of coordinates) with some linear symbols (e.g., test or trial functions), and $\sigma_{ei}$ is a function of coefficients and geometry. We do not pose any restrictions on function spaces (e.g., scalar- or vector-valued), coefficient expressions (linear or non-linear), differential and vector operators, so $\sigma_{ei}$ can be arbitrarily complex. We say that such an expression is in \textit{normal form}, because the algebraic structure of a variational form is intact: products have not yet been expanded, distinct monomials can still be identified, and so on. This brings us to formalize the class of loop nests that we aim to optimize.
 
 
 \begin{Def}[Finite element integration loop nest]
 \label{def:fem-loopnest}
-A finite element integration loop nest is a loop nest in which the following appear, in order: an imperfect order-free loop, an imperfect (perfect only in some special cases), linear or non-linear reduction loop, and a multilinear loop nest whose body is an independent basic block in which expressions are in normal form.
+A finite element integration loop nest is a loop nest in which the following appear, in order: an imperfect order-free loop, an imperfect (perfect only in some special cases) reduction loop, and a multilinear loop nest whose body is an independent basic block in which expressions are in normal form. Test and trial functions (or derivatives thereof) are the linear symbols of the multilinear loop nest.
 \end{Def}
 
 We then characterize optimality for a finite element integration loop nest as follows.
@@ -135,7 +139,7 @@ Given $\Lambda$, $\Lambda'$ and $\Gamma$ as in Definition~\ref{def:mln-optimalit
 
 The restriction to flop-decreasing transformations aims to exclude those apparent optimizations that, to achieve flop-optimal innermost loops, would rearrange the computation at the level of the outer loops causing, in fact, a global increase in operation count. 
 
-We also observe that Definitions~\ref{def:mln-optimality} and~\ref{def:mln-quasi-optimality} do not take into account memory requirements. If the execution of loop nest were memory-bound -- the ratio of operations to bytes transferred from memory to the CPU being too low -- then optimizing the number of flops would be fruitless. Henceforth we assume we operate in a CPU-bound regime, evaluating arithmetic-intensive expressions. In the context of finite elements, this is often true for more complex multilinear forms and/or higher order elements. 
+We also observe that Definitions~\ref{def:mln-optimality} and~\ref{def:mln-quasi-optimality} do not take into account memory requirements. If the execution of a loop nest were memory-bound -- the ratio of operations to bytes transferred from memory to the CPU being too low -- then optimizing the number of flops would be fruitless. Henceforth we assume we operate in a CPU-bound regime, evaluating arithmetic-intensive expressions. In the context of finite elements, this is often true for more complex multilinear forms and/or higher order elements. 
 
 Achieving optimality in polynomial time is not generally feasible, since the $\sigma_{ei}$ sub-expressions can be arbitrarily unstructured. However, multilinearity results in a certain degree of regularity in $\alpha_{eij}$ and $\beta_{eik}$. In the following sections, we will elaborate on these observations and formulate an approach that achieves: (i) at least a local optimum in all cases; (ii) global optimality whenever the monomials are ``sufficiently structured''. To this purpose, we will construct:
 \begin{itemize}
@@ -200,26 +204,26 @@ Eliminating spatial and temporal sharing through generalized code motion. Spatia
 \label{strategy:ii}
 Eliminating spatial sharing first -- through product expansion and factorization -- and temporal sharing afterwards, again through generalized code motion.
 \end{Strategy}
-In the current example, depending on the size of $L_i$, applying Strategy~\ref{strategy:ii} could reduce the operation count since the expression would be recast as $v^0_i v^0_i a a + v^0_i v^1_i (ab + ab) + v^1_i v^1_i c c + ...$ and some hoistable sub-expressions would be exposed. On the other hand, Strategy~\ref{strategy:i} would have no effect as $v$ only depends on a single loop, $L_i$. A second example showing the effect of Strategy~\ref{strategy:ii} was provided in Figure~\ref{code:multi_loopnest}. In general, choosing between the two strategies is challenging because multiple factors must be taken into account: the loop sizes, the increase in operations due to expansion (only in Strategy~\ref{strategy:ii}), the gain due to code motion, and the presence of common sub-expressions. Before addressing this problem through the {\em Strategy Selection Analysis} (Section~\ref{sec:opt:driving-se}), we need to understand under what conditions Strategy~\ref{strategy:ii} is deterministically applicable. For this, we introduce a relevant class of expressions.
+In the current example, depending on the size of $L_i$, applying Strategy~\ref{strategy:ii} could reduce the operation count since the expression would be recast as $v^0_i v^0_i a a + v^0_i v^1_i (ab + ab) + v^1_i v^1_i c c + ...$ and some hoistable sub-expressions would be exposed. On the other hand, Strategy~\ref{strategy:i} would have no effect as $v$ only depends on a single loop, $L_i$. A second example showing the effect of Strategy~\ref{strategy:ii} was provided in Figure~\ref{code:multi_loopnest}. In general, choosing between the two strategies is challenging because multiple factors must be taken into account: the loop sizes, the increase in operations due to expansion, the gain due to code motion, and the presence of common sub-expressions. Before addressing this problem (in Section~\ref{sec:opt:driving-se}), we need to understand under what conditions Strategy~\ref{strategy:ii} is applicable. For this, we introduce a relevant class of expressions.
 \begin{Def}[Structured expression]
 \label{def:struct-expr}
-We say that an expression is ``structured along a loop nest $\Lambda$'' if and only if,  for every symbol $s_{\Lambda}$ depending on at least one loop in $\Lambda$, the spatial sharing of $s_{\Lambda}$ may be eliminated by factorizing all occurrences of $s_{\Lambda}$ in the expression.
+We say that an expression is ``structured in a loop nest $\Lambda$'' if and only if, for every symbol $s_{\Lambda}$ depending on at least one loop in $\Lambda$, the spatial sharing induced by $s_{\Lambda}$ may be eliminated by factorizing all occurrences of $s_{\Lambda}$ in the expression.
 \end{Def}
 \begin{Prop}
 \label{prop:multi-struct}
-An expression along a multilinear loop nest is structured.
+An expression is structured in a loop nest $\Lambda$ if $\Lambda$ is multilinear.
 \end{Prop}
 \begin{proof}
-This follows directly from Definition~\ref{def:linear-loop} and Definition~\ref{def:multi-linear-loop}, which essentially restrict the number of occurrences of a symbol $s_{\Lambda}$ in a summand to at most 1.
+This follows directly from Definition~\ref{def:linear-symbol} and Definition~\ref{def:multi-linear-loop}, which restrict the number of occurrences of $s_{\Lambda}$ in a summand to at most 1.
 \end{proof}
-If $\Lambda$ were an arbitrary loop nest, a given symbol $s_{\Lambda}$ could appear everywhere (e.g., $n$ times in a summand and $m$ times in another summand with $n \neq m$, as argument of a higher level function, in the denominator of a division), thus posing the challenge of finding the factorization that maximizes temporal sharing. If $\Lambda$ is instead a finite element integration loop nest, Proposition~\ref{prop:multi-struct} guarantees that any sub-expression including at least two instances of the same linear symbol can be applied Strategy~\ref{strategy:ii}. As discussed in the next sections, this property will allow us to construct the space of flop-decreasing transformations by ``composition'' of Strategy~\ref{strategy:i} and Strategy~\ref{strategy:ii}.
+If $\Lambda$ were an arbitrary loop nest, a given symbol $s_{\Lambda}$ could appear everywhere (e.g., $n$ times in a summand and $m$ times in another summand with $n \neq m$, as argument of a higher level function, in the denominator of a division), thus posing the challenge of finding the factorization that maximizes temporal sharing. If $\Lambda$ is instead a finite element integration loop nest, it is guaranteed by Proposition~\ref{prop:multi-struct} that any sub-expression including at least two instances of the same linear symbol can be applied Strategy~\ref{strategy:ii}. As discussed in the next sections, this property will allow us to construct the space of flop-decreasing transformations by ``composition'' of Strategy~\ref{strategy:i} and Strategy~\ref{strategy:ii}.
 
 Finally, we observe that the $\sigma_{ei}$ sub-expressions can sometimes be considered ``weakly structured''. This happens when a relaxed version of Definition~\ref{def:struct-expr} applies, in which the factorization of $s_{\Lambda}$ only ``minimizes'' (rather than ``eliminates'') spatial sharing (for instance, in the complex hyperelastic model analyzed in Section~\ref{sec:opt:perf-results}). Weak structure will be exploited by Algorithm~\ref{algo:sharing-elimination} in the attempt to achieve optimality.
 
 
-\subsection{Driving the Transformation}
+\subsection{Global Analysis of the Expression}
 \label{sec:opt:driving-se}
-In this section, we introduce a novel data structure -- the {\em temporaries graph} -- that relates the sub-expressions in a finite element integration loop nest. This will enable us to analyze how Strategy~\ref{strategy:i} and Strategy~\ref{strategy:ii} impact the operation count.
+To evaluate the global impact of a transformation, we perform a so called {\em Strategy Selection Analysis} on a {\em temporaries graph} derived from the input expression. As we shall see, this outperforms a simplistic approach in which sub-expressions are analyzed in ``isolation'', because the presence of common sub-expressions is now taken into account.
 
 It is useful to start with introducing the notion of a {\em minimal common sub-expression}.
 
@@ -282,7 +286,7 @@ n_i \text{: the number of edges incident to } x_i \\
 
 
 \item Perform a depth-first visit of the loop tree and, for each expression independent of the multilinear loop nest, apply the most profitable between Strategy~\ref{strategy:i} and Strategy~\ref{strategy:ii}. \\
-\textit{Note: this pass speculatively assumes that expressions are (weakly) structured along the reduction loop. If the assumption does not hold, the operation count will generally be sub-optimal because only a subset of factorizations and code motion opportunities may eventually be considered.}
+\textit{Note: this pass speculatively assumes that expressions are (weakly) structured in the reduction loop. If the assumption does not hold, the operation count will generally be sub-optimal because only a subset of factorizations and code motion opportunities may eventually be considered.}
 \end{enumerate}
 \end{Algo}
 
