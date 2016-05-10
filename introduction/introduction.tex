@@ -11,35 +11,35 @@
 %
 %During the assembly phase, the solution of the PDE is approximated by executing a problem-specific kernel over all cells, or elements, in the discretized domain. We restrict our focus to relatively low order finite element methods, in which an assembly kernel's working set is usually small enough to fit the L1 cache. Low order methods are by no means exotic: they are employed in a wide variety of fields, including climate and ocean modeling, computational fluid dynamics, and structural mechanics. The efficient assembly of high order methods such as the spectral element method \citep{spencer} requires a significantly different loop nest structure. High order methods are therefore excluded from our study.
 
-In many fields, such as computational fluid dynamics, computational
-electromagnetics and structural mechanics, phenomena are modelled by
-partial differential equations (PDEs). Unstructured meshes, which
-allow an accurate representation of complex geometries, are often used 
-to discretize their computational domain. Numerical techniques, like the
-finite volume method and the finite element method, approximate the solution 
-of a PDE by applying suitable numerical operations, or kernels, to the 
-various entities of the unstructured mesh, such as edges, vertices, or
-cells. On standard clusters of multicores, typically, a kernel is
-executed sequentially by a thread, while parallelism is achieved by
-partitioning the mesh and assigning each partition to a different node
-or thread. Such an execution model, with minor variations, is adopted,
-for instance, in \cite{pyop2isc}, \cite{Fenics}, \cite{fluidity_manual_v4}, \cite{lizst}, which
-are examples of frameworks specifically thought for writing numerical methods for PDEs.
-
-The time required to execute these unstructured-mesh-based applications is a fundamental issue.
-An equation domain needs to be discretized into an extremely
-large number of cells to obtain a satisfactory approximation
-of the solution, possibly of the order of trillions
-(e.g. \cite{Rossinelli2013}), so applying numerical kernels all over the mesh is expensive. 
-For example, it is well-established that mesh resolution is crucial in the accuracy of numerical weather
-forecasts; however, operational centers have a strict time
-limit in which to produce a forecast - 60 minutes in the case of the
-UK Met Office - so, executing computation- and memory-efficient 
-kernels has a direct scientific payoff in higher resolution, and 
-therefore more accurate predictions. Motivated by this and analogous scenarios, 
-this thesis studies, formalizes, and implements a number of
-code transformations to improve the performance of real-world scientific 
-applications using numerical methods over unstructured meshes. 
+%In many fields, such as computational fluid dynamics, computational
+%electromagnetics and structural mechanics, phenomena are modelled by
+%partial differential equations (PDEs). Unstructured meshes, which
+%allow an accurate representation of complex geometries, are often used 
+%to discretize their computational domain. Numerical techniques, like the
+%finite volume method and the finite element method, approximate the solution 
+%of a PDE by applying suitable numerical operations, or kernels, to the 
+%various entities of the unstructured mesh, such as edges, vertices, or
+%cells. On standard clusters of multicores, typically, a kernel is
+%executed sequentially by a thread, while parallelism is achieved by
+%partitioning the mesh and assigning each partition to a different node
+%or thread. Such an execution model, with minor variations, is adopted,
+%for instance, in \cite{pyop2isc}, \cite{Fenics}, \cite{fluidity_manual_v4}, \cite{lizst}, which
+%are examples of frameworks specifically thought for writing numerical methods for PDEs.
+%
+%The time required to execute these unstructured-mesh-based applications is a fundamental issue.
+%An equation domain needs to be discretized into an extremely
+%large number of cells to obtain a satisfactory approximation
+%of the solution, possibly of the order of trillions
+%(e.g. \cite{Rossinelli2013}), so applying numerical kernels all over the mesh is expensive. 
+%For example, it is well-established that mesh resolution is crucial in the accuracy of numerical weather
+%forecasts; however, operational centers have a strict time
+%limit in which to produce a forecast - 60 minutes in the case of the
+%UK Met Office - so, executing computation- and memory-efficient 
+%kernels has a direct scientific payoff in higher resolution, and 
+%therefore more accurate predictions. Motivated by this and analogous scenarios, 
+%this thesis studies, formalizes, and implements a number of
+%code transformations to improve the performance of real-world scientific 
+%applications using numerical methods over unstructured meshes. 
 
 \section{Contributions}
 \label{sec:contributions}
@@ -70,26 +70,26 @@ applications using numerical methods over unstructured meshes.
 %\end{itemize}
 
 \section{Dissemination}
-The research exposed in this thesis has been disseminated in the scientific community through various channels:
-\begin{itemize}
-\item \textbf{Papers.} The following is the list of publications derived from the research activity (chronological order):
-\begin{enumerate}
-\item Strout, M.M.; Luporini, F.; Krieger, C.D.; Bertolli, C.; Bercea, G.-T.; Olschanowsky, C.; Ramanujam, J.; Kelly, P.H.J., "Generalizing Run-Time Tiling with the Loop Chain Abstraction," Parallel and Distributed Processing Symposium, 2014 IEEE 28th International , vol., no., pp.1136,1145, 19-23 May 2014
-\item Fabio Luporini, Ana Lucia Varbanescu, Florian Rathgeber, Gheorghe-Teodor Bercea, J. Ramanujam, David A. Ham, and Paul H. J. Kelly. "Cross-loop optimization of arithmetic intensity for finite element local assembly". 2014. Submitted for publication.
-\item Fabio Luporini, David A. Ham, Paul H. J. Kelly. "Optimizing Automated Finite Element Integration through Expression Rewriting and Code Specialization". 2014. To be written.
-\end{enumerate}
-\item \textbf{Talks.} Talks have been delivered at the following conferences/workshops:
-\begin{enumerate}
-\item "Generalised Sparse Tiling for Unstructured Mesh Computations in the OP2 Framework". Compilers for Parallel Computing, July 2013.
-\item "COFFEE: an Optimizing Compiler for Fintie Element Local Assembly". FEniCS Workshop, July 2014.
-\end{enumerate}
-\item \textbf{Software.} The following software is released under open source licenses.
-\begin{enumerate}
-\item COFFEE (COmpiler For Finit Element local assEmbly), the compiler described in Chapter~\ref{ch:coffee}.
-\end{enumerate}
-\end{itemize}
-, and the design of this software and results have
-been disseminated in the scientific community through publications.
+%The research exposed in this thesis has been disseminated in the scientific community through various channels:
+%\begin{itemize}
+%\item \textbf{Papers.} The following is the list of publications derived from the research activity (chronological order):
+%\begin{enumerate}
+%\item Strout, M.M.; Luporini, F.; Krieger, C.D.; Bertolli, C.; Bercea, G.-T.; Olschanowsky, C.; Ramanujam, J.; Kelly, P.H.J., "Generalizing Run-Time Tiling with the Loop Chain Abstraction," Parallel and Distributed Processing Symposium, 2014 IEEE 28th International , vol., no., pp.1136,1145, 19-23 May 2014
+%\item Fabio Luporini, Ana Lucia Varbanescu, Florian Rathgeber, Gheorghe-Teodor Bercea, J. Ramanujam, David A. Ham, and Paul H. J. Kelly. "Cross-loop optimization of arithmetic intensity for finite element local assembly". 2014. Submitted for publication.
+%\item Fabio Luporini, David A. Ham, Paul H. J. Kelly. "Optimizing Automated Finite Element Integration through Expression Rewriting and Code Specialization". 2014. To be written.
+%\end{enumerate}
+%\item \textbf{Talks.} Talks have been delivered at the following conferences/workshops:
+%\begin{enumerate}
+%\item "Generalised Sparse Tiling for Unstructured Mesh Computations in the OP2 Framework". Compilers for Parallel Computing, July 2013.
+%\item "COFFEE: an Optimizing Compiler for Fintie Element Local Assembly". FEniCS Workshop, July 2014.
+%\end{enumerate}
+%\item \textbf{Software.} The following software is released under open source licenses.
+%\begin{enumerate}
+%\item COFFEE (COmpiler For Finit Element local assEmbly), the compiler described in Chapter~\ref{ch:coffee}.
+%\end{enumerate}
+%\end{itemize}
+%, and the design of this software and results have
+%been disseminated in the scientific community through publications.
 
 
 
