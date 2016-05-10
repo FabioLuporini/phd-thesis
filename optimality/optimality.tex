@@ -1,7 +1,6 @@
 %TODO
 % notation weirdness : a(u, v) -> a(v, u) in (1) and (5)
 % Andrew T. T.
-% Temporaries graph description
 
 \chapter{Minimizing Operations in Finite Element Integration Loops}
 \label{ch:optimality}
@@ -537,7 +536,7 @@ Sharing elimination and pre-evaluation, as well as the transformation algorithm,
 COFFEE implements sharing elimination and pre-evaluation by composing building block transformation operators, which we refer to as \emph{rewrite operators}. This has several advantages. The first is extensibility. New transformations, such as sum factorization in spectral methods, could be expressed by composing the existing operators, or with small effort building on what is already available. Second, generality: COFFEE can be seen as a lightweight, low level computer algebra system, not necessarily tied to finite element integration. Third, robustness: the same operators are exploited, and therefore tested, by different optimization pipelines. The rewrite operators, whose (Python) implementation is based on manipulation of abstract syntax trees (ASTs), comprise the COFFEE language. A non-exhaustive list of such operators includes expansion, factorization, re-association, generalized code motion.
 
 \subsection{Independence from Form Compilers}
-COFFEE aims to be independent of the high level form compiler. It provides an interface to build generic ASTs and only expects expressions to be in normal form (or sufficiently close to it). For example, Firedrake has transitioned from a version of the FEniCS Form Compiler \cite{FFC-TC} modified to produce ASTs rather than strings, to a newly written compiler\footnote{TSFC, the two-stage form compiler \url{https://github.com/firedrakeproject/tsfc}}, while continuing to emply COFFEE. Thus, COFFEE decouples the mathematical manipulation of a form from code optimization; or, in other words, relieves form compiler developers of the task of fine scale loop optimization of generated code.
+COFFEE aims to be independent of the high level form compiler. It provides an interface to build generic ASTs and only expects expressions to be in normal form (or sufficiently close to it). For example, Firedrake has transitioned from a version of the FEniCS Form Compiler \cite{FFC-TC} modified to produce ASTs rather than strings, to a newly written compiler\footnote{TSFC, the two-stage form compiler \url{https://github.com/firedrakeproject/tsfc}}, while continuing to employ COFFEE. Thus, COFFEE decouples the mathematical manipulation of a form from code optimization; or, in other words, relieves form compiler developers of the task of fine scale loop optimization of generated code.
 
 \subsection{Handling Block-sparse Tables}
 \label{sec:zeros}
@@ -560,13 +559,13 @@ We evaluate the speed-ups achieved by a wide variety of transformation systems o
 \item[tens] Tensor contraction mode. Work presented in~\cite{FFC-TC}, implemented in the FEniCS Form Compiler.
 \item[auto] Automatic choice between \texttt{tens} and \texttt{quad} driven by heuristic (detailed in~\cite{Fenics} and summarized in Section~\ref{sec:qualitative}). Implemented in the FEniCS Form Compiler.
 \item[ufls] UFLACS, a novel back-end for the FEniCS Form Compiler whose primary goals are improved code generation and execution times.
-\item[cfO1] Generalized loop-invariant code motion. Work presented in~\cite{Luporini}, implemented in COFFEE.
+\item[cfO1] Generalized loop-invariant code motion. Work presented in~\cite{Luporini-coffee}, implemented in COFFEE.
 \item[cfO2] Optimal loop nest synthesis with handling of block-sparse tables. Work presented in this chapter, implemented in COFFEE.
 \end{description}
 
 The values that we report are the average of three runs with ``warm cache''; that is, with all kernels retrieved directly from the Firedrake's cache, so code generation and compilation times are not counted. The timing includes however the cost of both local assembly and matrix insertion, with the latter minimized through the choice of a mesh (details below) small enough to fit the L3 cache of the CPU. 
 
-For a fair comparison, small patches were written to the make \texttt{quad}, \texttt{tens}, and \texttt{ufls} compatible with Firedrake. By executing all simulations in Firedrake, we guarantee that both matrix insertion and mesh iteration have a fixed cost, independent of the transformation system employed. The patches adjust the data storage layout to what Firedrake expects (e.g., by generating an array of pointers instead of a pointer to pointers, by replacing flattened arrays with bi-dimensional ones). 
+For a fair comparison, small patches were written to make \texttt{quad}, \texttt{tens}, and \texttt{ufls} compatible with Firedrake. By executing all simulations in Firedrake, we guarantee that both matrix insertion and mesh iteration have a fixed cost, independent of the transformation system employed. The patches adjust the data storage layout to what Firedrake expects (e.g., by generating an array of pointers instead of a pointer to pointers, by replacing flattened arrays with bi-dimensional ones). 
 
 For Constraint~\ref{const:TH}, discussed in Section~\ref{sec:mem-const}, we set $T_H = \operatorname{size}(\mathrm{L2})$; that is, the size of the processor L2 cache (the last level of private cache). When the threshold had an impact on the transformation process, the experiments were repeated with $T_H = \operatorname{size}(\mathrm{L3})$. The results are documented later, individually for each problem.
 
@@ -579,7 +578,7 @@ While constants of our study are
 \begin{itemize}
 \item the space of test, trial, and coefficient functions: Lagrange
 \item the mesh: tetrahedral with a total of 4374 elements
-\item exact numerical quadrature (we employ the same scheme used in~\cite{quadrature1}, based on the Gauss-Legendre-Jacobi rule)
+\item exact numerical quadrature (we employ the same scheme used in~\cite{quadrature-olegaard}, based on the Gauss-Legendre-Jacobi rule)
 \end{itemize}
 
 \subsection{Performance Results}
@@ -614,7 +613,7 @@ Our transformation strategy does not always guarantee minimum execution time. In
 
 \paragraph{Autovectorization}
  
-We chose the mesh dimension and the function spaces such that the inner loop sizes would always be a multiple of the machine vector length. This ensured autovectorization in the majority of code variants\footnote{We verified the vectorization of inner loops by looking at both compiler reports and assembly code.}. The biggest exception is \texttt{quad}, due to the presence of indirection arrays in the generated code. In \texttt{tens}, loop nests are fully unrolled, so the standard loop vectorization is not feasible; the compiler reports suggest, however, that block vectorization \cite{SLP-vect} is often triggered. In \texttt{ufls}, \texttt{cfO1}, and \texttt{cfO2} the iteration spaces have identical structure, with loop vectorization being regularly applied.
+We chose the mesh dimension and the function spaces such that the inner loop sizes would always be a multiple of the machine vector length. This ensured autovectorization in the majority of code variants\footnote{We verified the vectorization of inner loops by looking at both compiler reports and assembly code.}. The biggest exception is \texttt{quad}, due to the presence of indirection arrays in the generated code. In \texttt{tens}, loop nests are fully unrolled, so the standard loop vectorization is not feasible; the compiler reports suggest, however, that block vectorization \citep{SLP-vect} is often triggered. In \texttt{ufls}, \texttt{cfO1}, and \texttt{cfO2} the iteration spaces have identical structure, with loop vectorization being regularly applied.
 
 \paragraph{Mass matrix}
 We start with the simplest of the bilinear forms investigated, the mass matrix. Results are in Figure~\ref{fig:mass}. We first notice that the lack of improvements when $q=1$ is due to the fact that matrix insertion outweighs local assembly. For $q \geq 2$, \texttt{cfO2} generally shows the highest speed-ups. It is worth noting why \texttt{auto} does not always select the fastest implementation: \texttt{auto} always opts for \texttt{tens}, while for $\mathrm{nf} \geq 2$ \texttt{quad} tends to be preferable. On the other hand, \texttt{cfO2} always makes the optimal decision about whether to apply pre-evaluation or not. Surprisingly, despite the simplicity of the form, the performance of the various code generation systems can differ significantly.
@@ -655,108 +654,3 @@ We have defined sharing elimination and pre-evaluation as high level transformat
 Another issue raised by the experimentation concerns selecting a proper threshold for Constraint~\ref{const:TH}. To solve this problem would require a more sophisticated cost model, which is an interesting question deserving further research. 
 
 We also identify two additional possible research directions: a complete classification of forms for which a global optimum is achieved; and a generalization of the methodology to other classes of loop nests, for instance those arising in spectral element methods.
-
-
-
-
-
-
-
-
-
-
-%\subsection{Generalized Loop-invariant Code Motion}
-%\label{sec:coffee-licm}
-%
-%\begin{figure}
-%\centering
-%\footnotesize
-%\lstinputlisting{coffee/listings/simple.code}
-%\caption{Excerpt of the non-optimized local assembly code from the Burgers problem shown in Listing~\ref{code:burgers}.}
-%\label{code:original-code}
-%\end{figure}
-%
-%Consider the local element matrix computation in Figure~\ref{code:original-code}, which is an excerpt from the Burgers problem shown in Listing~\ref{code:burgers}. The assembly expression, produced by the FEniCS and Firedrake's form compiler, has been deliberately simplified, and code details have been omitted for brevity and readability. In practice, as already emphasized, assembly expressions can be much more complex depending on the differential operators employed in the variational form; however, this example is representative enough for highlighting patterns that are common in a large class of equations. 
-%
-%A first glimpse of the code suggests that the \texttt{a*f0*A[i][j]+b*f1*B[i][j]} sub-expression is invariant with respect to the innermost (trial functions) loop \texttt{k}, so it can be hoisted at the level of the outer loop \texttt{j} to avoid redundant computation. This is indeed a standard compiler transformation, supported by any available compilers, so, in principle, there should be no need to transform the source code explicitly. With a closer look we notice that the sub-expression \texttt{d*D[i][k]+e*E[i][k]} is also invariant, although, this time, with respect to the outer (test functions) loop \texttt{j}. Available compilers (e.g. \emph{GNU's} and \emph{Intel's}) limit the search for code motion opportunities to the innermost loop of a given nest. Moreover, the hoisted code is scalar and therefore not subjected to SIMD auto-vectorization. In other words, these general-purpose compilers lack performance models to determine (i) the optimal place where to hoist an expression and (ii) the potential gain and overhead (due to the need for extra temporary memory) of vectorization. These are notable limitations for local assembly kernels. 
-%
-%\begin{figure}
-%\centering
-%\footnotesize
-%\lstinputlisting{coffee/listings/invariant.code}
-%\caption{Local assembly code for the Burgers example after application of generalized loop-invariant code motion.}
-%\label{code:invariant-code}
-%\end{figure}
-%
-%We work around these limitations with source-level loop-invariant code motion. In particular, we pre-compute all values that an invariant sub-expression assumes along its fastest varying dimension. This is implemented by introducing a temporary array per invariant sub-expression and by adding a new loop to the nest. At the price of extra memory for storing temporaries, the gain is that lifted terms can be auto-vectorized as part of an inner loop. Given the short trip counts of our loops, it is important to achieve auto-vectorization of hoisted terms in order to minimize the percentage of scalar instructions, which could otherwise be significant. It is also worth noting that, in some problems, for instance Helmholtz in Listing~\ref{code:helmholtz}, invariant sub-expressions along \texttt{j} are identical to those along \texttt{k}, and both loops iterate over the same iteration space, as anticipated in Section~\ref{sec:coffe-motivations}. In these cases, we safely avoid redundant pre-computation. The resulting code for the running Burgers example is shown in Figure~\ref{code:invariant-code}.
-%
-%In the following, we refer to this series of transformations as \textit{generalized loop-invariant code motion}. We will show that this optimization is crucial when optimizing non-trivial assembly expressions, allowing to achieve performance improvements over the original code larger than 3$\times$.
-%
-%
-%\subsection{Terms Factorization}
-%\label{sec:coffee-factorize}
-%
-%\begin{figure}
-%\centering
-%\footnotesize
-%\lstinputlisting{coffee/listings/factorized.code}
-%\caption{Terms factorization exposes additional code hoisting opportunities, as it can be evinced by comparison of the code in this Figure with that in Figure~\ref{code:invariant-code}.}
-%\label{code:factorized-code}
-%\end{figure}
-%
-%After generalized loop-invariant code motion has been applied, some assembly expressions can still  ``hide'' opportunities for code hoisting. By examining again the code in Figure~\ref{code:invariant-code}, we notice that the basis function array \texttt{A} iterating along the \texttt{[i,j]} loops appears twice in the expression. By expanding the products in which \texttt{A} is accessed and by applying sum commutativity, terms can be factorized. This has two effects: firstly, it reduces the number of arithmetic operations performed; secondly, and most importantly, it exposes a new sub-expression \texttt{A[i][k]/c+T2[k]*f} invariant with respect to loop \texttt{j}. Consequently, hoisting can be performed, resulting in the code in Figure~\ref{code:factorized-code}. In general, exposing factorization opportunities requires traversing the whole expression tree, and then expanding and moving terms. It also needs heuristics to select a factorization strategy: there may be different opportunities of reorganizing sub-expressions, and, in our case, the best is the one that maximizes the invariant code eventually disclosed. We will discuss this aspect formally in Section~\ref{sec:coffee-rewrite-rules}.
-%
-%
-%\subsection{Expanding Sub-expressions}
-%\label{sec:coffee-expansion}
-%
-%Expression rewriting also aims at minimizing register pressure in the assembly loop nest. Once the code has been optimized for arithmetic intensity, it is important to think about how the transformations impacted register allocation. Assume the local assembly kernel is executed on a state-of-the-art CPU architecture having 16 logical registers, e.g. an Intel Haswell. Each value appearing in the expression is loaded and kept in a register as long as possible. In Figure~\ref{code:scalarexp-code}, for instance, the scalar value \texttt{g} is loaded once, whereas the term \texttt{det*W[i]} is precomputed and loaded in a register at every \texttt{i} iteration. This implies that at every iteration of the \texttt{[j,k]} loop nest, 12$\%$ of the available registers are spent just to store values independent of test and trial functions loops. In more complicated expressions, the percentage of registers destined to store such constant terms can be even higher. Registers are, however, a precious resource, especially when evaluating compute-intensive expressions. The smaller is the number of available free registers, the worse is the instruction-level parallelism achieved: for example, a shortage of registers can increase the pressure on the L1 cache (i.e. it can worsen data locality), or it may prevent the effective application of standard transformations, e.g. loop unrolling. We aim at relieving this problem by suitably expanding terms and introducing, where necessary, additional temporary values. We illustrate this in the following example.
-%
-%%An analogous analysis applies to processors with larger numbers of registers, since using loop unroll or loop unroll-and-jam to expose more instruction-level parallelism would increase the requirements on registers.
-%
-%\begin{figure}
-%\footnotesize
-%\subfigure[Excerpt of the non-optimized local assembly code from the Burgers problem shown in Listing~\ref{code:burgers}, slightly modified for illustration purposes.]{\label{code:toexpand-code}\lstinputlisting{coffee/listings/toexpand.code}}
-%~\\
-%~\\
-%~\\
-%~\\
-%\subfigure[Local assembly code after expansion of term \texttt{det*W[i]}]{\label{code:expanded-1-code}\lstinputlisting{coffee/listings/expanded-1.code}}
-%~\\
-%~\\
-%~\\
-%~\\
-%\subfigure[Local assembly code after expansion of symbol \texttt{g}. Note the need to introduce a new temporary array.]{\label{code:expanded-2-code}\lstinputlisting{coffee/listings/expanded-2.code}}
-%\caption{Expansion of terms to improve register pressure in a local assembly kernel}\label{code:expanded-code}
-%\end{figure}
-%
-%Consider a variant of the Burgers local assembly kernel, shown in Figure~\ref{code:toexpand-code}. This is again a representative, simplified example. We can easily distribute \texttt{det*W[i]} over the three operands on the left-hand side of the multiplication, and then absorb it in the pre-computation of the invariant sub-expression stored in \texttt{T1}, resulting in code as in Figure~\ref{code:expanded-1-code}. Freeing the register destined to the constant \texttt{g} is less straightforward: we cannot absorb it in \texttt{T1} as we did with \texttt{det*W[i]} since \texttt{T1} is also accessed in the \texttt{T1[j]*A[i][k]} sub-expression. The solution is to add another temporary as in Figure~\ref{code:expanded-2-code}. Generalizing, this is a problem of data dependencies: to solve it, we use a dependency graph in which we add a direct edge from identifier \texttt{A} to identifier \texttt{B} to denote that the evaluation of \texttt{B} depends on \texttt{A}. The dependency graph is initially empty, and is updated every time a new temporary is created by either loop-invariant code motion or expansion of terms. The dependency graph is then queried to understand when expansion can be performed without resorting to new temporary values. This aspect is formalized in the next section.
-
-
-% ***********************************************************************************************************************************************
-
-%\section{Avoiding Iteration over Zero-valued Blocks by Symbolic Execution}
-%\label{sec:coffee-avoidzeros}
-...
-%Skipping arithmetic operations over blocks of zero-valued entries in basis functions arrays is the second goal of expression rewriting. Zero-valued columns arise, for example, when taking derivatives on a reference element and when employing vector-valued elements. In~\cite{quadrature-olegaard}, a technique to avoid operations on zero-valued columns based on the use of indirection arrays (e.g. \texttt{A[B[i]]}, where \texttt{A} is a tabulated basis function and \texttt{B} a map from loop iterations to non-zero columns in \texttt{A}) was described and implemented in FEniCS. The approach proposed in this section will be evaluated and compared to this pioneering work. Essentially, our strategy avoids indirection arrays in the generated code, which otherwise would break the optimizations applicable by code specialization, including SIMD vectorization. 
-%
-%\begin{figure}[t]
-%\tiny
-%\centerline{
-%\subfigure[]{\label{fig:withzeros-code}\lstinputlisting{coffee/listings/withzeros.code}}
-%~~~~~~~~~
-%\subfigure[]{\label{fig:withzeros-skipped-code}\lstinputlisting{coffee/listings/skipzeros.code}}
-%}
-%\caption{On the left, excerpt of the non-optimized local assembly code from the Burgers problem shown in Listing~\ref{code:burgers}. On the right, the code after the assembly expression's iteration space has been restructured, based on the propagation of zero-valued columns as determined through symbolic execution. Note the code annotation over the definition of the tabulated vector-valued basis function \texttt{D}, which is provided as input to identify zero-valued columns.}\label{fig:skip-code}
-%\end{figure}
-%
-%In Figure~\ref{fig:withzeros-code}, an enriched version of the Burgers excerpt in Figure~\ref{code:original-code} is illustrated. The code is instantiated for the specific case of polynomial order $q=1$ Lagrange basis functions on a 2D mesh. The array \texttt{D} represents a derivative of a basis function tabulated at the various quadrature points. There are four zero-valued columns. Any multiplications or additions along these columns could (should) be skipped to avoid irrelevant floating point operations. The solution adopted in~\cite{quadrature-olegaard} is not to generate the zero-valued columns (i.e. to generate a dense 6$\times$2 array), to reduce the size of the iteration space over test and trial functions (from 6 to 2), and to use an indirection array (e.g. $ind = \lbrace 3, 5\rbrace$) to update the right entries in the element tensor $A$. This prevents, among the various optimizations, effective SIMD vectorization, because memory loads and store would eventually reference non-contiguous locations. 
-%%on the other hand, reshrinki tutto su un array solo...
-%
-%Our new strategy exploits domain knowledge and makes use of symbolic execution. We discern the origin of zero-valued columns: for example, those due to taking derivatives on the reference element from those inherent to using vector-valued elements. In the running Burgers example, the use of vector-valued basis functions required the introduction of a zero-valued block (columns 0, 1, 2 in the array \texttt{D}) to correctly evaluate the local element matrix while iterating along the space of test and trial functions. The two key observations are that: (i) the number of zero-valued columns caused by using vector function spaces is, often, much larger then that due to derivatives, and (ii) such columns are contiguous in memory. Based on this observation, we aim to avoid iteration only along the block of zero-valued columns induced by vector-valued elements. 
-%
-%%Our example is then transformed as in Figure~\ref{fig:withzeros-skipped-code}: loop bounds are adjusted and suitable offsets are introduce to access the element matrix and basis function arrays. In general, the element matrix evaluation may also have to be split over multiple iteration spaces (test and trial functions loops), each iteration space characterized by its own loop bounds; this has the side effect of both increasing loop overhead and decreasing data locality.
-%
-%The goal is achieved by means of symbolic execution. The algorithm expects some indication about the location of the zero-valued columns induced by vector-valued function spaces, for each tabulated basis function, as shown in Figure~\ref{fig:withzeros-code}. Then, after expression rewriting took place, each statement is executed symbolically. For example, consider the assignment \texttt{T2[r] = d*D[i][k]+e*E[i][k]} in Figure~\ref{fig:withzeros-code}. Array \texttt{D} has non-zero-valued columns in the range $NZ_D=[3,5]$, while array \texttt{E} has non-zero-valued columns in the range $NZ_E=[0,2]$, although not displayed. Multiplications by scalar quantities (e.g. \texttt{d*D[i][k]}) do not affect the propagation of non-zero-valued columns. On the other hand, summing two operands such as \texttt{d*D[i][k]} and \texttt{e*E[i][k]} requires tracking the fact that the target identifier \texttt{T2} will have non-zero-valued columns in the range $NZ_E \| NZ_D=[0,5]$. Eventually, exploiting the $NZ$ information computed and associated with each identifier, we split the original assembly expression into multiple sets of sub-expressions, each set characterized by the same range of non-zero-valued columns. In our example, assuming that $NZ_{T1}=[3,5]$ and $NZ_A=[3,5]$, there are two of such sets, which leads to the generation of two distinct iteration spaces (one for each set), as in Figure~\ref{fig:withzeros-skipped-code}.
-
-%Code specialization's goal is architecture-specific optimization for instruction-level parallelism and register locality. A number of transformations are provided at this stage, including those enabling effective SIMD vectorization. 
