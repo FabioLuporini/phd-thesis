@@ -41,31 +41,24 @@ In Section~\ref{sec:lnopt} we introduce a set of definitions mapping mathematica
 In this section, we characterize global and local optimality for finite element integration. In order to make the article self-contained, we start with reviewing basic compiler terminology.
 
 \begin{Def}[Perfect and imperfect loop nests]
-A perfect loop nest is a loop whose body either 1) comprises only a sequence
-of non-loop statements or 2) is itself a perfect loop nest. If this
-condition does not hold, a loop nest is said to be imperfect. 
+A perfect loop nest is a loop whose body either 1) comprises only a sequence of non-loop statements or 2) is itself a perfect loop nest. If this condition does not hold, a loop nest is said to be imperfect. 
 \end{Def}
 
 \begin{Def}[Independent basic block]
-An independent basic block is a sequence of statements such that no data
-dependencies exist between statements in the block.
+An independent basic block is a sequence of statements such that no data dependencies exist between statements in the block.
 \end{Def}
 
-We focus on perfect nests whose innermost loop body is an independent basic
-block. A straightforward property of this class is that hoisting invariant
-expressions from the innermost to any of the outer loops or the preheader
-(i.e., the block that precedes the entry point of the nest) is always safe,
-as long as any dependencies on loop indices are honored. We will make use of this property. The results of this section could also be generalized to larger classes of loop nests, in which basic block independence does not hold, although this would require refinements beyond the scope of this paper. 
+We focus on perfect nests whose innermost loop body is an independent basic block. A straightforward property of this class is that hoisting invariant expressions from the innermost to any of the outer loops or the preheader (i.e., the block that precedes the entry point of the nest) is always safe, as long as any dependencies on loop indices are honored. We will make use of this property. The results of the next sections could also be generalized  to larger classes of loop nests, in which basic block independence does not hold, although this would require refinements beyond the scope of this chapter. 
 
-By mapping mathematical properties to the loop nest level, we introduce some new concepts. We start with the notion of a {\em linear symbol}. This will allow us to define a {\em linear loop} and, more generally, a (perfect) {\em multilinear loop nest}.
+We introduce some new concepts by mapping mathematical properties to the loop nest level. We start with the notion of a {\em linear symbol}. This will allow us to define a {\em linear loop} and, more generally, a (perfect) {\em multilinear loop nest}.
 
 \begin{Def}[Linear symbol]
 \label{def:linear-symbol}
-A symbol $a$ within an expression is linear if
+A symbol $a$ in an expression $e$ is linear if
 \begin{enumerate}
 \item $a$ is an $n$-dimensional array, and
-\item all occurrences (or ``instances'') of $a$ in the expression are indexed through the same vector-valued access function $f = [f_0, ..., f_{n-1}]$ (e.g., $a[f_0(...)][f_1(...)]$), and
-\item all sub-expressions in which $a$ appears are affine in $a$.
+\item all occurrences of $a$ in $e$ are indexed through the same vector-valued access function $f = [f_0, ..., f_{n-1}]$ (e.g., $a[f_0(...)][f_1(...)]$), and
+\item all sub-expressions of $e$ in which $a$ appears are affine in $a$.
 \end{enumerate}
 \end{Def}
 
@@ -119,7 +112,7 @@ We then characterize optimality for a finite element integration loop nest as fo
 
 \begin{Def}[Optimality of a loop nest]
 \label{def:mln-optimality}
-Let $\Lambda$ be a generic loop nest, and let $\Gamma$ be a transformation function $\Gamma : \Lambda \rightarrow \Lambda'$ such that $\Lambda'$ is semantically equivalent to $\Lambda$ (possibly, $\Lambda' = \Lambda$). We say that $\Lambda' = \Gamma (\Lambda)$ is an optimal synthesis of $\Lambda$ if the total number of operations (additions, products) performed to evaluate the result is minimal.
+Let $\Lambda$ be a loop nest, and let $\Gamma$ be a transformation function $\Gamma : \Lambda \rightarrow \Lambda'$ such that $\Lambda'$ is semantically equivalent to $\Lambda$ (possibly, $\Lambda' = \Lambda$). We say that $\Lambda' = \Gamma (\Lambda)$ is an optimal synthesis of $\Lambda$ if the total number of operations (additions, products) performed to evaluate the result is minimal.
 \end{Def}
 
 The concept of local optimality, which relies on the particular class of \textit{flop-decreasing} transformations, is also introduced.
@@ -223,7 +216,7 @@ Finally, we observe that the $\sigma_{ei}$ sub-expressions can sometimes be cons
 
 \subsection{Global Analysis of the Expression}
 \label{sec:opt:driving-se}
-To evaluate the global impact of a transformation, we perform a so called {\em Strategy Selection Analysis} on a {\em temporaries graph}, which represents a model of the input expression. As we shall see, this outperforms a simplistic approach in which sub-expressions are analyzed in ``isolation'', because the presence of common sub-expressions is now taken into account.
+To evaluate the global impact of a transformation, we perform a so called {\em strategy selection analysis} on a {\em temporaries graph}, which models the input expression. As we shall see, this outperforms a simplistic approach in which sub-expressions are analyzed in ``isolation'', because common sub-expressions are taken into account.
 
 It is useful to start with introducing the notion of a {\em minimal common sub-expression}.
 
@@ -237,24 +230,24 @@ A sub-expression $m$ within an expression $e$ is said to be a minimal common sub
 
 For example, in $a b + a b c + a b c d$ the sub-expression $a b$ is an MCS, whereas $a b c$ is not, despite occurring twice. 
 
-A temporaries graph is a directed $k$-partite graph in which vertices are MCSs and edges represent read-after-write dependencies between MCSs (e.g., an edge from $e_1$ to $e_2$ indicates that $e_1$ is read in $e_2$). The $k$ independent sets $\lbrace T_i \rbrace_{i=0}^{k-1}$ of vertices, or simply {\em level}s, are determined iteratively. Initially, Strategy~\ref{strategy:i} is applied to the input expression. This produces $T_0$ and modifies the input expression by replacing the MCSs in $T_0$ with appropriate temporaries. Then, Strategy~\ref{strategy:i} is applied to the modified expression; $T_1$ and the edges from $T_0$ to $T_1$ are in this way determined. This process is repeated $k$ times, until no more MCSs can be extracted. An example of temporaries graph is provided in Figure~\ref{fig:opt:tg}. It is worth observing that $k$ can be quite large as the input is in normal form. This implies, for instance, that the operands of an inner product occurring multiple times in the variational form are common sub-expressions in the translated scalar expression.
+A temporaries graph is a directed $k$-partite graph in which vertices are MCSs and edges represent read-after-write dependencies between MCSs (e.g., an edge from $e_1$ to $e_2$ indicates that $e_1$ is read in $e_2$). The $k$ independent sets $\lbrace T_i \rbrace_{i=0}^{k-1}$ of vertices, or simply {\em level}s, are determined iteratively. Initially, Strategy~\ref{strategy:i} is applied to the input expression. This produces $T_0$ and modifies the input expression by replacing the MCSs in $T_0$ with appropriate temporaries. Then, Strategy~\ref{strategy:i} is applied to the modified expression; $T_1$ and the edges from $T_0$ to $T_1$ are in this way determined. This process is repeated $k$ times, until no more MCSs can be extracted. An example of temporaries graph is provided in Figure~\ref{fig:opt:tg}. It is worth observing that $k$ can be quite large as the input is in normal form. This implies, for instance, that the operands of an inner product occurring multiple times in the variational form will be common sub-expressions in the translated scalar expression.
 
-The {\em Strategy Selection Analysis} uses a temporaries graph to determine whether applying Strategy~\ref{strategy:ii} to some subsets of levels would lower the global operation count. If the MCSs in the graph are structured expressions, then this analysis can be accomplished in polynomial time (thanks to Proposition~\ref{prop:multi-struct}). Given two levels $T_{i_1}$ and $T_{i_2}$ such that $i_1 < i_2$, one can easily:
+The {\em strategy selection analysis} uses a temporaries graph to determine whether applying Strategy~\ref{strategy:ii} to some subsets of levels would lower the global operation count. If the MCSs in the graph are structured expressions, then this analysis can be accomplished in polynomial time (thanks to Proposition~\ref{prop:multi-struct}). Given two levels $T_{i_1}$ and $T_{i_2}$ such that $i_1 < i_2$, one can
 
 \begin{enumerate}
-\item calculate the operation count for the expressions in $\lbrace T_i \rbrace_{i=i_1}^{i_2}$;
-\item inline the MCSs within $T_{i_1}$ into $\lbrace T_i \rbrace_{i=i_1 + 1}^{i_2}$;
-\item apply Strategy~\ref{strategy:ii} to all sub-expressions in $\lbrace T_i \rbrace_{i=i_1 + 1}^{i_2}$;
-\item evaluate and store the operation count;
-\item iterate this process until $i=i_2$.
+\item Starting with $i = i_1$, calculate the total operation count for computing all sub-expressions in $\lbrace T_j \rbrace_{j=i}^{i_2}$. The operation count includes the loop sizes.
+\item Inline the MCSs in $T_{i}$ into $\lbrace T_j \rbrace_{j=i + 1}^{i_2}$. The temporaries in $T_{i}$ are thus discarded.
+\item Apply Strategy~\ref{strategy:ii} to all sub-expressions in $\lbrace T_j \rbrace_{j=i + 1}^{i_2}$, factorizing any linear symbol/temporary.
+\item Evaluate and store the new total operation count, which includes the loop sizes.
+\item Increment $i$ and repeat this process until $i = i_2$.
 \end{enumerate}
 
-It is finally straightforward to determine for which range of levels (if any) the application of Strategy~\ref{strategy:ii} improved the operation count. The cost and the effectiveness of the {\em Strategy Selection Analysis} obviously depend on the number $n$ of pairs ${<}i_1, i_2{>}$ that are evaluated (at most $k - 1$). Since during our experiments setting $n = k - 1$ never led to unacceptable code generation times\footnote{Even in the case of complex hyperelastic models, the code generation time never exceed a few seconds on a relatively old Sandy Bridge architecture.}, in the following we assume that the {\em Strategy Selection Analysis} always considers all legal pairs ${<}i_1, i_2{>}$.
+It is finally straightforward to determine for which range of levels (if any) the application of Strategy~\ref{strategy:ii} improved the operation count. The cost and the effectiveness of the {\em strategy selection analysis} obviously depend on the number $n$ of pairs ${<}i_1, i_2{>}$ that are evaluated (at most $k - 1$). Since during our experiments setting $n = k - 1$ never led to unacceptable code generation times\footnote{Even in the case of complex hyperelastic models, the code generation time never exceed a few seconds on a relatively old Sandy Bridge architecture.}, in the following we assume that the {\em strategy selection analysis} always considers all legal pairs ${<}i_1, i_2{>}$.
 
 
 \subsection{The Sharing Elimination Algorithm}
 \label{sec:se-algo}
-Algorithm~\ref{algo:sharing-elimination} gathers the considerations from the previous sections and describes sharing elimination in its entirety. 
+Algorithm~\ref{algo:sharing-elimination} describes sharing elimination gathering the considerations from the previous sections. It also introduces a model to minimize the operation count within the innermost loop once {\em strategy selection analysis} has been performed.
 
 \noindent\rule[0.01ex]{\linewidth}{0.7pt}
 
@@ -263,16 +256,16 @@ Algorithm~\ref{algo:sharing-elimination} gathers the considerations from the pre
 \normalfont 
 The input of the algorithm is a tree representation a finite element integration loop nest.
 \begin{enumerate}
-\item Perform a depth-first visit of the loop tree to collect all {\em MCS}s. Apply Strategy~\ref{strategy:i} to these sub-expressions. This implies creating temporaries and replacing the hoisted common sub-expressions with the corresponding temporaries. Repeat this process until there are no more {\em MCS}s.
+\item Perform a depth-first visit of the loop tree to collect all {\em MCS}s. Apply Strategy~\ref{strategy:i} to these MCSs. This requires introducing some new temporaries. Repeat this process until there are no more {\em MCS}s.
 
-\item Group the temporaries based on the linear loop they depend on. We have two disjoint sets in the case of bilinear forms and, trivially, a single set for linear forms. For each of these sets, build a {\em temporaries graph} and apply the {\em Strategy Selection Analysis} discussed earlier.
+\item Group the temporaries based on the linear loop they depend on. We have two disjoint sets in the case of bilinear forms and, trivially, a single set for linear forms. For each of these sets, build a {\em temporaries graph} and apply the {\em strategy selection analysis} discussed earlier.
 
-\item For each expression in the body of the multilinear loop nest, build the \textit{sharing graph} $G = (S, E)$. Each $s \in S$ represents a linear symbol or a temporary produced by the previous steps. An edge $(s_i$, $s_j)$ indicates that a product $s_i s_j$ would appear if the sub-expressions including $s_i$ and $s_j$ were expanded.\\
+\item Build the {\em sharing graph} $G = (S, E)$ for each expression in the body of the multilinear loop nest (these are the expressions transformed by the {\em strategy selection analysis}, which now include some temporaries). Each $s \in S$ represents a linear symbol or a temporary produced by the previous steps. An edge $(s_i$, $s_j)$ indicates that a product $s_i s_j$ would appear if the sub-expressions including $s_i$ and $s_j$ were expanded.\\
 \textit{Note: this and the following steps will only impact bilinear forms, since otherwise, due to linearity, $E = \emptyset$.}
 
 \item Partition $S$ into $n$ disjoint sets $\lbrace S_1, ..., S_n\rbrace$, such that $S_i$ includes all instances of a given symbol $s$ in the expression. Transform $G$ by merging $\lbrace s_1, ..., s_m \rbrace \subset S_i$ into a unique vertex $s$ (taking the union of the edges), provided that their factorization would not cause an increase in operation count.
 
-\item Map $G$ to an Integer Linear Programming (ILP) model for determining how to optimally apply Strategy~\ref{strategy:ii}. The solution is the set of symbols that will be factorized by Strategy~\ref{strategy:ii}. Let $|S| = n$; the ILP model then is as follows:
+\item Map $G$ to an Integer Linear Programming (ILP) model for determining how to optimally apply Strategy~\ref{strategy:ii}. The solution is the set of linear symbols/temporaries that will be factorized. Let $|S| = n$; the ILP model then is as follows:
 \begin{gather*}
 x_i \text{: a vertex in } S \text{ (1 if a symbol should be factorized, 0 otherwise)}\\
 y_{ij} \text{: an edge in } E \text{ (1 if } s_i \text{ is factorized in the product } s_i s_j \text{ , 0 otherwise)}\\
@@ -300,10 +293,10 @@ Although the primary goal of Algorithm~\ref{algo:sharing-elimination} is operati
 In this section, we present a series of examples of increasing complexity.
 
 \subsubsection{Example 1}
-Consider again Figure~\ref{code:multi_loopnest_a}. There are no common sub-expressions, so the {\em Strategy Selection Analysis} has no effect. The sharing graph is $G = (\lbrace b_j, c_i, d_i \rbrace, \lbrace (b_j, c_i), (b_j, d_i) \rbrace$. The ILP formulation leads to the code in Figure~\ref{code:multi_loopnest_c}.
+Consider again Figure~\ref{code:multi_loopnest_a}. There are no common sub-expressions, so the {\em strategy selection analysis} has no effect. The {\em sharing graph} is $G = (\lbrace b_j, c_i, d_i \rbrace, \lbrace (b_j, c_i), (b_j, d_i) \rbrace$. The ILP formulation leads to the code in Figure~\ref{code:multi_loopnest_c}.
 
 \subsubsection{Example 2}
-In Figure~\ref{code:poisson}, Algorithm~\ref{algo:sharing-elimination} is executed in a simple yet realistic scenario, which originates from the bilinear form of a Poisson equation in two dimensions. The temporaries graph, which consists of a single level, is used for performing {\em Strategy Selection Analysis}. This leads to the synthesis in Figure~\ref{code:poisson_b}. The sharing graph is $G = (\lbrace t_0, t_1, t_2, t_3 \rbrace, \lbrace (t_0, t_2), (t_1, t_3) \rbrace)$, but since there are no factorization opportunities the ILP formulation has no effect.
+In Figure~\ref{code:poisson}, Algorithm~\ref{algo:sharing-elimination} is executed in a simple yet realistic scenario, which originates from the bilinear form of a Poisson equation in two dimensions. The temporaries graph, which consists of a single level, is used for performing {\em strategy selection analysis}. This leads to the synthesis in Figure~\ref{code:poisson_b}. The {\em sharing graph} is $G = (\lbrace t_0, t_1, t_2, t_3 \rbrace, \lbrace (t_0, t_2), (t_1, t_3) \rbrace)$, but since there are no factorization opportunities the ILP formulation has no effect.
 
 \begin{figure}[h]
 \begin{CenteredBox}
@@ -323,7 +316,7 @@ In Figure~\ref{code:poisson}, Algorithm~\ref{algo:sharing-elimination} is execut
 \end{figure}
 
 \subsubsection{Example 3}
-In this example, we focus on the ILP formulation. We consider a bilinear form extracted from a model of temperature-dependent multiphase flow through porous media~\citep{quadrature-olegaard}, which we informally refer to as ``pressure equation''. Although the complete specification of the form is irrelevant for the purpose of this example, it is useful to know that (i) the problem is linear, (ii) there are in total six monomials, (iii) gradient and divergence of test and trial functions appear in some monomials. 
+In this example, we focus on the ILP formulation. We consider a bilinear form extracted from a model of temperature-dependent multiphase flow through porous media~\citep{quadrature-olegaard}, which we informally refer to as ``pressure equation''. Although the complete specification of the form is irrelevant for the purpose of this example, it is useful to know that (i) the problem is linear, (ii) there are in total six monomials, (iii) the gradient and the divergence of test and trial functions appear in some monomials (so several distinct linear symbols are present in the input expression). 
 
 \begin{figure}[htp]
 
@@ -341,12 +334,12 @@ In this example, we focus on the ILP formulation. We consider a bilinear form ex
 \label{code:pressure}
 \end{figure}
 
-Figure~\ref{code:pressure_a} shows the finite element integration loop nest at the end of step (2) in Algorithm~\ref{algo:sharing-elimination}; that is, once {\em Strategy Selection Analysis} has been performed. The linear temporaries induce spatial sharing in the loop nest. It is not obvious to individuate the factorization that would result in a local optimum. One can derive the sharing graph directly from inspection of Figure~\ref{code:pressure_a}, obtaining $G = (\lbrace t_{10_{ik}}, t_{10_{ij}}, t_{11_{j}}, t_{12_{j}}, t_{13_{k}}, t_{14_{k}}, t_{15_{k}}\rbrace$, $\lbrace (t_{10_{ik}},t_{10_{ij}}), (t_{10_{ik}},t_{11_{j}}), (t_{10_{ik}},t_{12_{j}}), (t_{15_{k}},t_{11_{j}}), (t_{15_{k}},t_{12_{j}}), (t_{10_{ij}},t_{14_{k}}), (t_{10_{ij}},t_{13_{k}}),\\ (t_{11_{j}},t_{14_{k}}), (t_{11_{j}},t_{13_{k}}), (t_{12_{j}},t_{14_{k}}), (t_{12_{j}},t_{13_{k}}) \rbrace)$. The ILP formulation retrieves three factorization candidates. Eventually, the code in Figure~\ref{code:pressure_b} is produced. 
+Figure~\ref{code:pressure_a} shows the finite element integration loop nest at the end of step (2) in Algorithm~\ref{algo:sharing-elimination}; that is, once {\em strategy selection analysis} has been performed. The linear temporaries induce spatial sharing in the loop nest. It is not obvious to individuate the factorization that would result in a local optimum. One can derive the {\em sharing graph} directly from inspection of Figure~\ref{code:pressure_a}, obtaining $G = (\lbrace t_{10_{ik}}, t_{10_{ij}}, t_{11_{j}}, t_{12_{j}}, t_{13_{k}}, t_{14_{k}}, t_{15_{k}}\rbrace$, $\lbrace (t_{10_{ik}},t_{10_{ij}}), (t_{10_{ik}},t_{11_{j}}), (t_{10_{ik}},t_{12_{j}}), (t_{15_{k}},t_{11_{j}}), (t_{15_{k}},t_{12_{j}}), (t_{10_{ij}},t_{14_{k}}), (t_{10_{ij}},t_{13_{k}}),\\ (t_{11_{j}},t_{14_{k}}), (t_{11_{j}},t_{13_{k}}), (t_{12_{j}},t_{14_{k}}), (t_{12_{j}},t_{13_{k}}) \rbrace)$. The ILP formulation, eventually, retrieves three factorization candidates, as shown in Figure~\ref{code:pressure_b}.
 
 \subsubsection{Example 4}
-In the last example, we show how the {\em Strategy Selection Analysis} impacts the operation count in a hyperelastic model. This is the same problem used for performance evaluation in Section~\ref{sec:opt:perf-results}. The code in Figure~\ref{code:hyper_a} is obtained by repeatedly applying Strategy~\ref{strategy:i} to the expression in normal form (step (1) in Algorithm~\ref{algo:sharing-elimination}). The temporaries graph, which consists of 6 levels, can easily be derived. For given values of $I$ and $K$, the {\em Strategy Selection Analysis} determines that applying Strategy~\ref{strategy:ii} to the temporaries between levels $T_0$ and $T_4$ will improve the operation count within the outer loops. Strategy~\ref{strategy:i} is instead preferable for $T_5$, which comprises the four temporaries $t_{59_k}$, $t_{60_k}$, $t_{65_k}$, $t_{66_k}$. The resulting synthesis is shown in Figure~\ref{code:hyper_b}. Intuitively, instead of executing $N$ operations $I K$ times (Figure~\ref{code:hyper_a}), now $M$ operations are executed $I$ times (Figure~\ref{code:hyper_b}). It is true that $M > N$, but the analysis guarantees that $I$ and $K$ are such that the operation count has improved. 
+In the last example, we show how the {\em strategy selection analysis} impacts the operation count in a hyperelastic model. This is the same problem used for performance evaluation in Section~\ref{sec:opt:perf-results}. The code in Figure~\ref{code:hyper_a} is obtained by repeatedly applying Strategy~\ref{strategy:i} to the expression in normal form (step (1) in Algorithm~\ref{algo:sharing-elimination}). The temporaries graph, which consists of 6 levels, can easily be derived. For given values of $I$ and $K$, the {\em strategy selection analysis} determines that applying Strategy~\ref{strategy:ii} to the temporaries between levels $T_0$ and $T_4$ will improve the operation count. Strategy~\ref{strategy:i} is instead preferable for $T_5$, which comprises the four temporaries $t_{59_k}$, $t_{60_k}$, $t_{65_k}$, $t_{66_k}$. The resulting synthesis is shown in Figure~\ref{code:hyper_b}. Intuitively, instead of executing $N$ operations $I K$ times (Figure~\ref{code:hyper_a}), now $M$ operations are executed $I$ times (Figure~\ref{code:hyper_b}). It is true that $M > N$, but the analysis guarantees that $I$ and $K$ are such that the operation count has improved. 
 
-In this example, the application of Strategy~\ref{strategy:ii} reduces the operation count by about $1.3 \times$, on average (the actual value clearly depends on $I$ and $K$). It is not rare, however, to encounter cases (e.g., more complex hyperelastic models) in which the reduction is even larger than $2 \times$. We emphasize that here we are discussing the improvement from applying Strategy~\ref{strategy:ii} ``on top of'' Strategy~\ref{strategy:i}; the overall gain due to performing {\em Strategy Selection Analysis}, which must take Strategy~\ref{strategy:i} into account, is obviously larger.
+In this example, the application of Strategy~\ref{strategy:ii} reduces the operation count by about $1.3 \times$, on average (the actual value clearly depends on $I$ and $K$). It is not rare, however, to encounter cases (e.g., more complex hyperelastic models) in which the reduction is even larger than $2 \times$. We emphasize that here we are discussing the improvement from applying Strategy~\ref{strategy:ii} ``on top of'' Strategy~\ref{strategy:i}; the overall gain due to performing {\em strategy selection analysis}, which must take Strategy~\ref{strategy:i} into account, is obviously larger.
 
 \begin{figure}[htp]
 \begin{CenteredBox}
@@ -363,7 +356,7 @@ In this example, the application of Strategy~\ref{strategy:ii} reduces the opera
 
 \end{CenteredBox}
 
-\caption{Applying the {\em Strategy Selection Analysis} to the bilinear form arising from a hyperelastic model in 2D.}
+\caption{Applying the {\em strategy selection analysis} to the bilinear form arising from a hyperelastic model in 2D.}
 \label{code:hyperelasticity}
 \end{figure}
 
@@ -522,7 +515,7 @@ We discuss these points separately
 \end{enumerate}
 \item Consider Algorithm~\ref{algo:sharing-elimination}. Proposition~\ref{prop:multi-struct} ensures that there are only two ways of scheduling the multilinear operands in $P \in \mathbb{P}$: through generalized code motion (Strategy~\ref{strategy:i}) or factorization of linear symbols (via Strategy~\ref{strategy:ii}). If applied, these two strategies would lead, respectively, to performing $|P|$ and $|S_P|$ multiplications at every loop iteration. Since Strategy~\ref{strategy:i} is applied if and only if $|P| < |S_P|$ and does not change the structure of the expression (it requires neither expansion nor factorization), step (1) cannot prune the optimum from the search space. 
 
-After structuring the sharing graph $G$ in such a way that only flop-decreasing transformations are possible, the ILP model is instantiated. At this point, proving optimality reduces to establishing the correctness of the model, which is relatively straightforward because of its simplicity. The model aims to minimize the operation count by selecting the most promising factorizations. The second set of constraints is to select all edges (i.e., all multiplications), exactly once. The first set of inequalities allows multiplications to be scheduled: once a vertex $s$ is selected (i.e., once a symbol is decided to be factorized), all multiplications involving $s$ can be grouped. 
+After structuring the {\em sharing graph} $G$ in such a way that only flop-decreasing transformations are possible, the ILP model is instantiated. At this point, proving optimality reduces to establishing the correctness of the model, which is relatively straightforward because of its simplicity. The model aims to minimize the operation count by selecting the most promising factorizations. The second set of constraints is to select all edges (i.e., all multiplications), exactly once. The first set of inequalities allows multiplications to be scheduled: once a vertex $s$ is selected (i.e., once a symbol is decided to be factorized), all multiplications involving $s$ can be grouped. 
 \end{enumerate}
 \end{proof}
 
