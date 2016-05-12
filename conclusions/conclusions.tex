@@ -1,2 +1,27 @@
 \chapter{Conclusions}
-...
+In this final chapter, the achievements and the limitations of this thesis are reviewed. Future research directions, including estimates of their potential scientific impact, are also discussed. 
+
+\section{Summary}
+Novel techniques that improve the performance of numerical methods for solving partial differential equations have been introduced. The three cornerstones of this work are:
+
+\begin{description} 
+\item[Realistic motivations] The performance optimization of a code must always start with a study of its bottlenecks and an assessment of its potentials. To avoid solving fictitious problems, real-world applications, kernels, and datasets must be used. All contributions of this thesis are motivated through the computational analysis of scientific programs.
+\item[Automation through compilers] Implementing and evaluating optimizations is more difficult than commonly thought. Simplistic codes and benchmarks should be avoided for experimentation, since they often return an incomplete picture of the system. On the other hand, integrating optimizations with real codes is a long, tedious, error-prone task -- and, more importantly, a task that users should not be expected to carry out on their own. Our solution to this issue is inserting compilers and libraries into frameworks that rely on domain-specific languages. In such an environment (i) domain specialists will provide the real applications and (ii) performance optimization is automated ``behind the scenes'' -- that is, without the need for user intervention.
+\item[Validation of the hypotheses] No matter what level of abstraction an optimization takes place, the hypotheses behind a speed-up in run-time must always be validated. Optimizations, especially changes at the algorithmic level, may have unpredictable implications on the low-level performance. For instance, a transformation that reduces the operation count may harm the vectorizability of the code, so the improvement in execution time could be much lower than that expected based on a cost model. All performance numbers reported in this thesis have been extensively analyzed through a variety of tools, including compiler reports and profilers. 
+\item[Domain knowledge]
+\end{description}
+
+
+\section{Limitations}
+
+tiling : performance tuning is a super mess
+tiling : implementation super complex may still be some bugs ?
+
+\section{Future Work}
+
+coffee: gpus
+coffee: sum factorization
+coffee: more general (a compute algebra system that sees loop)
+
+tiling: experimentation with more codes
+tiling: SFCs
