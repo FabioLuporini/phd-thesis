@@ -758,6 +758,13 @@ The implementation of generalized sparse tiling is distributed over three softwa
 \end{description}
 The interaction among these modules is illustrated in Figure~\ref{fig:st-implementation}.
 
+\begin{figure}
+\centering
+\includegraphics[scale=0.6]{sparsetiling/figures/firedrake-pyop2-slope.pdf}
+\caption{The interaction amongst Firedrake, PyOP2, and SLOPE.}
+\label{fig:st-implementation}
+\end{figure}
+
 The reasons behind the choice of this three-layer structuring are:
 \begin{description}
 \item[Simplicity of analysis] The abstractions used in Firedrake and PyOP2 simplify the analysis on the input programs required for automation. For example, from the parallel loop construct in PyOP2 (reviewed in Section~\ref{sec:bkg:op2}) we can derive useful information to build a loop chain.

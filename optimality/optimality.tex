@@ -231,6 +231,13 @@ For example, in $a b + a b c + a b c d$ the sub-expression $a b$ is an MCS, wher
 
 A temporaries graph is a directed $k$-partite graph in which vertices are MCSs and edges represent read-after-write dependencies between MCSs (e.g., an edge from $e_1$ to $e_2$ indicates that $e_1$ is read in $e_2$). The $k$ independent sets $\lbrace T_i \rbrace_{i=0}^{k-1}$ of vertices, or simply {\em level}s, are determined iteratively. Initially, Strategy~\ref{strategy:i} is applied to the input expression. This produces $T_0$ and modifies the input expression by replacing the MCSs in $T_0$ with appropriate temporaries. Then, Strategy~\ref{strategy:i} is applied to the modified expression; $T_1$ and the edges from $T_0$ to $T_1$ are in this way determined. This process is repeated $k$ times, until no more MCSs can be extracted. An example of temporaries graph is provided in Figure~\ref{fig:opt:tg}. It is worth observing that $k$ can be quite large as the input is in normal form. This implies, for instance, that the operands of an inner product occurring multiple times in the variational form will be common sub-expressions in the translated scalar expression.
 
+\begin{figure}[ht]
+\centering
+\includegraphics[scale=0.6]{optimality/figures/temporaries_graph.pdf}
+\caption{The temporary graph for an excerpt of code extracted from a hyperelastic model.}
+\label{fig:opt:tg}
+\end{figure}
+
 The {\em strategy selection analysis} uses a temporaries graph to determine whether applying Strategy~\ref{strategy:ii} to some subsets of levels would lower the global operation count. If the MCSs in the graph are structured expressions, then this analysis can be accomplished in polynomial time (thanks to Proposition~\ref{prop:multi-struct}). Given two levels $T_{i_1}$ and $T_{i_2}$ such that $i_1 < i_2$, one can
 
 \begin{enumerate}
@@ -370,11 +377,11 @@ We start with an example. Consider again the loop nest and the expression in Fig
 \begin{figure}[h]
 \begin{CenteredBox}
 
-\begin{subfigure}{0.40\textwidth}
+\begin{subfigure}{0.42\textwidth}
 \lstinputlisting[basicstyle=\scriptsize\ttfamily]{optimality/listings/loopnest_red.code}
 \subcaption{With reduction}\label{code:loopnest_red}
 \end{subfigure}
-~~~~~~~~~~
+~~~~~~~
 \begin{subfigure}{0.40\textwidth}
 \lstinputlisting[basicstyle=\scriptsize\ttfamily]{optimality/listings/loopnest_nored.code}
 \subcaption{After pre-evaluation}\label{code:loopnest_nored}
