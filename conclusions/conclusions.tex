@@ -1,27 +1,45 @@
 \chapter{Conclusions}
-In this final chapter, the achievements and the limitations of this thesis are reviewed. Future research directions, including estimates of their potential scientific impact, are also discussed. 
+In this final chapter, the achievements and the shortcomings of this thesis are reviewed. Future research directions, including an estimate of their potential scientific impact, are also discussed. 
 
 \section{Summary}
-Novel techniques that improve the performance of numerical methods for solving partial differential equations have been introduced. The three cornerstones of this work are:
+Novel techniques that improve the performance of numerical methods for solving partial differential equations have been introduced. Our work builds upon three cornerstones:
 
 \begin{description} 
-\item[Realistic motivations] The performance optimization of a code must always start with a study of its bottlenecks and an assessment of its potentials. To avoid solving fictitious problems, real-world applications, kernels, and datasets must be used. All contributions of this thesis are motivated through the computational analysis of scientific programs.
-\item[Automation through compilers] Implementing and evaluating optimizations is more difficult than commonly thought. Simplistic codes and benchmarks should be avoided for experimentation, since they often return an incomplete picture of the system. On the other hand, integrating optimizations with real codes is a long, tedious, error-prone task -- and, more importantly, a task that users should not be expected to carry out on their own. Our solution to this issue is inserting compilers and libraries into frameworks that rely on domain-specific languages. In such an environment (i) domain specialists will provide the real applications and (ii) performance optimization is automated ``behind the scenes'' -- that is, without the need for user intervention.
-\item[Validation of the hypotheses] No matter what level of abstraction an optimization takes place, the hypotheses behind a speed-up in run-time must always be validated. Optimizations, especially changes at the algorithmic level, may have unpredictable implications on the low-level performance. For instance, a transformation that reduces the operation count may harm the vectorizability of the code, so the improvement in execution time could be much lower than that expected based on a cost model. All performance numbers reported in this thesis have been extensively analyzed through a variety of tools, including compiler reports and profilers. 
-\item[Domain knowledge]
+\item[Solid motivations] The performance optimization of a code must always start with an analysis of its bottlenecks and an assessment of its potentials. Furthermore, to avoid solving fictitious problems, real-world applications, kernels, and datasets must be used. This approach has systematically been adopted in this thesis.
+\item[Automation through high-level compilers] Implementing and evaluating optimizations is challenging. Simplistic codes and benchmarks should be avoided for experimentation, since they often provide an incomplete picture of the computational domain. On the other hand, integrating optimizations with real codes is a long, tedious, error-prone task -- notably, a task that users should not be expected to carry out on their own. Our solution to this issue is inserting compilers and libraries into frameworks based upon domain-specific languages. In such environments, (i) domain specialists provide the real applications and (ii) performance optimization is automated ``behind the scenes'' -- that is, without the need for user intervention.
+\item[Validation of the hypotheses] The hypotheses behind run-time improvements must always be validated. Optimizations, especially changes at the algorithmic level, may have unpredictable implications on the low-level performance. For instance, a transformation that reduces the operation count may harm the vectorizability of loops. All performance numbers reported in this thesis have been extensively analyzed through a variety of tools, including compiler reports and profilers. 
 \end{description}
 
+In this thesis, we have investigated three main problems in the field of numerical methods on unstructured meshes.
+
+\paragraph{Sparse tiling of irregular loops (Chapter~\ref{ch:sparsetiling})} The biggest achievement is a technique for fusing arbitrary sequences of loops expressible by means of the loop chain abstraction. In fact, this technique is so general that any graph-based computation that adheres to the program model of the loop chain abstraction (or equivalent) is a potential optimization candidate. The first version of the generalized inspector/executor sparse tiling scheme was jointly devised with~\cite{st-paper}. The performance limitations of the inspector presented in this work and a careful study of the requirements of real-world applications (e.g., execution on distributed-memory architectures) motivated the design and the implementation of a second generalized inspector/executor scheme, which we presented in Section~\ref{sec:tiling:inspector}. Automation was achieved through integration of SLOPE with the Firedrake/PyOP2 tool-chain. The extensive performance investigation of the seismological code in Section~\ref{sec:tiling:seigen} clarifies the limitations and the potentials of sparse tiling. To the best of our knowledge, this is, to date, the first study that {\it simultaneously} attack (i) fusion/tiling of irregular loops, (ii) real-world applications, (iii) automation.
+
+\paragraph{Minimizing flops in finite element kernels (Chapter~\ref{ch:optimality})} Automated code generation for finite element assembly is especially interesting when the kernels, as a consequence of the operators used in the problem specification, are characterized by the presence of complex mathematical expressions. Hand-writing these kernels requires a great deal of effort; even more complex is optimizing for the operation count. This thesis demonstrates how to leverage automated code generation and mathematical properties for reducing (in particular, reaching local or global optima) the operation count in finite element integration loop nests. The main challenge tackled in this chapter was determining how to coordinate different rewrite operators (e.g., common sub-expressions elimination, factorization, expansion) that are subjected to a non-trivial interplay. Our algorithm shows significant performance improvements over state-of-the-art code generation systems for finite element assembly. 
+
+\paragraph{Low-level optimization of finite element kernels (Chapter~\ref{ch:lowlevelopt})}
+A second question arising when studying finite element kernels concerns the efficiency of the generated code. We have addressed this problem for conventional multi-core architectures. The peculiar structure of the assembly kernels (e.g., small loops, small working set distributed over a large number of variables/arrays) makes it difficult to find a specific sequence of transformations that maximizes the performance of all problems, on all architectures. We have investigated a number of novel and traditional compiler transformations, aimed at creating or improving SIMD vectorization and data locality. Amongst all these, the most powerful one is padding and data alignment, which exploits the memory access pattern of assembly kernels to increase the effectiveness of SIMD vectorization, at the price of a few additional iterations. This transformation has been demonstrated to provide systematic improvements in execution time across a range of problems. Although the idea behind this optimization is simple, the implementation conceals several challenges, including the handling of non unit-stride memory accesses.
+~\\ 
+~\\
+The techniques produced in this thesis have been released in publicly available software. The work on finite element kernels, in particular, is implemented in COFFEE, which we have described in Chapter~\ref{ch:coffee}. We recall that COFFEE is used in Firedrake, a framework for the resolution of partial differential equations through the finite element method, which comprises a user base in steady increase.
 
 \section{Limitations}
+Limitations of the proposed optimizations have already been discussed in the respective chapters; here, we simply want to recall the two relevant shortcomings.
+ 
+\paragraph{Performance analysis and tuning of sparse tiling}
+%tiling : performance tuning is a super mess
+%tiling : implementation super complex may still be some bugs ?
+%tiling: experimentation is LONG and need to talk to people to find more applications. there many hints there are more, but how easy? how easy the integration ? 
 
-tiling : performance tuning is a super mess
-tiling : implementation super complex may still be some bugs ?
+\paragraph{Combination of low-level transformations in finite element kernels}
+%lowlevelopt: cost model unrealiable, users have to do performance tuning.
 
 \section{Future Work}
-
-coffee: gpus
-coffee: sum factorization
-coffee: more general (a compute algebra system that sees loop)
-
-tiling: experimentation with more codes
-tiling: SFCs
+%
+%coffee: gpus
+%coffee: sum factorization
+%coffee: more general (a compute algebra system that sees loop)
+%
+%tiling: experimentation with more codes
+%tiling: experimentation with non-unstructured-mesh codes
+%tiling: SFCs
+%tiling: global synchro points
