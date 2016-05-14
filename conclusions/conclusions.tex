@@ -23,9 +23,11 @@ A second question arising when studying finite element kernels concerns the effi
 The techniques produced in this thesis have been released in publicly available software. The work on finite element kernels, in particular, is implemented in COFFEE, which we have described in Chapter~\ref{ch:coffee}. We recall that COFFEE is used in Firedrake, a framework for the resolution of partial differential equations through the finite element method, which comprises a user base in steady increase.
 
 \section{Limitations}
-Limitations of the proposed optimizations have already been discussed in the respective chapters; here, we simply want to recall the two relevant shortcomings.
+Limitations of the proposed optimizations have already been discussed in the respective chapters; here, we emphasize the two relevant shortcomings.
  
 \paragraph{Performance analysis and tuning of sparse tiling}
+The system developed in Chapter~\ref{ch:sparsetiling} automates sparse tiling in Firedrake/PyOP2 programs through the {\em loop$\_$chain} interface. This is a major step towards making this optimization accessible to domain specialists. What is still missing, however, is a cost model that facilitates, or ideally automates, the performance tuning. Similarly to Seigen (Section~\ref{sec:tiling:seigen}), real applications are characterized by long sequences of loops. This leads to considering multiple computational aspects: some loops may be memory-bound, others compute-bound; the working set size may vary amongst different subsets of loops (thus posing different constraints on the tile size); a loop may take much longer to execute than others; and so on. Altogether, these issues make it difficult thinking of a system capable of autonomously individuating the optimal loop chains and the respective tile sizes. Auto-tuning could help, but its implementation would be non-trivial. Further, an auto-tuning system could require (i) a significant amount of time to retrieve configurations and (ii) re-execution each time the mesh changes. We believe that, prior to focussing on the problem of automating performance tuning, more experimentation is necessary to gain more insights into the effects of sparse tiling in a whole class of programs.
+
 %tiling : performance tuning is a super mess
 %tiling : implementation super complex may still be some bugs ?
 %tiling: experimentation is LONG and need to talk to people to find more applications. there many hints there are more, but how easy? how easy the integration ? 
