@@ -23,7 +23,7 @@ A second question arising when studying finite element kernels concerns the effi
 The techniques produced in this thesis have been released in publicly available software. The work on finite element kernels, in particular, is implemented in COFFEE, which we have described in Chapter~\ref{ch:coffee}. We recall that COFFEE is used in Firedrake, a framework for the resolution of partial differential equations through the finite element method, which comprises a user base in steady increase.
 
 \section{Limitations}
-Limitations of the proposed techniques have already been discussed in the respective chapters; here, we emphasize the most relevant shortcomings.
+Limitations of the proposed techniques have already been discussed in the respective chapters; here, we emphasize the most relevant.
  
 \paragraph{Performance analysis and tuning of sparse tiling}
 The system described in Chapter~\ref{ch:sparsetiling} automates sparse tiling in Firedrake/PyOP2 programs through the {\em loop$\_$chain} interface. This represented a major step towards the accessibility of the optimization. What is still missing is a cost model that facilitates, or ideally automates, the performance tuning. Most applications, such as Seigen (Section~\ref{sec:tiling:seigen}), are characterized by long sequences of heterogeneous loops. Multiple computational aspects need be considered: some loops may be memory-bound, while others compute-bound; the working set size may vary significantly amongst different subsets of loops; a loop may take much longer to execute than others; and so on. Altogether, these issues make it difficult thinking of a system that autonomously individuates loop chains and optimal tile sizes. Auto-tuning could help, but its implementation would be non-trivial. Moreover, an auto-tuning system could require (i) a significant amount of time to retrieve a configuration and (ii) re-execution as some problem parameters change (e.g., the domain discretization). It is however necessary to experiment with a wider class of programs and loops before addressing the automation of performance tuning.
@@ -35,8 +35,31 @@ The system described in Chapter~\ref{ch:sparsetiling} automates sparse tiling in
 All optimizations presented in Chapter~\ref{ch:lowlevelopt} can improve the performance of finite element kernels, but it is difficult to determine the optimal sequence of transformations for a given problem. If, on one hand, padding and data alignment shows consistent speed-ups across a variety of problems, challenging is understanding how to compose the other transformations. The cost model suggested in~\cite{Luporini-coffee} works decently if the expression rewriting stage (Section~\ref{sec:coffee:pipeline}) is limited to the sole generalized loop-invariant code motion. However, coordinating vector-register tiling and expression splitting, as well as the more general purpose transformations (especially vector-promotion; see Section~\ref{sec:coffee-genpurp-opts} for the full list), becomes unclear if the potential of the whole expression rewriting engine is exploited. This is a result of introducing more temporaries and complex sub-expressions in the outer loops, as well as creating more loops. These low-level transformations are available in COFFEE, but at the moment, apart from padding and data alignment, users are expected to execute performance tuning on their own. Preliminary work on compiler auto-tuning is available at~\citep{coffee-code}; this is one of the loose ends of this thesis.
 
 
-\section{Future Work}
-%
+\section{Future Research Directions}
+We recapitulate the open questions that have arisen from the three main chapters of this thesis. 
+
+\paragraph{Extensive performance evaluation of sparse tiling}
+The theory and the tools behind generalized sparse tiling are now mature. The next big step is extensive experimentation with computations arising in a diverse range of domains, such as numerical methods on unstructured meshes (not necessarily finite element), molecular dynamics, and graph processing. The potentials of this optimization are still to be fully unveiled. 
+
+\paragraph{Sparse tiling in general-purpose or research compilers}
+It is unclear whether sparse tiling could (should) be automated in general-purpose or research (polyhedral-based) compilers. Although simple inspector/executor schemes are widespread (e.g., many compilers introduce alternative code paths for handling statically unknown loop bounds), the way towards supporting more advanced transformations is long and intricate. More importantly, sparse tiling can be seen, to some extent, as a domain-specific transformation; this makes us wonder whether integration with general-purpose compilers is even a rightful research direction. Unless in presence of very strong motivations (e.g., a suite of legacy codes characterized by memory-bound irregular loop nests), we find difficult to encourage investigating this path.
+
+\paragraph{Sparse tiling and space-filling curves}
+In Section~\ref{sec:tiling:difficult}, we have discussed the dichotomy between space-filling curves and loop tiling. Later, in Section~\ref{sec:tiling:seigen}, we have hypothesized that applying sparse tiling on top of a space-filling curve may significantly relieve the performance penalties that we are subjected to at the moment (e.g., load balancing, TLB misses). There is an on-going effort in the DMPlex community towards the introduction of space-filling curves in their system, so we one should be able to verify our hypothesis relatively soon. We speculate that space-filling curves can have a terrific impact on the performance of sparse tiling.
+
+\paragraph{Minimizing operations with sum-factorization in assembly kernels.}
+...
+
+\paragraph{Memory threshold; memory threshold on many-core architectures}
+...
+
+\paragraph{Low-level optimization of assembly kernels on GPUs}
+...
+
+\paragraph{Compiler auto-tuning for assembly kernels}
+...
+
+%"we leave this as an open question"
 %coffee: gpus
 %coffee: sum factorization
 %coffee: more general (a compute algebra system that sees loop)
