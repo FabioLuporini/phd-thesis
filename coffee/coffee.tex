@@ -14,6 +14,7 @@ Firedrake users employ the Unified Form Language to express problems in a notati
 \end{figure}
 
 \section{The Compilation Pipeline}
+\label{sec:coffee:pipeline}
 Similarly to general-purpose compilers, COFFEE provides different optimization levels, namely \texttt{O0}, \texttt{O1}, \texttt{O2} and \texttt{O3}. Apart from \texttt{O0}, which does not transform the code received from the form compiler (useful for debugging purposes), all optimization levels apply ordered sequences of optimizations. In essence, the higher the optimization level, the more aggressive (and potentially slower) is the transformation process. In the following, when describing aspects of the optimization process common to \texttt{O1}, \texttt{O2} and \texttt{O3}, we will use the generic notation \texttt{Ox} (\texttt{x} $\in \lbrace 1, 2, 3\rbrace$).
 
 The optimization level \texttt{Ox} can logically be split into three phases:
