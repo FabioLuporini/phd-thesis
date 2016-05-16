@@ -47,24 +47,15 @@ It is unclear whether sparse tiling could (should) be automated in general-purpo
 \paragraph{Sparse tiling and space-filling curves}
 In Section~\ref{sec:tiling:difficult}, we have discussed the dichotomy between space-filling curves and loop tiling. Later, in Section~\ref{sec:tiling:seigen}, we have hypothesized that applying sparse tiling on top of a space-filling curve may significantly relieve the performance penalties that we are subjected to at the moment (e.g., load balancing, TLB misses). There is an on-going effort in the DMPlex community towards the introduction of space-filling curves in their system, so we one should be able to verify our hypothesis relatively soon. We speculate that space-filling curves can have a terrific impact on the performance of sparse tiling.
 
-\paragraph{Minimizing operations with sum-factorization in assembly kernels.}
-...
+\paragraph{Minimizing operations and sum-factorization in assembly kernels}
+The strategy for minimizing the operation count developed in Chapter~\ref{ch:optimality} targets a specific class of finite element integration loop nests. If the loop nest changes, a generalization of the strategy is necessary. This may happen if the chosen function spaces have some additional structure. For instance, in spectral element methods basis functions are constructed from the tensor product of two orthogonal spaces. This enables the application of sum-factorization, a well-known technique for reducing the operation count. In essence, sum-factorization is the mathematical name for something very close to Strategy~\ref{strategy:ii} in Section~\ref{sec:se-rln}. It is still to be investigated the relationship between this optimization and our transformation model. 
 
-\paragraph{Memory threshold; memory threshold on many-core architectures}
-...
+\paragraph{Minimizing operations and memory constraints in assembly kernels}
+Two memory constraints have been introduced in Chapter~\ref{ch:optimality}. While Constraint~\ref{const:Le} was imposed to limit the transformation space, Constraint~\ref{const:TH} has a direct impact on the main optimization algorithm. Both constraints leave some interesting questions unanswered. First, the heuristic for choosing the memory threshold is a weakness of our methodology: we have proved (Section~\ref{sec:opt:perf-results}) that a drastic reduction in operation count should overrule any constraints on the working set size. However, we do not know how to identify the ``cut-off'' point, which is probably architecture-dependent. Second, Constraint~\ref{const:Le} becomes overly restrictive if the time dimension is included in our definition of finite element integration loop nest. Geometry-dependent sub-expressions are now generalized code motion candidates, which further expands the transformation space. Supporting this kind of hoisting could dramatically improve the execution time of an application; as explained in Section~\ref{sec:tiling:seigen}, Seigen would be extremely likely to benefit from it.
 
-\paragraph{Low-level optimization of assembly kernels on GPUs}
-...
+\paragraph{Extensions to many-core architectures}
+In this thesis, we have focused on the platforms that are typically used for unstructured mesh computations, that is, conventional CPU architectures. Two of the key limiting factors to the execution on many-core platforms (e.g., GPUs) are the stringent memory requirements of these computations and the lack of support from third-party libraries (e.g., PETSc). It would not be surprising if this scenario evolved over the next years. The upcoming generation of many-core architectures is in this sense promising, with traditional ``accelerators'' slowly becoming first-class platforms (e.g., nodes that can run a full-fledged operating system, larger memory systems, tighter coupling with the CPU through a shared address space), like the Intel's Knights Landing. While sparse tiling has yet too many open questions that need be answered before even thinking about new platforms. the COFFEE-related work is sufficiently mature for a generalization. Automated generation of efficient code for finite element kernels on GPUs has never been treated, to date.
 
 \paragraph{Compiler auto-tuning for assembly kernels}
-...
+As explained in the previous section, low-level optimization of assembly kernels could greatly benefit from compiler auto-tuning. Auto-tuning techniques have been proven successful in a variety of frameworks based upon domain-specific languages, such as Spiral and Halide. This would require some new technology in COFFEE. Our hypothesis is that a minimalistic auto-tuning system, performing a brute-force search out of a few tens of promising code syntheses, could result in significant speed-ups. This consideration is the fruit of preliminary work on the subject, with experimentation limited to relatively simple problems.
 
-%"we leave this as an open question"
-%coffee: gpus
-%coffee: sum factorization
-%coffee: more general (a compute algebra system that sees loop)
-%
-%tiling: experimentation with more codes
-%tiling: experimentation with non-unstructured-mesh codes
-%tiling: SFCs
-%tiling: global synchro points
