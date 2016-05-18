@@ -7,46 +7,19 @@
 
 %We exploit domain-specific languages to automate the performance optimization of numerical methods based upon unstructured meshes. 
 
-Maximizing the performance of numerical methods based upon unstructured meshes is a challenging task that can be relieved by raising the level of abstraction: if applications are expressed with domain-specific languages, powerful optimizations can be automated through compilers without the need for complex source code analysis. 
+%Maximizing the performance of numerical methods based upon unstructured meshes is a challenging task that can be relieved by raising the level of abstraction: if applications are expressed with domain-specific languages, powerful optimizations can be automated through compilers without the need for complex source code analysis. 
 
+Maximizing the performance of numerical methods for partial differential equations is a challenging task that can be relieved by raising the level of abstraction, which remarkably simplifies the introduction of powerful optimizations via domain-specific compilers. 
 
 \section{Overview}
-%In many fields such as computational fluid dynamics, computational electromagnetics and structural mechanics, phenomena are modelled by partial differential equations (PDEs). Numerical techniques, like the finite volume method and the finite element method, are widely employed to approximate solutions of these PDEs. Unstructured meshes are often used to discretize the computational domain, since they allow an accurate representation of complex geometries. The solution is sought by applying suitable numerical operations, or
-%kernels, to the entities of a mesh, such as edges, vertices, or cells. On standard clusters of multicores, typically, a kernel is executed sequentially by a thread, while parallelism is achieved by partitioning the mesh and assigning each partition to a different node or thread. Such an execution model, with minor variations, is adopted, for example, in \cite{pyop2isc}, \cite{Fenics}, \cite{fluidity_manual_v4}, \cite{lizst}.
-%
-%The time required to apply the numerical kernels is a major issue, since the equation domain needs to be discretized into an extremely large number of cells to obtain a satisfactory approximation of the PDE, possibly of the order of trillions, as in \cite{Rossinelli2013}. For example, it has been well established that mesh resolution is critical in the accuracy of numerical weather forecasts. However, operational forecast centers have a strict time limit in which to produce a forecast - 60 minutes in the case of the UK Met Office. Producing efficient kernels has a direct scientific payoff in higher resolution, and therefore more accurate, forecasts. Computational cost is a dominant problem in computational science simulations, especially for those based on finite elements, which are the subject of this work. In this chapter, we address, in particular, the well-known problem of optimizing the local assembly phase of the finite element method, which can be responsible for a significant fraction of the overall computation run-time, often in the range 30-60$\%$ \citep{francis}, \citep{quadrature-olegaard}, \citep{petsc-integration-gpu}, \citep{tensor-kirby}. 
-%
-%During the assembly phase, the solution of the PDE is approximated by executing a problem-specific kernel over all cells, or elements, in the discretized domain. We restrict our focus to relatively low order finite element methods, in which an assembly kernel's working set is usually small enough to fit the L1 cache. Low order methods are by no means exotic: they are employed in a wide variety of fields, including climate and ocean modeling, computational fluid dynamics, and structural mechanics. The efficient assembly of high order methods such as the spectral element method \citep{spencer} requires a significantly different loop nest structure. High order methods are therefore excluded from our study.
+In many fields such as computational fluid dynamics, computational electromagnetics and structural mechanics, phenomena are modelled by partial differential equations (PDEs). Numerical techniques, like the finite volume method and the finite element method, are widely employed to approximate solutions of these PDEs. Unstructured meshes are often used to discretize the computational domain, since they allow an accurate representation of complex geometries. The solution is sought by applying suitable numerical operations, or
+kernels, to the entities of a mesh, such as edges, vertices, or cells. On standard clusters of multi-cores, typically, a kernel is executed sequentially by a process, while parallelism is achieved by partitioning the mesh and assigning each partition to a different node or process. This execution model is adopted by many real-world applications and libraries.
 
-%In many fields, such as computational fluid dynamics, computational
-%electromagnetics and structural mechanics, phenomena are modelled by
-%partial differential equations (PDEs). Unstructured meshes, which
-%allow an accurate representation of complex geometries, are often used 
-%to discretize their computational domain. Numerical techniques, like the
-%finite volume method and the finite element method, approximate the solution 
-%of a PDE by applying suitable numerical operations, or kernels, to the 
-%various entities of the unstructured mesh, such as edges, vertices, or
-%cells. On standard clusters of multicores, typically, a kernel is
-%executed sequentially by a thread, while parallelism is achieved by
-%partitioning the mesh and assigning each partition to a different node
-%or thread. Such an execution model, with minor variations, is adopted,
-%for instance, in \cite{pyop2isc}, \cite{Fenics}, \cite{fluidity_manual_v4}, \cite{lizst}, which
-%are examples of frameworks specifically thought for writing numerical methods for PDEs.
-%
-%The time required to execute these unstructured-mesh-based applications is a fundamental issue.
-%An equation domain needs to be discretized into an extremely
-%large number of cells to obtain a satisfactory approximation
-%of the solution, possibly of the order of trillions
-%(e.g. \cite{Rossinelli2013}), so applying numerical kernels all over the mesh is expensive. 
-%For example, it is well-established that mesh resolution is crucial in the accuracy of numerical weather
-%forecasts; however, operational centers have a strict time
-%limit in which to produce a forecast - 60 minutes in the case of the
-%UK Met Office - so, executing computation- and memory-efficient 
-%kernels has a direct scientific payoff in higher resolution, and 
-%therefore more accurate predictions. Motivated by this and analogous scenarios, 
-%this thesis studies, formalizes, and implements a number of
-%code transformations to improve the performance of real-world scientific 
-%applications using numerical methods over unstructured meshes. 
+The time required to apply the numerical kernels is a major issue, since the equation domain needs to be discretized into an extremely large number of cells to obtain a satisfactory approximation of the PDE, possibly of the order of trillions, as in \cite{Rossinelli2013}. For example, it has been well established that mesh resolution is critical in the accuracy of numerical weather forecasts. However, operational forecast centers have a strict time limit in which to produce a forecast - 60 minutes in the case of the UK Met Office. Producing efficient kernels or making the iteration over the mesh more efficient have a direct scientific payoff in higher resolution, and therefore more accurate, forecasts. Optimizing the computational cost is a critical problem for most scientific simulations. 
+
+This thesis shows that the use of domain-specific languages for expressing this class of numerical methods can play a fundamental role in performance optimization. In the translation of the problem specification into low-level code (e.g., C), a stack of compilers will apply sophisticated transformations. In an ideal world, these transformations would manually be written, specialized, and tuned for each application and for each architecture. However, this is often in practice unrealistic: such an approach would affect the gold rules of software engineering, including code robustness, maintainability, extendibility, separation of abstractions (an optimization may hinder the actual computation code). 
+
+As we shall demonstrate, a performance optimization process through domain-specific compilers provides significant advantages. First, simplicity: the information captured by high-level languages and/or domain properties are now straightforwardly exploitable. This is invaluable since the analysis that a compiler would otherwise have to perform would be either too complex or practically infeasible. Second, portability: different applications, or kernels, use the same transformation pipeline. Depending on the level of sophistication of the framework, execution on heterogeneous architectures may be supported. Third, clear separation of concerns. Application specialists only focus on expressing their simulations with a notation which is possibly very close to the mathematics of textbooks, whereas the performance optimization is hidden within the lower levels of abstraction. 
 
 \section{Summary of the Contributions}
 \label{sec:contributions}
