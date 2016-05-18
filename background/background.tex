@@ -1,6 +1,8 @@
 \chapter{Background}
 \label{ch:background}
 
+%The concepts are introduced  Following a top-down approach ()
+
 \section{The Finite Element Method}
 \label{sec:bkg:fem}
 Computational methods based upon finite elements are used to approximate the solution of partial differential equations (henceforth, PDEs) in a wide variety of domains. The mathematical abstraction used in finite element methods (or FEMs) is extremely powerful: not only does it help reasoning about the problem, but also provides systematic ways of deriving effective computer implementations. In~\cite{brenner-and-scott}, it is usefully suggested to consider an FEM as a black box that, given a differential equation, returns a discrete algorithm capable of approximating the equation solution. Unveiling the magic of such a black box is clearly out of the scope of this chapter. We rather limit ourselves to review the mathematical and computational aspects that are essential for understanding the contributions in Chapters~\ref{ch:optimality} and~\ref{ch:lowlevelopt}. The content and the notation used in this section are inspired by~\cite{florian-thesis},~\cite{Fenics} and~\cite{quadrature-olegaard}. For a complete treatment of the subject, the reader is invited to refer to~\cite{brenner-and-scott}.
