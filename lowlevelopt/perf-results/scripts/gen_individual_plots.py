@@ -23,6 +23,7 @@ fontsize = 15
 
 # DATA
 # Format of np.array: [licm, ap, opvect, split]
+# Gain_in_licm_ap * normalized_gain (from txt) - Gain_in_licm_ap
 plots = []
 # Helmholtz 2D
 plots.append(('Helmholtz', 'Triangle', np.array([[1.05, 0.27, 0., 0.],

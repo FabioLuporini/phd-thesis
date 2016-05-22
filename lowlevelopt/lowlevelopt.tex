@@ -235,7 +235,7 @@ These problems were studied varying both the shape of mesh elements and the poly
 Experiments were run on a single core of an Intel architecture, a Sandy Bridge I7-2600 CPU running at 3.4 GHz, with 32KB of L1 cache and 256KB of L2 cache). The \texttt{icc 14.1}  compiler was used. On the Sandy Bridge, the compilation flags used were \texttt{-O2} and \texttt{-xAVX} for auto-vectorization (other optimization levels were tried, but they generally resulted in higher execution times).
 
 \begin{figure}[t]
-\centerline{\includegraphics[scale=0.45]{lowlevelopt/perf-results/individual/graph}}
+\centerline{\includegraphics[scale=0.45]{lowlevelopt/perf-results/individual/plot_sb}}
 \caption{Performance improvement due to generalized loop-invariant code motion (\emph{licm}), data alignment and padding (\emph{ap}), outer-product vectorization (\emph{op-vect}), and expression splitting (\emph{split}) over the original non-optimized code. In each plot, the horizontal axis reports speed ups, whereas the polynomial order $q$ of the method varies along the vertical axis.}
 \label{fig:coffee-individual-res}
 \end{figure}
