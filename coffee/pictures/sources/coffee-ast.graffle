@@ -48,7 +48,7 @@
 	<array>
 		<dict>
 			<key>Bounds</key>
-			<string>{{388.79999130964279, 222.83999622613192}, {149, 34}}</string>
+			<string>{{366.47999180853367, 222.83999622613192}, {228, 34}}</string>
 			<key>Class</key>
 			<string>ShapedGraphic</string>
 			<key>FitText</key>
@@ -100,15 +100,15 @@
 \deftab720
 \pard\pardeftab720
 
-\f0\fs22 \cf0 indices: [i, j]\
-offsets: [(), (2, 1)]}</string>
+\f0\fs22 \cf0 rank: [i, j]\
+offset: [(), (scale=2, stride=1)]}</string>
 			</dict>
 			<key>Wrap</key>
 			<string>NO</string>
 		</dict>
 		<dict>
 			<key>Bounds</key>
-			<string>{{251.27999438345432, 222.83999622613192}, {123, 34}}</string>
+			<string>{{228.87999550998211, 222.83999622613192}, {116, 34}}</string>
 			<key>Class</key>
 			<string>ShapedGraphic</string>
 			<key>FitText</key>
@@ -160,15 +160,15 @@ offsets: [(), (2, 1)]}</string>
 \deftab720
 \pard\pardeftab720
 
-\f0\fs22 \cf0 indices: [i, j]\
-offsets: [(), ()]}</string>
+\f0\fs22 \cf0 rank: [i, j]\
+offset: [(), ()]}</string>
 			</dict>
 			<key>Wrap</key>
 			<string>NO</string>
 		</dict>
 		<dict>
 			<key>Bounds</key>
-			<string>{{101.51999773085117, 163.43999715149403}, {123, 34}}</string>
+			<string>{{78.339997634291649, 163.43999715149403}, {116, 34}}</string>
 			<key>Class</key>
 			<string>ShapedGraphic</string>
 			<key>FitText</key>
@@ -220,8 +220,8 @@ offsets: [(), ()]}</string>
 \deftab720
 \pard\pardeftab720
 
-\f0\fs22 \cf0 indices: [i, j]\
-offsets: [(), ()]}</string>
+\f0\fs22 \cf0 rank: [i, j]\
+offset: [(), ()]}</string>
 			</dict>
 			<key>Wrap</key>
 			<string>NO</string>
@@ -288,8 +288,8 @@ offsets: [(), ()]}</string>
 			<integer>116</integer>
 			<key>Points</key>
 			<array>
-				<string>{405.58971196197035, 189.83508902939261}</string>
-				<string>{370.30654952448202, 160.47222833219558}</string>
+				<string>{405.60396433823536, 189.82896514295084}</string>
+				<string>{370.34873426449468, 160.45415580469106}</string>
 			</array>
 			<key>Style</key>
 			<dict>
@@ -371,8 +371,8 @@ offsets: [(), ()]}</string>
 			<integer>114</integer>
 			<key>Points</key>
 			<array>
-				<string>{303.8630557163296, 189.40383744326769}</string>
-				<string>{335.28212131018034, 160.84657630050623}</string>
+				<string>{303.88010727234376, 189.41056326595688}</string>
+				<string>{335.33066714376514, 160.86579180331012}</string>
 			</array>
 			<key>Style</key>
 			<dict>
@@ -425,8 +425,9 @@ offsets: [(), ()]}</string>
 \pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\pardirnatural\qc
 
 \f0\fs20 \cf0 Prod\
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\pardirnatural\qc
 
-\f1\b *}</string>
+\f1\b \cf0 *}</string>
 				<key>VerticalPad</key>
 				<integer>0</integer>
 			</dict>
@@ -495,8 +496,8 @@ offsets: [(), ()]}</string>
 			<integer>111</integer>
 			<key>Points</key>
 			<array>
-				<string>{161.86896660686799, 134.99034720110012}</string>
-				<string>{218.01573071911929, 112.0080625874667}</string>
+				<string>{161.85937532569685, 134.98208750617914}</string>
+				<string>{217.98498338312626, 111.98166230182014}</string>
 			</array>
 			<key>Style</key>
 			<dict>
@@ -540,8 +541,8 @@ offsets: [(), ()]}</string>
 			<integer>42</integer>
 			<key>Points</key>
 			<array>
-				<string>{326.6928100831438, 135.09294772319677}</string>
-				<string>{269.13950465814969, 111.87375431618462}</string>
+				<string>{326.69444638398676, 135.09151744170867}</string>
+				<string>{269.14481475947235, 111.86911518268006}</string>
 			</array>
 			<key>Style</key>
 			<dict>
@@ -707,7 +708,7 @@ offsets: [(), ()]}</string>
 	<key>MasterSheets</key>
 	<array/>
 	<key>ModificationDate</key>
-	<string>2016-05-15 13:49:56 +0000</string>
+	<string>2016-05-25 11:28:02 +0000</string>
 	<key>Modifier</key>
 	<string>Fabio Luporini</string>
 	<key>NotesVisible</key>
