@@ -1,30 +1,23 @@
 \chapter{Automated Sparse Tiling for Irregular Computations}
 \label{ch:sparsetiling}
 
+Many numerical methods for partial differential equations (PDEs) are structured as sequences of parallel loops. This exposes parallelism well, but does not convert data reuse between loops into data locality, since their working set is usually too big to fit in some level of cache. In Section~\ref{sec:bkg:poly}, it was explained that loop fusion and loop tiling may be used to retain some of this potential data locality. This chapter introduces a mixed compiler/library system capable of applying these transformations to sequences of irregular loops, automatically. Challenges deriving from real-world applications are addressed. As reiterated throughout the chapter, parts of this work are the result of a joint collaboration with~\cite{st-paper}, from which some of the following sections are also inspired.
+
 \section{Motivation}
 \label{sec:tiling:motivation}
-%mention dichotomy tiling/fusion...
 
-%- irregular codes from pde-land are often memory bound (this however depends on the discretization)
-%- investigation of tiling in real-world irregular codes
+The focus of this chapter is improving data locality in unstructured mesh PDE solvers, such as those based on the finite volume or the finite element methods. Here, the loop-to-loop dependence structure is data-dependent due to indirect references such as \texttt{A[map[i]]}. The \texttt{map} array stores connectivity information, for example from elements in the mesh to degrees of freedom. A similar pattern occurs in molecular dynamics simulations and graph processing, so both the theory and the tools that we will develop in this chapter are generalizable to these domains. 
 
-%- fully parallel loops ! with local reductions ... (diff with global reductions)
+Three motivating real-world applications for this work are Hydra, Volna and Seigen. Hydra~\citep{hydra-op2} is a computational fluid dynamics application used at Rolls Royce for the simulation of next-generation components of jet engines. Volna~\citep{ST-volna} is a computational fluid dynamics application for the modelling of tsunami waves. Seigen aims to solve the elastic wave equation using the discontinuous Galerkin finite element method for energy exploration purposes. All these applications are characterized by the presence of a time-stepping loop, in which several loops over the computational mesh (33 in Hydra, 10 in Volna, 28 in Seigen) are executed. These loops are characterized by the aforementioned irregular loop-to-loop dependence structure. We will use Seigen, as well as other simpler benchmarks, for performance evaluation.
 
-
-
-Many numerical methods for partial differential equations (PDEs) are structured as sequences of parallel loops. This exposes parallelism well, but does not convert data reuse between loops into data locality, since their working set is usually too big to fit some level of cache. In Section~\ref{sec:bkg:poly} we have explained that loop fusion and loop tiling may be used to retain some of this potential data locality. As we elaborate in this chapter, it is however extremely challenging to implement these optimizations in real-world applications. 
-
-Our focus is on unstructured mesh PDE solvers, like those based on the finite volume or the finite element methods. Here, the  loop-to-loop dependence structure is data-dependent due to
-indirect references such as \texttt{A[map[i]]}; the \texttt{map} array stores connectivity information, for example from elements in the mesh to degrees of freedom. A similar pattern occurs in molecular dynamics simulations and graph processing, so both the theory and the tools that we will develop in this chapter are generalizable to these domains. 
-
-Because of the irregular memory access pattern, our approach to loop transformation is based on dynamic analysis, particularly on \textit{inspector/executor schemes}. Our hypothesis, backed by the studies reviewed in Section~\ref{sec:bkg:ie}, is that dynamic loop optimization can improve the performance of a class of real-world unstructured mesh applications. Among the possible dynamic loop optimizations, we target \textit{sparse tiling}. We recall from Section~\ref{sec:bkg:tiling} that sparse tiling aims to exploit data reuse across consecutive loops by composing two transformations, namely loop fusion and loop tiling. 
+Because of the irregular memory access pattern, our approach to loop transformation is based on dynamic analysis, particularly on \textit{inspector/executor schemes}. Among the possible dynamic loop optimizations, we target \textit{sparse tiling}. We recall from Section~\ref{sec:bkg:tiling} that sparse tiling aims to exploit data reuse across consecutive loops by composing two transformations, namely loop fusion and loop tiling. Given the presence of significant data reuse across consecutive loops, our hypothesis is that sparse tiling has strong potentials in the class of unstructured mesh PDE solvers that we are targeting.
 
 Summarizing, the three main issues that we tackle in this chapter are:
 
 \begin{itemize}
 \item Previous approaches to sparse tiling were all based upon ``ad-hoc'' inspector/executor strategies; that is, developed ``by hand'', per application. We seek a general technique, applicable to arbitrary computations on unstructured meshes.
 \item Automation is more than a desired feature because application specialists will avoid complicated optimizations that may harm the comprehensibility of source code. We therefore aim for a fully-automated framework, based upon a mixed compiler/library approach.
-\item Very few studies have addressed the problem of fusing loops when these need be interleaved by routines for message passing. We are aware of none for the scenario in which the memory accesses pattern is irregular. We fill this gap by introducing a sparse tiling scheme that uses redundant computation over partition boundaries to delay communication. The importance of this contribution stems from the fact that most scientific simulations require distributed-memory parallelism.
+\item A few studies have addressed the problem of fusing loops when these need be interleaved by routines for message passing. However, we are aware of none for the scenario in which the memory accesses pattern is irregular. We fill this gap by introducing a sparse tiling scheme that uses redundant computation over partition boundaries to delay communication. The importance of this contribution stems from the fact that most scientific simulations require distributed-memory parallelism.
 \end{itemize}
 
 \section{Open Problems, Questions, Hypotheses}

@@ -1,8 +1,10 @@
 \chapter{COFFEE: a Compiler for Fast Expression Evaluation}
 \label{ch:coffee}
 
+Sharing elimination and pre-evaluation, presented in Chapter~\ref{ch:optimality}, as well as the low level optimizations in Chapter~\ref{ch:lowlevelopt}, have been implemented in COFFEE\footnote{COFFEE is the acronym for COmpiler For Fast Expression Evaluation.}, a high-level compiler integrated with Firedrake. In this chapter, the conception, architecture and interface of COFFEE are described. The codebase, which comprises more than 4000 lines of Python, is available at~\citep{coffee-code}.
+
+
 \section{Overview}
-Sharing elimination and pre-evaluation, presented in Chapter~\ref{ch:optimality}, as well as the low level optimizations discussed in Chapter~\ref{ch:lowlevelopt}, have been implemented in COFFEE\footnote{COFFEE is the acronym for COmpiler For Fast Expression Evaluation.}, a high-level compiler integrated with Firedrake. The codebase, which comprises more than 4000 lines of Python, is available at~\citep{coffee-code}.
 
 We recall from Section~\ref{sec:bkg:fenics-and-firedrake} that Firedrake users employ the Unified Form Language to express problems in a mathematical syntax. At run-time, the high-level specification is translated by a form compiler, the Two-Stage Form Compiler (TSFC)~\citep{TSFC}, into one or more abstract syntax trees (ASTs) representing assembly kernels. ASTs are then passed to COFFEE for optimization. The output of COFFEE, C code, is eventually provided to PyOP2~\citep{pyop2isc}, where just-in-time compilation and execution over the computational mesh take place. This structure of this tool-chain is outlined in Figure~\ref{fig:coffee-pipeline}, along with an overview of the compilation pipeline in COFFEE. 
 
