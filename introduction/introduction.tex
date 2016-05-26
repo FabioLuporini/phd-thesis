@@ -9,17 +9,16 @@
 
 %Maximizing the performance of numerical methods based upon unstructured meshes is a challenging task that can be relieved by raising the level of abstraction: if applications are expressed with domain-specific languages, powerful optimizations can be automated through compilers without the need for complex source code analysis. 
 
-Maximizing the performance of numerical methods for partial differential equations is a challenging task that can be relieved by raising the level of abstraction, which remarkably simplifies the introduction of powerful optimizations via domain-specific compilers. 
+Maximizing the performance of numerical methods for partial differential equations is a challenging task that can considerably be relieved by raising the level of abstraction, through which automated optimization becomes possible. 
 
 \section{Overview}
-In many fields such as computational fluid dynamics, computational electromagnetics and structural mechanics, phenomena are modelled by partial differential equations (PDEs). Numerical techniques, like the finite volume method and the finite element method, are widely employed to approximate solutions of these PDEs. Unstructured meshes are often used to discretize the computational domain, since they allow an accurate representation of complex geometries. The solution is sought by applying suitable numerical operations, or
-kernels, to the entities of a mesh, such as edges, vertices, or cells. On standard clusters of multi-cores, typically, a kernel is executed sequentially by a process, while parallelism is achieved by partitioning the mesh and assigning each partition to a different node or process. This execution model is adopted by many real-world applications and libraries.
+In many fields such as computational fluid dynamics, computational electromagnetics and structural mechanics, phenomena are modelled by partial differential equations (PDEs). Numerical techniques, like the finite volume method and the finite element method, are widely employed to approximate solutions of these PDEs. Unstructured meshes are often used to discretize the computational domain, since they allow an accurate representation of complex geometries. The solution is sought by applying suitable numerical operations, or kernels, to the entities of a mesh, such as edges, vertices, or cells. On standard clusters of multi-cores, typically, a kernel is executed sequentially by a process, while parallelism is achieved by partitioning the mesh and assigning each partition to a different node or process. This execution model is adopted by many real-world applications and frameworks.
 
 The time required to apply the numerical kernels is a major issue, since the equation domain needs to be discretized into an extremely large number of cells to obtain a satisfactory approximation of the PDE, possibly of the order of trillions, as in \cite{Rossinelli2013}. For example, it has been well established that mesh resolution is critical in the accuracy of numerical weather forecasts. However, operational forecast centers have a strict time limit in which to produce a forecast - 60 minutes in the case of the UK Met Office. Producing efficient kernels or making the iteration over the mesh more efficient have a direct scientific payoff in higher resolution, and therefore more accurate, forecasts. Optimizing the computational cost is a critical problem for most scientific simulations.
 
-This thesis shows that the use of domain-specific languages for expressing this class of numerical methods can play a fundamental role in performance optimization. In the translation of the problem specification into low-level code (e.g., C), a stack of compilers will apply sophisticated transformations. In an ideal world, these transformations would manually be written, specialized, and tuned for each application and for each architecture. However, this is often in practice unrealistic: such an approach would affect the gold rules of software engineering, including code robustness, maintainability, extendibility, separation of abstractions (an optimization may hinder the actual computation code).
+This thesis shows that the use of domain-specific languages for expressing a class of numerical methods based on unstructured meshes plays a fundamental role in performance optimization. In the translation of the problem specification into low level code (e.g., C), a stack of compilers applies sophisticated transformations. In an ideal world, these transformations would manually be written, specialized, and tuned for each application and for each architecture. However, this is often unrealistic. Indeed, such an approach affects many gold rules of software engineering, including maintainability, extendibility, and modularity.
 
-As we shall demonstrate, a performance optimization process through domain-specific compilers provides significant advantages. First, simplicity: the information captured by high-level languages and/or domain properties are now straightforwardly exploitable. This is invaluable since the analysis that a compiler would otherwise have to perform would be either too complex or practically infeasible. Second, portability: different applications, or kernels, use the same transformation pipeline. Depending on the level of sophistication of the framework, execution on heterogeneous architectures may be supported. Third, clear separation of concerns. Application specialists only focus on expressing their simulations with a notation which is possibly very close to the mathematics of textbooks, whereas the performance optimization is hidden within the lower levels of abstraction. 
+As we shall demonstrate, a optimizing applications through domain-specific compilers has significant advantages. First, simplicity: program structure and domain properties are captured by the high level syntax, which invaluably simplifies the analysis phase in a compiler. Second, portability: multiple applications use the same transformation pipeline and execution on heterogeneous architectures may be supported. Third, separation of concerns. Application specialists focus on expressing simulations with a notation close to the mathematics of textbooks, whereas performance optimization is hidden in the lower abstraction layers. 
 
 \section{Thesis Outline and Contributions}
 \label{sec:contributions}
@@ -28,80 +27,44 @@ This thesis investigates two main problems: (i) the generalization of a compiler
 The thesis comprises 7 chapters, including the present introduction and the conclusions. Chapter~\ref{ch:background} establishes the foundation upon which our contributions will be derived. Here, the basics of the finite element method, the state-of-the-art on automated code generation for unstructured mesh computations, and compiler optimization are reviewed. Chapters~\ref{ch:sparsetiling},~\ref{ch:optimality}, and~\ref{ch:lowlevelopt}, which respectively correspond to the aforementioned research topics (i), (ii-a), and (ii-b), represent the core contributions of this thesis. In particular:
 
 \begin{description}
-\item[Chapter~\ref{ch:sparsetiling}] Sparse tiling is a transformation that fuses and tiles loops characterized by indirect memory accesses (e.g., {\tt A[B[i]]}). These loops are common when iterating over unstructured meshes. The initial work on sparse tiling was a joint international effort with people from several institutions: Michelle M. Strout, Christopher Krieger, and Catherine Olschanowsky (Colorado State University; fundamental contributions to the first version of the {\em generalized sparse tiling algorithm} for shared-memory architectures); Carlo Bertolli (IBM T. J. Watson; main algorithm and debugging); J. ``Ram'' Ramanujam (Louisiana State University; main algorithm); Gheorghe-Teodor Bercea and Paul H. J. Kelly (Imperial College; main algorithm). The implementation of the first sparse tiling algorithm in the OP2 library and the relative experimentation were entirely conducted by the author of this thesis. This work was later extended ...
+\item[Chapter~\ref{ch:sparsetiling}] Sparse tiling is a transformation that fuses and tiles loops characterized by indirect memory accesses (e.g., {\tt A[B[i]]}). These loops are common when iterating over unstructured meshes. The research on sparse tiling can logically be split into two phases:
+\begin{enumerate}
+\item The initial work was a joint international effort with people from several institutions: Michelle M. Strout, Christopher Krieger, and Catherine Olschanowsky (Colorado State University; fundamental contributions to the first version of the {\em generalized sparse tiling algorithm} for shared-memory architectures); Carlo Bertolli (IBM T. J. Watson; main algorithm and debugging); J. ``Ram'' Ramanujam (Louisiana State University; main algorithm); Gheorghe-Teodor Bercea and Paul H. J. Kelly (Imperial College; main algorithm). The design and the implementation of the first sparse tiling algorithm in the OP2 library were entirely performed by the author of this thesis. 
+\item The work has later been extended in three directions: a more efficient sparse tiling algorithm for shared-memory execution; support for distributed-memory execution (with contributions from Michael Lange); automation in the Firedrake framework through the SLOPE library. SLOPE implements sparse tiling, and is entirely a by-product of this thesis.
+\end{enumerate}
 
-\item[Chapter~\ref{ch:optimality}] ...
+\item[Chapter~\ref{ch:optimality}] An algorithm for minimizing the operation count in a class of finite element integration loop nests is devised and evaluated. This algorithm, which exploits fundamental mathematical properties of finite element operators, is proven to achieve a locally optimal operation count. Rewrite operators, such as factorization and generalized loop-invariant code motion, as well as cost models are to this purpose used. The algorithm is implemented in COFFEE, a domain-specific compiler conceived and written by the author of this thesis. COFFEE is integrated in the Firedrake system, which is capable of solving PDEs expressed in mathematical syntax through the finite element method. As such, the technology developed in this chapter is used in a number of projects built on top of Firedrake.
 
-\item[Chapter~\ref{ch:lowlevelopt}] ...
+\item[Chapter~\ref{ch:lowlevelopt}] The low level optimization of the code resulting from the minimization algorithm in Chapter~\ref{ch:optimality} is studied. A number of transformations, both novel (inspired by kernel structure and/or domain properties) and known (yet specialized, to take advantage of kernel properties), are introduced. SIMD vectorization and register locality on state-of-the-art CPUs are targeted. Since the implementation is carried out in COFFEE, the transformations are promptly available to Firedrake users. Some of them -- the ones which are proven to provide systematic performance improvements -- are automatically applied in the default optimization process.
 
 \end{description}
 
-Finally, Chapter~\ref{ch:coffee} ...
+Finally, Chapter~\ref{ch:coffee} describes the conception, architecture and interface of COFFEE. This is a technical chapter, in which implementation choices and challenges are discussed.
 
+Summarizing, this thesis advances the state-of-the-art by introducing new performance optimizations for a class of unstructured mesh computations (with emphasis on the finite element method) and by automating them through two new software components: SLOPE and COFFEE.
 
-%Besides developing novel compilers theory, contributions of this thesis come in the form of tools that have been, and currently are, used to accelerate scientific computations, namely:
-%\begin{itemize}
-%\item \textbf{A run-time library, which can be regarded as a prototype compiler, capable of optimizing sequences of non-affine loops by fusion and automatic parallelization. The library has been used to speed up a real application for tsunami simulations as well as other representative benchmarks.}
-%
-%One limiting factor to the performance of unstructured mesh applications is imposed by
-%the need for indirect memory accesses (e.g. \texttt{A[B[i]]}) to read and
-%write data associated with the various entities of the discretized domain.
-%For example, when executing a kernel that numerically computes an integral over a cell, 
-%which is common in a finite element method, it may be necessary
-%to read the coordinates of the adjacent vertices; this is achieved by
-%using a suitable indirection array, often referred to as ``map'', that
-%connects cells to vertices. The problem with indirect 
-%memory accesses is that they break several hardware and compiler optimizations,
-%including prefetching and standard loop blocking (or tiling). A first contribution of this thesis
-%is the formalization and development of a technique, called ``generalized sparse tiling'',
-%that aims at increasing data locality by fusing loops in which indirections
-%are used. The challenges are 1) to determine if and how a sequence of loops can be fused,
-%and 2) doing it efficiently, since the fusability analysis must be performed at
-%run-time, once the maps are available (i.e. once the mesh topology has been read 
-%from disk).
-%
-%\item \textbf{A fully-operating compiler, named COFFEE\footnote{COFFEE stands for COmpiler For FinitE Element local assembly.}, capable of optimizing numerical kernels solving partial differential equations using the finite element method. The compiler is integrated with the Firedrake system (\cite{firedrake-code}).}
-%
-%The second contribution, in the context of the finite element method, is about optimizing the computation of so called local element matrices, which can be responsible for a significant fraction of the overall computation run-time. This is a well-known problem, and several studies can be found in the literature, among which \citep{francis}, \citep{quadrature-olegaard}, \citep{petsc-integration-gpu}, \citep{tensor-kirby}. With respect to these studies, we propose a novel set of composable, model-aware code transformations explicitly targeting, for the first time, instruction-level parallelism - with emphasis on SIMD vectorization - and register locality. These transformations are automated in COFFEE.
-%\end{itemize}
 
 \section{Dissemination}
-%The research exposed in this thesis has been disseminated in the scientific community through various channels:
-%\begin{itemize}
-%\item \textbf{Papers.} The following is the list of publications derived from the research activity (chronological order):
-%\begin{enumerate}
-%\item Strout, M.M.; Luporini, F.; Krieger, C.D.; Bertolli, C.; Bercea, G.-T.; Olschanowsky, C.; Ramanujam, J.; Kelly, P.H.J., "Generalizing Run-Time Tiling with the Loop Chain Abstraction," Parallel and Distributed Processing Symposium, 2014 IEEE 28th International , vol., no., pp.1136,1145, 19-23 May 2014
-%\item Fabio Luporini, Ana Lucia Varbanescu, Florian Rathgeber, Gheorghe-Teodor Bercea, J. Ramanujam, David A. Ham, and Paul H. J. Kelly. "Cross-loop optimization of arithmetic intensity for finite element local assembly". 2014. Submitted for publication.
-%\item Fabio Luporini, David A. Ham, Paul H. J. Kelly. "Optimizing Automated Finite Element Integration through Expression Rewriting and Code Specialization". 2014. To be written.
-%\end{enumerate}
-%\item \textbf{Talks.} Talks have been delivered at the following conferences/workshops:
-%\begin{enumerate}
-%\item "Generalised Sparse Tiling for Unstructured Mesh Computations in the OP2 Framework". Compilers for Parallel Computing, July 2013.
-%\item "COFFEE: an Optimizing Compiler for Fintie Element Local Assembly". FEniCS Workshop, July 2014.
-%\end{enumerate}
-%\item \textbf{Software.} The following software is released under open source licenses.
-%\begin{enumerate}
-%\item COFFEE (COmpiler For Finit Element local assEmbly), the compiler described in Chapter~\ref{ch:coffee}.
-%\end{enumerate}
-%\end{itemize}
-%, and the design of this software and results have
-%been disseminated in the scientific community through publications.
+The tools developed in this thesis are released under open source licenses. The underlying theory has been exposed to the scientific community through various publications and presentations.
+
+\begin{description}
+\item[Publications] From this thesis derive three main publications; a further publication is planned for the most recent achievements in sparse tiling. In chronological order:
+\begin{description}
+\item[\citep{st-paper}] This conference paper generalizes sparse tiling to arbitrary sequences of irregular loops.
+\item[\citep{Luporini-coffee}] This journal paper describes the work on the low level optimization of finite element integration loops (Chapter~\ref{ch:lowlevelopt}).
+\item[\citep{Luporini-minimalflops}] The operation count minimization algorithm (Chapter~\ref{ch:optimality}) is introduced in this journal article.
+\end{description}
+Other publications -- the result of collaborations with people at Imperial College -- are not reported here since they do not contribute directly to the achievements in this thesis.
+\item[Presentations] A number of formal and informal presentations were given at various conferences, workshops, and meetings. The most relevant, in chronological order, are:
+\begin{itemize}
+\item Generalised Sparse Tiling for Unstructured Mesh Computations in the OP2 Framework. CPC 2013.
+\item COFFEE: an Optimizing Compiler for Fintie Element Local Assembly. FEniCS 2014.
+\item Optimization of Arithemtic Intensity for Finite Element Assembly. GungHo! 2014.
+\item Cross-loop Optimization of Arithmetic Intensity and Data Locality for Unstructured Mesh Applications. Oxford Many-core seminars, 2014.
+\item Cross-loop Optimization of Arithmetic Intensity for Finite Element Local Assembly. HiPEAC (main track), 2015.
+\item Generating high performance finite element kernels using optimality criteria. SIAM PP 2016.
+\item An algorithm for the optimization of finite element integration loops. PRISM Workshop (Imperial College) 2016.
+\end{itemize}
+\end{description}
 
 
-
-%The plan is to structure the thesis as follows:
-%
-%\begin{itemize}
-%\item Chapter 1: \textbf{Introduction}. This is going to be similar to the introduction presented in this LSA report.
-%\item Chapter 2: \textbf{Background}. The basis for understading the contributions of the thesis will be provided. This chapter will be composed of three main sections:
-%\begin{itemize}
-%\item a summary of the finite element method, which is required to understand the structure of the numerical kernels optimized by COFFEE;
-%\item an overview of the domain-specific languages, frameworks, methodologies, and compilers that inspired the research;
-%\item a summary of contemporary multi-core architectures and compilers, including those used for the performance analysis carried out in this thesis.
-%\end{itemize}
-%\item Chapter 3: \textbf{Generalized Sparse Tiling with the OP2 Loop Chain Abstraction}. First contribution of the thesis. Presented in Chapter~\ref{ch:sparsetiling} of this report.
-%\item Chapter 4: \textbf{Generalized Loop Fusion with the OP2 Loop Chain Abstraction.} Second contribution of the thesis. Part of the plan for the third year (see Section~\ref{sec:thirdyear}).
-%\item Chapter 5: \textbf{Cross-loop Optimization of Arithmetic Intensity for Finite Element Local Assembly}. Third contribution of the thesis. Presented in Chapter~\ref{ch:lowlevelopt} of this report.
-%\item Chapter 6: \textbf{Conclusions}. 
-%\end{itemize}
-%Note that performance evaluations of the techniques presented in Chapters 3, 4, and 5 will be included directly in these chapters.
