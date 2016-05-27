@@ -743,44 +743,39 @@ Local maps & $n M$ & $n M$\\
 
 \section{Implementation}
 \label{sec:tiling:automation}
-The implementation of generalized sparse tiling is distributed over three software modules. 
+The implementation of automated generalized sparse tiling is distributed over three software modules. 
 \begin{description}
-\item[Firedrake] This is the framework for the automated solution of finite element methods described in Section~\ref{sec:bkg:fenics-and-firedrake}. 
-\item[PyOP2] Firedrake produces numerical kernels to be applied over sets of mesh components. The parallel iteration over the mesh is handled by PyOP2 (see Section~\ref{sec:bkg:op2}).
-\item[SLOPE] A library for writing generalized inspector/executor schemes, with primary focus on sparse tiling. PyOP2 uses SLOPE for tiling loop chains.
+\item[Firedrake] The framework for the automated solution of PDEs through the finite element method (Section~\ref{sec:bkg:fenics-and-firedrake}).
+\item[PyOP2] Firedrake produces numerical kernels to be applied over sets of mesh components. The parallel iteration over the mesh is handled by PyOP2 (Section~\ref{sec:bkg:op2}).
+\item[SLOPE] A library for writing generalized inspector/executor schemes, with primary focus on sparse tiling. PyOP2 uses SLOPE for applying sparse tiling to loop chains.
 \end{description}
-The interaction among these modules is illustrated in Figure~\ref{fig:st-implementation}.
 
-\begin{figure}
+There are several reasons that motivate this structuring.
+\begin{description}
+\item[Simplicity of analysis] The abstractions used in Firedrake and PyOP2 drastically simplify the analysis of input programs. For example, from the parallel loop construct in PyOP2 (Section~\ref{sec:bkg:op2}) we can derive all information we need to construct a loop chain.
+\item[Flexibility] It is very intuitive to use sparse tiling in a Firedrake program. Once the regions of code to be sparse tiled are indicated, the inspector/executor schemes are automatically derived at the level of the run-time support. In the case of a PyOP2 program, the generation of inspector/executor schemes is only partly automated: the separation of a set into the core, boundary and non-exec regions for distributed-memory parallelism is here user's responsibility. An inspector-executor scheme can also be written from scratch, for instance in a plain C program. In this case, the loop chain must be provided explicitly through direct calls to the SLOPE library. 
+\item[Realistic simulations] We aim to use generalized sparse tiling in real-world programs. The choice was then to use a framework, Firedrake, with a user base that could provide meaningful examples. The implementation effort is higher, but so is the potential scientific impact.
+\end{description}
+
+The interplay amongst Firedrake, PyOP2 and SLOPE is outlined in Figure~\ref{fig:st-implementation} and discussed in more detail in the following sections.
+
+\begin{figure}[htpb]
 \centering
 \includegraphics[scale=0.6]{sparsetiling/figures/firedrake-pyop2-slope.pdf}
-\caption{The interaction amongst Firedrake, PyOP2, and SLOPE.}
+\caption{Sparse tiling in the Firedrake-PyOP2-SLOPE framework. There are three ways of sparse tiling a loop chain: decorating UFL in a Firedrake program (1A), decorating a sequence of loops in a PyOP2 program (1B), writing both loop chain and inspector/executor codes explicitly in C through calls to SLOPE (1C). Both (1A) and (1B) use the {\em loop$\_$chain} interface (details in Section~\ref{sec:tiling:lcinterface}). The kernels generated within a {\em loop$\_$chain} are pre-processed in PyOP2 (2) and forwarded to SLOPE through its python interface (3). SLOPE has now access to the loop chain, so it can generate an inspector/executor scheme and return it to PyOP2 (4). The inspector is compiled and executed. The result, a schedule (i.e., the output of Algorithm~\ref{algo:st-inspector}), is cached and used as input to the executor. Each time the same {\em loop$\_$chain} is encountered in a Firedrake/PyOP2 program, the corresponding schedule is reused}.
 \label{fig:st-implementation}
 \end{figure}
 
-The reasons behind the choice of this three-layer structuring are:
-\begin{description}
-\item[Simplicity of analysis] The abstractions used in Firedrake and PyOP2 simplify the analysis on the input programs required for automation. For example, from the parallel loop construct in PyOP2 (reviewed in Section~\ref{sec:bkg:op2}) we can derive useful information to build a loop chain.
-\item[Flexibility] As shown in the next sections, it is very simple to use sparse tiling in a Firedrake program. It is sufficient to declare which regions of code should be transformed, and inspector/executor schemes will be derived automatically at the level of the run-time support. In the case of a PyOP2 program, the generation of inspector/executor schemes is only partly automated: the separation of a set into the core, boundary and non-exec regions for distributed-memory parallelism is now user's responsibility. An inspector-executor scheme can also be written from scratch, for instance in a plain C program. In this case, the loop chain must be provided explicitly through direct calls to the SLOPE library. 
-\item[User base] We want generalized sparse tiling to be usable in real software. We therefore chose a framework, Firedrake, with a user base in rapid expansion. This, obviously, increased the implementation effort.
-\end{description}
-
-
-%- is automation possible ? -> DSLs !!! + lazy evaluation + inspector/executor + mpi-trick
-% subsets ! seed loop cannot be subset
-
-In the next sections, we describe the interplay between these three frameworks and how this leads to automation.
-
 \subsection{SLOPE: a Library for Sparse Tiling Irregular Computations}
 \label{sec:tiling:impl-slope}
-SLOPE is an open source software that provides an interface to build loop chains and to express inspector/executor schemes for sparse tiling\footnote{SLOPE is available at \url{https://github.com/coneoproject/SLOPE}}. 
+SLOPE is an open source software that provides an interface to build loop chains and to express inspector/executor schemes for sparse tiling\footnote{SLOPE is a contribution of this thesis and is available at \url{https://github.com/coneoproject/SLOPE}}. 
 
-The loop chain abstraction implemented by SLOPE is the one described in Section~\ref{sec:tiling:lc-unstruct}. In essence, a loop chain comprises some sets (including the separation into core, boundary, and non-exec regions), maps between sets, and a sequence of loops. Each loop has one or more descriptors specifying what and how different sets are accessed. The example in Listing~\ref{code:tiling-inspector} illustrates the interface exposed by SLOPE. 
+The loop chain abstraction implemented by SLOPE has been formalized in Section~\ref{sec:tiling:lc-unstruct}. In essence, a loop chain comprises some sets (including the separation into core, boundary, and non-exec regions), maps between sets, and a sequence of loops. Each loop has one or more descriptors specifying what and how different sets are accessed. The example in Listing~\ref{code:tiling-inspector} illustrates the interface exposed by SLOPE. 
 
 SLOPE implements the algorithms in Section~\ref{sec:tiling:inspector}. Further, it provides additional features to estimate the effectiveness and to verify the correctness of sparse tiling:
 \begin{description}
 \item[VTK file generator] For each tiled loop, a file showing the mesh and the repartition into colored tiles is generated. The file is suitable for visualization in Paraview~\citep{paraview}.
-\item[Inspection summary] The inspector returns useful information concerning the tiling process, including: the number and the average size of tiles, the total number of colors used (which can give an indication of how effective a shared-memory parallelization will be), times for the most critical inspection phases. 
+\item[Inspection summary] The inspector returns useful information concerning the sparse tiling process, including: the number and the average size of tiles, the total number of colors used (which can partly explain the performance of a shared-memory parallelization), time spent in the critical inspection phases. 
 \end{description}
 
 In the case of shared-memory parallelism, the following sections of code are parallelized through OpenMP:
@@ -791,46 +786,47 @@ In the case of shared-memory parallelism, the following sections of code are par
 
 
 \subsection{PyOP2: Lazy Evaluation and Interfaces}
-PyOP2 has been described in Section~\ref{sec:bkg:op2}. This section focuses on three complementary aspects: (i) the interface offered for identifying loop chains; (ii) the lazy evaluation mechanism that allows building loop chains; (iii) the interface with SLOPE to execute inspector/executor schemes.
+\label{sec:tiling:lcinterface}
+We focus on three relevant aspects of PyOP2: (i) the interface exposed for identifying loop chains; (ii) the lazy evaluation mechanism that allows building loop chains; (iii) the interaction with SLOPE for building and executing inspector/executor schemes.
 
-To apply sparse tiling to a sequence of loops, PyOP2 provides the {\em loop$\_$chain} interface, exemplified in Listing~\ref{code:loop-chain-interface}. This interface is exposed to both users and Firedrake. In a Firedrake program, parallel loops may actually not appear at all in the source code because they will automatically be generated from the mathematical specification.
+To apply sparse tiling to a sequence of loops, PyOP2 provides the {\em loop$\_$chain} interface, exemplified in Listing~\ref{code:loop-chain-interface}. This interface is exposed to both users and Firedrake. In a Firedrake program, parallel loops may actually not appear at all in the source code, since they will automatically be generated from the UFL specification.
 
 \begin{algorithm}[htpb]
 \scriptsize\ttfamily
 \SetAlgorithmName{LISTING}{}
-\KwSty{with} {\em loop$\_$chain} (name, tile$\_$size, split$\_$mode, ...):\\
+\KwSty{with} {\em loop$\_$chain} (name, tile$\_$size, mode, ...):\\
 ~~~~Any Python code here, including UFL of PyOP2 loops\\
-\caption{Illustration of the {\em loop$\_$chain} interface in PyOP2. Apart from the {\tt name} and the {\tt tile$\_$size}, all other parameters are optional, and only useful for performance evaluation (e.g., logging) and tuning. Among the options for performance tuning, there is {\tt split$\_$mode}: this allows the user to specify how an excessively long loop chain should be split into smaller loop chains, for instance imposing a maximum number of loops.}
+\caption{The {\em loop$\_$chain} interface in PyOP2. The {\tt name} is compulsory as it uniquely identify a loop chain, while all other parameters are optional. The optional parameters are useful for performance evaluation (e.g., logging) and performance tuning. The {\tt tile$\_$size} specifies the initial average size for the seed partitions. The {\tt mode} allows users to specify how to break a loop chain into smaller loop chains, thus simplifying experimentation with a whole set of sparse tiling schemes.}
 \label{code:loop-chain-interface}
 \end{algorithm}
 
-PyOP2 exploits lazy evaluation of parallel loops to generate an inspector/executor scheme. The parallel loops encountered during interpretation of the input program -- or, analogously, those generated through Firedrake -- are not executed immediately; rather, they are first pushed into a queue. The sequence of parallel loops in the queue is called {\em trace}. If a dataset $f$ needs be read, for example because a user wants to inspect its values or a global linear algebra operation needs be performed, the trace is traversed -- from the most recent parallel loop to the oldest one -- and a new sub-trace produced. The sub-trace includes all parallel loops that must be executed for computing $f$. At this point, the sub-trace can be executed or further pre-processed.
+PyOP2 exploits lazy evaluation of parallel loops to generate an inspector/executor scheme. The parallel loops encountered during the program execution -- or, analogously, those generated through Firedrake -- are not scheduled immediately; rather, they are pushed into a queue. The sequence of parallel loops in the queue is called {\em trace}. If a dataset $f$ needs be read, for example because a user wants to inspect its values or a global linear algebra operation needs be performed, the trace is traversed -- from the most recent parallel loop to the oldest one -- and a new sub-trace produced. The sub-trace includes all parallel loops that must be executed for correctly evaluating $f$. The sub-trace can then be executed or further pre-processed.
 
-The rule that we employ is that all loops in a trace that were created within a {\em loop$\_$chain} scope are candidates for sparse tiling. In detail, the interaction between PyOP2 and SLOPE is as follows:
+All loops in a trace that were created within a {\em loop$\_$chain} scope are sparse tiling candidates. In detail, the interaction between PyOP2 and SLOPE is as follows:
 \begin{enumerate}
-\item The examples in Listing~\ref{code:loop-chain-interface} shows that a {\em loop$\_$chain} defines a new scope. As this scope is entered, a stamp $s_1$ of the trace is generated. This happens ``behind the scenes'', because the {\em loop$\_$chain} is a Python context manager, which can execute pre-specified routines prior and after the execution of the body. As the {\em loop$\_$chain}'s scope is exited, a new stamp $s_2$ of the trace is computed. All parallel loops generated between $s_1$ and $s_2$ are placed into a list for pre-processing.
-\item The pre-processing consists of two main steps: (i) ``simple'' fusion -- all consecutive parallel loops iterating over the same iteration space that do not present data dependencies through indirections are merged into a single loop; (ii) generation of a loop chain suitable for SLOPE.
-\item SLOPE provides a thin Python interface to ease integration with other frameworks. PyOP2 inspects the sequence of loops and translates all relevant data structures (sets, maps, loops) into a format suitable for SLOPE. C code implementing an inspector for the loops in the {\em loop$\_$chain} is returned by SLOPE. PyOP2 compiles this code and executes it; this produces an {\em inspection} for the loop chain.
-\item A ``software cache'' mapping {\em loop$\_$chain}s to {\em inspection}s is used. This whole process is therefore executed only once for each unique {\em loop$\_$chain} encountered in the code. 
-\item The executor is built in an analogous way to the inspector. It is executed, taking as input an {\em inspection}, each time a {\em loop$\_$chain} is exited .
+\item The example in Listing~\ref{code:loop-chain-interface} shows that a {\em loop$\_$chain} defines a new scope. As this scope is entered, a stamp $s_1$ of the trace is generated. This happens ``behind the scenes'', because the {\em loop$\_$chain} is a Python context manager, which can execute pre-specified routines prior and after the execution of the body. As the {\em loop$\_$chain}'s scope is exited, a new stamp $s_2$ of the trace is computed. All parallel loops generated between $s_1$ and $s_2$ are placed into a list for pre-processing.
+\item The pre-processing consists of two steps: (i) ``simple'' fusion -- consecutive parallel loops iterating over the same iteration space that do not present indirect data dependencies are merged; (ii) generation of a loop chain representation for SLOPE, discussed next.
+\item PyOP2 inspects the sequence of loops and translates all relevant data structures (sets, maps, loops) into a format suitable for the SLOPE's Python interface. C code implementing an inspector for the loops in the {\em loop$\_$chain} is returned by SLOPE. PyOP2 compiles and executes this code, which results in an {\em inspection} for the loop chain.
+\item A ``software cache'' mapping {\em loop$\_$chain}s to {\em inspection}s is used. This whole process needs therefore be executed only once for a given {\em loop$\_$chain}. 
+\item The executor is built in an analogous way to the inspector.
 \end{enumerate}
 
 
 \subsection{Firedrake/DMPlex: the S-depth mechanism for MPI}
 \label{sec:tiling:impl-firedrake}
-Firedrake uses DMPlex~\citep{dmplex-cite} to handle meshes. In particular, DMPlex is responsible for partitioning, distributing over multiple processes, and locally reordering a mesh. The MPI parallelization, therefore, is managed through Firedrake/DMPlex.
+Firedrake uses DMPlex~\citep{dmplex-cite} to handle meshes. DMPlex is responsible for partitioning, distributing over multiple processes, and locally reordering a mesh. The MPI parallelization is therefore managed through Firedrake/DMPlex.
 
-During the start-up phase, each MPI process receives a contiguous partition of the original mesh from DMPlex. An MPI process creates the required PyOP2 sets, which represent either topological components (e.g., cells, vertices) or function spaces. As seen in Section~\ref{sec:bkg:op2}, PyOP2 sets distinguish between different regions: core, owned, exec, and non-exec. Firedrake sets these regions based on the information provided by DMPlex, and creates the data structures that will enable communication.
+During the start-up phase, each MPI process receives a contiguous partition of the original mesh from DMPlex. The required PyOP2 sets, which can represent either topological components (e.g., cells, vertices) or function spaces, are created. As explained in Section~\ref{sec:bkg:op2}, these sets distinguish between multiple regions: core, owned, exec, and non-exec. Firedrake initializes the four regions exploiting the information provided by DMPlex. 
 
-To support our loop chain abstraction, Firedrake must be able to allocate arbitrarily deep halo regions. Both Firedrake and DMPlex have been extended with this feature\footnote{The implementation received invaluable contributions from Dr. Michael Lange.}. A parameter called {\em S-depth} (the name derives from~\cite{s-depth-paper}), used for initializing a mesh, specifies the extent of the halo regions. A value of {\em S-depth} equal to $n$ indicates the presence of $n$ strips of off-process data elements in each set. The default value for {\em S-depth} is $1$, which corresponds to the standard execution model of Firedrake/PyOP2. In absence of sparse tiling, this value enables overlap of computation with communication when executing a loop, at the price of a small amount of redundant computation along partition boundaries.
+To support the loop chain abstraction, Firedrake must be able to allocate arbitrarily deep halo regions. Both Firedrake and DMPlex have been extended to support this feature\footnote{The implementation was mostly carried out by Michael Lange.}. A parameter called {\em S-depth} (the name has historical origins, see for instance~\cite{s-depth-paper}) regulates the extent of the halo regions. A value $S{-}depth=n$ indicates the presence of $n$ strips of off-process data elements in each set. The default value is $S{-}depth=1$, which enables computation-communication overlap when executing a single loop at the price of a small amount of redundant computation along partition boundaries. This is the default execution model in Firedrake.
 
 
 \section{Performance Evaluation}
-The experimentation was divided into two phases:
+The experimentation was characterized by two phases:
 
 \begin{enumerate}
 \item Generalized sparse tiling was initially applied to two benchmarks: a sparse Jacobi kernel and a proxy unstructured mesh application, originally developed as a demo for the OP2 framework. This was especially useful to identify strengths and limitations of the technique.
-\item Then, it was used in an application developed in Firedrake, Seigen, an Elastic Wave Equation Solver for Seismological Problems\footnote{Seigen has been developed by Christian Jacobs.}. The aim of this phase was to evaluate the performance improvements in a real-world simulation.
+\item Then, it was used in an application developed in Firedrake, Seigen, an Elastic Wave Equation Solver for Seismological Problems\footnote{Seigen has been developed by Christian Jacobs.}. The aim of this phase was to evaluate the performance improvements in a realistic simulation.
 \end{enumerate}
 
 %note: tile size independent of mesh size !!!! but actually dependent on the application...!
