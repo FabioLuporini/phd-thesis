@@ -383,7 +383,7 @@ $\rbrace$
 
 In Listing~\ref{code:weighted-laplace-vector-prom}, the evaluation of the coefficient \texttt{w} on the basis functions in {\tt C} is made vectorizable along the {\tt i} loop by ``promoting'' the scalar \texttt{f} to an array of size 6. All sub-expression hoisted at the level of the integration loop (which result from applying the techniques described in Chapter~\ref{ch:optimality}) can be treated similarly. The cost of this transformation obviously depends on the amount of computation within the {\tt i} loop: the larger the number of scalars to be turned into arrays, the bigger the working set, which may lead to the same memory issues explained in Section~\ref{sec:mem-const}. Loop tiling may be used to counteract this effect, but the implementation complexity would be significantly higher. 
 
-Neither the GNU's nor the Intel's compilers seem to be capable of applying this transformations, probably because of the non-trivial impact on the working set. In fact, it is challenging to specify a reliable cost model even just for the class of assembly kernels considered in this chapter. Vector promotion is implemented in COFFEE, but unused by any of the default optimization pipelines. 
+Neither the GNU nor the Intel compiler seems capable of applying this transformations, probably because of the non-trivial impact on the working set. In fact, it is challenging to specify a reliable cost model even just for the class of assembly kernels considered in this chapter. Vector promotion is implemented in COFFEE, but unused by any of the default optimization pipelines. 
 
 \subsection{Loop Fusion}
 \label{sec:coffee-loopfusion}

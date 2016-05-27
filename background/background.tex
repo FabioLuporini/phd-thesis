@@ -1,7 +1,7 @@
 \chapter{Background}
 \label{ch:background}
 
-The foundations of the thesis are thoroughly reviewed in this chapter. A top-down approach is followed. The first topic treated is the mathematical theory of the finite element method. How this theory is translated into software is subsequently discussed; in particular, a revolutionary approach based upon automated code generation is explored. The core libraries that make this approach possible are surveyed. The state-of-the-art of performance optimization is then described, with emphasis on both static and dynamic strategies. The fundamental class of loop reordering transformation is here presented. An overview of the successful domain-specific abstractions that have inspired some of the core contributions of this thesis concludes the chapter. In this journey, some of the relevant related work is introduced, although extended literature review is also present in each of the following chapters..
+The foundations of the thesis are thoroughly reviewed in this chapter. A top-down approach is followed. The first topic treated is the mathematical theory of the finite element method. How this theory is translated into software is subsequently discussed; in particular, a revolutionary approach based upon automated code generation is explored. The core libraries that make this approach possible are surveyed. The state-of-the-art in performance optimization is then presented, with emphasis on the fundamental class of loop reordering transformations. An overview of the successful domain-specific abstractions that have inspired some of the core contributions of this thesis concludes the chapter. In this journey, some of the relevant related work is introduced, although extended literature review is provided by the later chapters as well.
 
 
 \section{The Finite Element Method}
@@ -285,9 +285,9 @@ $\rbrace$
 
 
 
-A possible C implementation of (\ref{eq:quadrature}) is illustrated in Listing~\ref{code:weighted-laplace}. We assume a domain of dimension $d=2$ and polynomial order $1$ Lagrange elements. The values at the quadrature points of the derivatives of the basis functions are pre-tabulated in the \texttt{B} and \texttt{D} arrays (representing, respectively, the derivatives with respect to the coordinates $x$ and $y$). The values at the quadrature points of the basis functions spanning the field $w$ are pre-tabulated in the array \texttt{C}. Pre-tabulation, which is made possible by mapping the computation to a reference element, is of fundamental importance to speed-up the local assembly phase. The summation over the $N_q = 6$ quadrature points is implemented by the \texttt{i} loop. The summation over $\alpha_3$ for expressing $w$ is implemented by the loop \texttt{r}. The summations over the spatial dimensions $\alpha_1$, $\alpha_2$ and $\beta$ have been expanded in the ``assembly expression'' that evaluates the local element matrix $A$. The $K$ array includes the four components of the inverse of the Jacobian matrix for the change of coordinates. 
+A possible C implementation of (\ref{eq:quadrature}) is illustrated in Listing~\ref{code:weighted-laplace}. We assume a domain of dimension $d=2$ and polynomial order $1$ Lagrange elements. The values at the quadrature points of the derivatives of the basis functions are pre-tabulated in the \texttt{B} and \texttt{D} arrays (representing, respectively, the derivatives with respect to the coordinates $x$ and $y$). The values at the quadrature points of the basis functions spanning the field $w$ are pre-tabulated in the array \texttt{C}. Pre-tabulation, which is made possible by mapping the computation to a reference element, is fundamental to speed up the local assembly phase. The summation over the $N_q = 6$ quadrature points is implemented by the \texttt{i} loop. The summation over $\alpha_3$ for expressing $w$ is implemented by the loop \texttt{r}. The summations over the spatial dimensions $\alpha_1$, $\alpha_2$ and $\beta$ have been expanded in the ``assembly expression'' that evaluates the local element matrix $A$. The $K$ array includes the four components of the inverse of the Jacobian matrix for the change of coordinates. 
 
-\begin{algorithm}[H]
+\begin{algorithm}[thpb]
 \scriptsize\ttfamily
 \SetAlgorithmName{LISTING}{}
 
@@ -359,7 +359,7 @@ The solution of linear systems is not a topic of this thesis; the interested rea
 \section{Abstractions in Computational Science}
 \label{sec:bkg:abstractions}
 
-The performance optimizations studied in this thesis target different layers of abstraction. In this section, we dive into such abstractions and review the state-of-the-art on established software. This will provide the foundation for understanding the contributions in Chapters~\ref{ch:sparsetiling},~\ref{ch:optimality} and~\ref{ch:lowlevelopt}.
+The performance optimizations studied in this thesis target different layers of abstraction. In this section, we dive into such abstractions and review the state-of-the-art on established software. 
 
 %We adopt a top-down approach: we start discussing high-level languages for specifying numerical methods in mathematical notation and we finish with explaining the automatic parallelization on clusters of multi-core nodes.
 
@@ -378,11 +378,11 @@ Firedrake uses a mathematical language called UFL, the {\em Unified Form Languag
 
 element = \textcolor{RedOrange}{FiniteElement} (\textcolor{ForestGreen}{'Lagrange'}, \textcolor{RedOrange}{triangle}, 1)\\
 ~\\
-u = \textcolor{RedOrange}{TrialFunction} (element)\\
-v = \textcolor{RedOrange}{TestFunction} (element)\\
-w = \textcolor{RedOrange}{Coefficient} (element)\\
+u = \textcolor{RedOrange}{TrialFunction}(element)\\
+v = \textcolor{RedOrange}{TestFunction}(element)\\
+w = \textcolor{RedOrange}{Coefficient}(element)\\
 ~\\
-a = w*\textcolor{RedOrange}{dot} (\textcolor{RedOrange}{grad}(v), \textcolor{RedOrange}{grad}(u))*\textcolor{RedOrange}{dx}\\
+a = w*\textcolor{RedOrange}{dot}(\textcolor{RedOrange}{grad}(v), \textcolor{RedOrange}{grad}(u))*\textcolor{RedOrange}{dx}\\
 
 \caption{UFL specification of the weighted Laplace operator defined in (\ref{sec:bkg:eq:spec-laplacian}). In orange the keywords of the language. }
 \label{code:ufl-laplace}
@@ -390,12 +390,12 @@ a = w*\textcolor{RedOrange}{dot} (\textcolor{RedOrange}{grad}(v), \textcolor{Red
 
 The UFL representation of the weighted Laplace operator shown in (\ref{sec:bkg:eq:spec-laplacian}) is given in Listing~\ref{code:ufl-laplace}. When constructing a finite element, three pieces of information are specified: {\em family}, {\em cell}, and {\em polynomial degree}. The {\em family} represents the element type. UFL supports several families, including the traditional {\em Lagrange} and {\em Discontinuous Galerkin} elements as well as mixed elements such as {\em H(div)} and {\em H(curl)}. This allows solving problems with different requirements on the continuity of the functions, as thoroughly described in~\cite{Fenics}. The {\em cell} represents the shape of the reference element: possible values include {\em triangle}, {\em quadrilateral} and {\em tetrahedron}. The {\em polynomial degree} drives the number of degrees of freedom in an element. Functions can also be vector-valued, in which case one must use the special construct {\em VectorElement} in place of {\em FiniteElement}. 
 
-UFL pioneered the development of scientific methods through high level mathematical notation. It is therefore worth appreciating the depth of the language and the power of the underlying transformation system, although a deep knowledge is unnecessary for the rest of this thesis.
+UFL will be used to generate a set of kernels for experimentation; an understanding of the language however is not required for this thesis.
 
 % strict or deep ?
 
 \subsubsection{Form Compilers}
-The transformed UFL (e.g., after automatic differentiation has been applied) is passed to a form compiler, which now has to construct a representation of the assembly operators. The {\em FEniCS Form Compiler}, or FFC, was originally used by Firedrake for this task. FFC, which supports the quadrature and tensor contraction modes illustrated in Section~\ref{sec:bkg:math-to-code}, was adapted from FEniCS to emit abstract syntax trees (ASTs) instead of C code. More recently, FFC has been supplanted by the {\em Two-Stage Form Compiler}, or TSFC. Just like FFC, TSFC emits abstract syntax trees (ASTs). The optimizations described in Chapters~\ref{ch:optimality} and~\ref{ch:lowlevelopt} are implemented by manipulating ASTs in a lower-level compiler, COFFEE, whose structure will be outlined in Chapter~\ref{ch:coffee}.
+The transformed UFL (e.g., after automatic differentiation has been applied) is passed to a form compiler, where a representation of the assembly operators is constructed. The {\em FEniCS Form Compiler}, or FFC, was originally used by Firedrake for this task. FFC, which supports the quadrature and tensor contraction modes illustrated in Section~\ref{sec:bkg:math-to-code}, was later modified to emit abstract syntax trees (ASTs) instead of C code. More recently, FFC has been supplanted by the {\em Two-Stage Form Compiler}, or TSFC. Just like FFC, TSFC emits abstract syntax trees (ASTs). The optimizations described in Chapters~\ref{ch:optimality} and~\ref{ch:lowlevelopt} are implemented by manipulating these ASTs in a lower-level compiler, COFFEE, whose structure will be outlined in Chapter~\ref{ch:coffee}.
 
 TSFC has two main features:
 \begin{itemize}
@@ -403,14 +403,14 @@ TSFC has two main features:
 \item As opposed to FFC, it supports the compilation of complicated forms making extensive use of tensor algebra. TSFC can efficiently identify repeated sub-expressions and assign them to temporary variables, thus drastically reducing the code generation time.
 \end{itemize}
 
-We observe that in Firedrake there is a neat separation of concerns:
+A neat separation of concerns characterizes Firedrake:
 \begin{itemize}
 \item UFL is the mathematical language that allows expressing finite element problems.
-\item TSFC progressively abstracts away the domain knowledge and transforms the input into an AST. Some nodes in the ASTs are decorated to keep track of properties (e.g., linearity of an expression in test or trial functions) exploitable for later optimization.
+\item TSFC progressively abstracts away the finite element specification by producing a general AST. Some nodes in the ASTs are decorated to keep track of domain properties (e.g., linearity of an expression in test and trial functions), exploitable in later optimization stages.
 \item COFFEE applies code transformations for improving the performance of the operators returned by TSFC. 
 \end{itemize}
 
-The conception and the design of the COFFEE layer is one of the main contributions of this thesis. Chapters~\ref{ch:optimality},~\ref{ch:lowlevelopt} and~\ref{ch:coffee} are entirely devoted to this topic.
+The conception and the design of the COFFEE layer, as well as its optimization algorithms, are amongst the main contributions of this thesis. These topics are treated in Chapters~\ref{ch:optimality},~\ref{ch:lowlevelopt} and~\ref{ch:coffee}.
 
 \subsubsection{Iteration over the Mesh}
 \label{sec:bkg:meshiteration}
