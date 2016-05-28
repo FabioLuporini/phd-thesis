@@ -1,7 +1,7 @@
 \chapter{Automated Sparse Tiling for Irregular Computations}
 \label{ch:sparsetiling}
 
-Many numerical methods for partial differential equations (PDEs) are structured as sequences of parallel loops. This exposes parallelism well, but does not convert data reuse between loops into data locality, since their working set is usually too big to fit in some level of cache. In Section~\ref{sec:bkg:poly}, it was explained that loop fusion and loop tiling may be used to retain some of this potential data locality. This chapter introduces a mixed compiler/library system capable of applying these transformations to sequences of irregular loops, automatically. Challenges deriving from real-world applications are addressed. As reiterated throughout the chapter, parts of this work are the result of a joint collaboration with~\cite{st-paper}, from which some of the following sections are also inspired.
+Many numerical methods for partial differential equations (PDEs) are structured as sequences of parallel loops. This exposes parallelism well, but does not convert data reuse between loops into data locality, since their working set is usually too big to fit in some level of cache. In Section~\ref{sec:bkg:poly}, it was explained that loop fusion and loop tiling may be used to retain some of this potential data locality. This chapter introduces a mixed compiler/library system capable of applying these transformations to sequences of irregular loops, automatically. Challenges deriving from real-world applications are addressed. As reiterated throughout the chapter, parts of this work are the result of a joint collaboration with~\cite{st-paper}.
 
 \section{Motivation}
 \label{sec:tiling:motivation}
@@ -10,39 +10,39 @@ The focus of this chapter is improving data locality in unstructured mesh PDE so
 
 Three motivating real-world applications for this work are Hydra, Volna and Seigen. Hydra~\citep{hydra-op2} is a computational fluid dynamics application used at Rolls Royce for the simulation of next-generation components of jet engines. Volna~\citep{ST-volna} is a computational fluid dynamics application for the modelling of tsunami waves. Seigen aims to solve the elastic wave equation using the discontinuous Galerkin finite element method for energy exploration purposes. All these applications are characterized by the presence of a time-stepping loop, in which several loops over the computational mesh (33 in Hydra, 10 in Volna, 28 in Seigen) are executed. These loops are characterized by the aforementioned irregular loop-to-loop dependence structure. We will use Seigen, as well as other simpler benchmarks, for performance evaluation.
 
-Because of the irregular memory access pattern, our approach to loop transformation is based on dynamic analysis, particularly on \textit{inspector/executor schemes}. Among the possible dynamic loop optimizations, we target \textit{sparse tiling}. We recall from Section~\ref{sec:bkg:tiling} that sparse tiling aims to exploit data reuse across consecutive loops by composing two transformations, namely loop fusion and loop tiling. Given the presence of significant data reuse across consecutive loops, our hypothesis is that sparse tiling has strong potentials in the class of unstructured mesh PDE solvers that we are targeting.
+Because of the irregular memory access pattern, our approach to loop transformation is based on dynamic analysis, particularly on \textit{inspector/executor schemes}. Among the possible dynamic loop optimizations, we target \textit{sparse tiling}. We recall from Section~\ref{sec:bkg:tiling} that sparse tiling aims to exploit data reuse across consecutive loops by composing two transformations, namely loop fusion and loop tiling. Given the presence of significant data reuse across consecutive loops, our hypothesis is that sparse tiling has potential in the class of unstructured mesh PDE solvers that we are targeting.
 
-Summarizing, the three main issues that we tackle in this chapter are:
+Summarizing, three main issues are tackled in this chapter:
 
 \begin{itemize}
 \item Previous approaches to sparse tiling were all based upon ``ad-hoc'' inspector/executor strategies; that is, developed ``by hand'', per application. We seek a general technique, applicable to arbitrary computations on unstructured meshes.
-\item Automation is more than a desired feature because application specialists will avoid complicated optimizations that may harm the comprehensibility of source code. We therefore aim for a fully-automated framework, based upon a mixed compiler/library approach.
-\item A few studies have addressed the problem of fusing loops when these need be interleaved by routines for message passing. However, we are aware of none for the scenario in which the memory accesses pattern is irregular. We fill this gap by introducing a sparse tiling scheme that uses redundant computation over partition boundaries to delay communication. The importance of this contribution stems from the fact that most scientific simulations require distributed-memory parallelism.
+\item Automation is more than a desired feature because application specialists avoid complex optimizations harming source code comprehensibility. We therefore aim for a fully-automated framework, based upon domain-specific languages and a mixed compiler/library approach.
+\item A few studies have addressed the problem of fusing loops when these need be interleaved by routines for message passing. However, we are aware of none for the scenario in which the memory accesses pattern is irregular. We fill this gap by introducing a sparse tiling scheme that performs redundant computation over partition boundaries to delay communication. The importance of this contribution stems from the fact that most scientific simulations require distributed-memory parallelism.
 \end{itemize}
 
-\section{Open Problems, Questions, Hypotheses}
+\section{Context and Approach}
 \label{sec:tiling:struct}
-Loop fusion and loop tiling have widely been studied in the literature. Over the years, a considerable number of compilers and techniques have been proposed for automating these transformations. Their evaluation, however, has traditionally been limited to a small set of benchmarks (or ``mini-applications'') and single-node performance. This unfortunately does not shed light on their applicability in real-world applications, where the loop nests are often deeper, less structured, and characterized by irregular control flow. On the other hand, it is true that simple stencil codes arising in finite difference methods~\citep{vect-tiled-ho-fd,ics-stencil-tiling,cohen-timetiling}, linear algebra routines~\citep{qr-fact-tiled,blas-tiling}, and image processing kernels~\citep{Halide} can benefit from transformations like fusion and tiling. Since numerical methods for PDEs are often structured as sequences of parallelizable loops (or ``sweeps'') over the discretized equation domain, the following questions arise naturally: 
+Loop fusion and loop tiling have been widely studied in the literature. A considerable number of techniques for improving and automating these transformations have been proposed over the years. Their evaluation, however, has traditionally been limited to a small set of benchmarks (or ``mini-applications'') and single-node performance. In particular, it has repeatedly been shown that simple stencil codes arising in finite difference methods~\citep{vect-tiled-ho-fd,ics-stencil-tiling,cohen-timetiling}, linear algebra routines~\citep{qr-fact-tiled,blas-tiling}, and image processing kernels~\citep{Halide} can benefit from both loop fusion and loop tiling. This, unfortunately, does not shed light on the impact that these transformations could have in real-world applications, where the loop nests are often deeper, less structured, and characterized by irregular control flow. Since numerical methods for PDEs are often structured as sequences of complex, irregular loops (or ``sweeps'') over the computational mesh, some obvious questions arise: 
 
 \begin{description}
-\item[Applicability] Can we adopt sparse tiling in real-life numerical methods for solving PDEs, and should we expect any gain in performance?
-\item[Lack of evidence] Why, despite decades of research, loop transformations are rarely used in production code for scientific simulations? 
-\item[Challenges] What are the theoretical and technical challenges that we have to overcome to automate sparse tiling?
+\item[Applicability] Can sparse tiling be adopted in real-life numerical methods for solving PDEs, and should performance improvements be expected?
+\item[Lack of evidence] Why, despite decades of research, non-trivial loop transformations are rarely used in scientific simulations? 
+\item[Challenges] What are the theoretical and technical challenges that need be overcome to automate sparse tiling?
 \end{description}
 
-The context in which we tackle these questions is the following:
+In this chapter, we tackle these problems in the following context:
 \begin{description}
-\item[Irregular codes] Unstructured meshes are often used to discretize the computational domain, since they allow for an accurate representation of complex geometries. Their connectivity is stored by means of adjacency lists (or equivalent data structure). This leads to indirect memory accesses within loop nests. Indirections break static analysis, thus making compiler-based approaches to loop transformation (e.g., polyhedral optimization) unsuitable for our context. Runtime data dependence analysis enables dynamic loop optimization, although at the price of additional overhead.
-\item[Realistic datasets] Complex simulations usually operate on at least terabytes of data, hence execution on multi-node systems is required. Any loop transformation we consider will have to support distributed-memory parallelism.
-\item[Automation, but no legacy code] Sparse tiling is an ``extreme optimization''. It requires a great deal of effort to be implemented as it imposes a thoughtful restructuring of the application. Similarly to many other low level transformations, it also tends to render the source code impenetrable, increasing the maintenance and the extension costs. We therefore aim for a fully automated system based on domain-specific languages, which abstracts sparse tiling through a simple interface (i.e., a single construct to tell the compiler ``transform the following sequence of loops'' ) and a tiny set of parameters for performance tuning (e.g., the tile size). We are not interested in supporting legacy code, where the key computational aspects (e.g., mesh iteration, distributed-memory parallelism) are usually hidden for software modularity, which makes automation almost impossible.
+\item[Irregular codes] Unstructured meshes are often used to discretize the computational domain, since they allow for an accurate representation of complex geometries. Their connectivity is stored by means of adjacency lists (or equivalent data structure). This leads to indirect memory accesses within loop nests. Indirections break static analysis, thus making many compiler-based approaches to loop transformation (e.g., polyhedral optimization) ineffective. Runtime data dependence analysis enables dynamic loop optimization, although this results in additional overhead.
+\item[Realistic datasets] Complex simulations usually operate on at least terabytes of data, hence execution on multi-node systems is required. Sparse tiling will have to coexist with distributed-memory parallelism.
+\item[Automation, but no legacy code] Sparse tiling is an ``extreme optimization''. An implementation in a low level language (e.g., C, Fortran) requires a great deal of effort, as a thoughtful restructuring of the application is necessary. Similarly to many other low level transformations, it also makes the source code impenetrable, thus affecting maintenance and extendibility. We therefore aim for a fully automated system based on domain-specific languages, which abstracts sparse tiling through a simple interface (i.e., a single construct to tell the compiler ``transform the following sequence of loops'' ) and a tiny set of parameters for performance tuning (e.g., the tile size). We are not interested in supporting legacy code, where the key computational aspects (e.g., mesh iteration, distributed-memory parallelism) are usually hidden for software modularity, which makes automation almost impossible.
 \end{description}
 
-Based upon these observations and requirements, we decompose our problem into two tasks:
+In this chapter, the problem of automatically applying sparse tiling to irregular codes based on shared- and distributed-memory parallelism is decomposed into two tasks:
 \begin{enumerate}
-\item writing a library for expressing inspector/executor schemes enabling sparse tiling in arbitrary computations on unstructured meshes;
-\item integrating the library with a multilayer framework that relies on domain-specific languages.
+\item establishing abstractions and devising algorithms to enable sparse tiling in arbitrary sequences of irregular loops (Sections~\ref{sec:tiling:lc}-\ref{sec:tiling:algo});
+\item integration with a framework relying on domain-specific languages (Section~\ref{sec:tiling:automation}).
 \end{enumerate}
-Before addressing these two tasks, respectively in Sections~\ref{sec:tiling:lc}-\ref{sec:tiling:algo} and Section~\ref{sec:tiling:automation}, we elaborate on the theoretical and technical challenges that arise when applying loop fusion and loop tiling to real codes (Section~\ref{sec:tiling:difficult}), and review the related work (Section~\ref{sec:tiling:relatedwork}).  
+Before addressing these two tasks, we elaborate on the theoretical and technical challenges that arise when applying loop fusion and loop tiling to real-world applications (Section~\ref{sec:tiling:difficult}), and review the related work (Section~\ref{sec:tiling:relatedwork}).  
 
 %Finally, to summarize, our hypotheses are:
 %\begin{itemize}
@@ -51,7 +51,7 @@ Before addressing these two tasks, respectively in Sections~\ref{sec:tiling:lc}-
 
 % Is skewing used for optimizing cross-time dependency, i.e., is the wave due to time?
 
-\section{Applying Fusion and Tiling is More Difficult than Commonly Thought}
+\section{Applying Loop Fusion and Loop Tiling is More Difficult than Commonly Assumed}
 \label{sec:tiling:difficult}
 We show in Listing~\ref{code:tiling-struct} the ``skeleton'' of a typical PDE solver on an unstructured mesh. This will be useful throughout the analysis presented in this section.
 
@@ -91,25 +91,25 @@ $\rbrace$
 We identify three classes of problems that are often neglected, or at least treated with scarce emphasis, in the relevant literature. 
 
 \begin{description}
-\item[Theoretical questions] We first wonder about the effectiveness of fusion and tiling in unstructured mesh applications.
+\item[Theoretical questions] We first wonder about the effectiveness of loop fusion and loop tiling in unstructured mesh applications.
 
 \begin{description}
 \item[Computational boundedness] Computational methods for PDEs are structured as sequences of loop nests, each loop nest characterized by its own operational intensity. Within the same application, some loop nests may be memory-bound, while others CPU-bound. This clearly depends on the numerical method itself, particularly on aspects such as the arithmetic complexity of the operators and the type of discretization employed (e.g., polynomial order of function spaces). Obviously, if most loop nests are CPU-bound, the benefits of sparse tiling on data locality will provide marginal gains. Before even thinking about aggressive optimizations, it is fundamental to determine the bottlenecks of an application. This boils down to answering two questions: (i) what fraction of the execution time is due to memory-bound loop nests; (ii) can CPU-boundedness be relieved by applying other optimizations (e.g., vectorization).
-\item[Loop tiling vs space filling curves] Loop tiling and space filling curves (SFCs) are two different attempts to solving the same problem: improving the performance of mesh-based computations by increasing data locality. SFCs provide an effective way of iterating over a mesh by guaranteeing that consecutive iterations correspond to neighboring elements; if these elements share some data values, data reuse is exploited. Just like loop tiling, SFCs can be considered loop reordering transformations (see Section~\ref{sec:bkg:loop-transf}). Unfortunately, there seems to be a lack of communication between the communities that have contributed to these two classes of transformations, since we could not find studies comparing their effectiveness. In this chapter, we will integrate SFCs with tiling.
+\item[Loop tiling vs space filling curves] Loop tiling and space filling curves (SFCs) are two different attempts to solving the same problem: improving the performance of mesh-based computations by increasing data locality. SFCs provide an effective way of iterating over a mesh by guaranteeing that consecutive iterations correspond to neighboring elements; if these elements share some data values, data reuse is exploited. Just like loop tiling, SFCs can be considered loop reordering transformations (see Section~\ref{sec:bkg:loop-transf}). Unfortunately, the relationship between loop tiling and SFCs is unclear in the context of unstructured meshes. In this chapter, sparse tiling will be applied on top of SFCs.
 \end{description}
 
-\item[Practical issues] Recent work on fusion and tiling for structured mesh applications have addressed automation (e.g., polyhedral compilers), composition of transformations (e.g., time tiling), techniques for minimizing communication (e.g., diamond tiling). However, the following issues were rarely given the attention they actually deserve.
+\item[Technical issues] Recent works on fusion and tiling for structured mesh applications have addressed automation (e.g., polyhedral compilers), composition of transformations (e.g., time tiling), techniques for minimizing communication (e.g., diamond tiling). However, the following aspects were rarely given the attention they actually deserve.
 \begin{description}
 \item[Unstructured meshes] Although ad-hoc inspector-executor strategies for some proxy applications had previously been developed, general techniques for arbitrary computations on unstructured meshes have been missing until this thesis\footnote{We reinforce once more that the generalized sparse tiling algorithm is the result of a joint collaboration amongst the authors of~\citep{st-paper}.}. As already explained, the main problem with unstructured meshes is the presence of indirect memory accesses, which complicates the data dependence analysis needed for applying loop transformations.
-\item[Time tiling and distributed-memory parallelism] We reiterate the fact that real-world computations require large-scale distributed-memory architectures. As Listing~\ref{code:tiling-struct} shows, MPI calls are now necessary in between consecutive mesh sweeps. This poses a big challenge to time tiling, because now all tiles close to the boundary of a mesh partition require special handling.
-\item[Time tiling and extra code] The {\tt Comp(...)} function in Listing~\ref{code:tiling-struct} denotes the possibility that additional computation is performed between consecutive mesh sweeps. {\tt Comp} could represent, for instance, check-pointing, I/O, or the resolution of a linear system through a function call to an external library. Moreover, conditional execution of loops (e.g., through \texttt{if-then-else}) may be present. The presence of additional code between loops make loop fusion extremely challenging. 
+\item[Time tiling and distributed-memory parallelism] We reiterate the fact that real-world computations require large-scale distributed-memory architectures. As Listing~\ref{code:tiling-struct} shows, MPI calls usually separate consecutive mesh sweeps. This poses a big challenge to time tiling, because now all tiles close to the boundary of a mesh partition require special handling.
+\item[Time tiling and extra code] The {\tt Comp(...)} function in Listing~\ref{code:tiling-struct} shows that additional computation may be performed between consecutive mesh sweeps. {\tt Comp} could represent, for instance, check-pointing, I/O, or the resolution of a linear system through a function call to an external library. Moreover, conditional execution of loops (e.g., through \texttt{if-then-else}) may be present. The presence of additional code between loops make loop fusion extremely challenging. 
 \item[Legacy code is usually impenetrable] Loop transformation opportunities are often hidden in existing scientific codes. As explained in~\cite{strout-common-problems}, common problems are: 1) potentially fusible or tilable loop nests are separated for code modularity; 2) handling of boundary conditions; 3) source code not amenable for data dependency analysis (e.g., extensive use of pointers, function calls).
 \end{description}
 
 \item[Limitations inherent in the numerical method] Two loops cannot be fused if they are separated by a global synchronization point. This is often a global reduction, either explicit (e.g., the first loop updates a global variable that is read by the second loop) or implicit (i.e., within an external function invoked between the two loops, like in many iterative solvers for linear systems). By limiting the applicability of many loop optimizations, global synchronization points pose great challenges and research questions. If strong scaling is the primary goal and memory-boundedness is the key limiting factor, then interesting questions are: (i) can the numerical method be reformulated to relieve the constraints on low level optimization (which requires a joint effort between application and performance specialists); (ii) can the tools be made more sophisticated to work around these problems; (iii) will the effort be rewarded by significant performance improvements.
 \end{description}
 
-All these issues and questions will be addressed in the upcoming sections.
+All these issues will be addressed in the upcoming sections.
 
 \section{Related Work}
 \label{sec:tiling:relatedwork}
@@ -147,15 +147,15 @@ In this section, we formalize the loop chain abstraction for unstructured mesh a
 \subsection{Relationship between Loop Chain and Inspector}
 The \textit{loop chain} is an abstraction introduced in~\cite{ST-KriegerHIPS2013}. Informally, a loop chain is a sequence of loops with no global synchronization points, with attached some extra information to enable run-time data dependence analysis. 
 
-We reiterate once more that the presence of indirect memory accesses inhibit static loop optimization for data locality. The idea pursued in this chapter is to replace static with dynamic optimization, exploiting the information carried by the loop chain. The loop chain must somehow be added to or derived from the input code. The inspector performs data dependence analysis using the information carried by the loop chain and produces a loop reordering, which implements a sparse tiling schedule. This schedule is used by the executor, a piece of code that replaces the original sequence of loops.
+We reiterate once more that the presence of indirect memory accesses inhibit static loop optimization for data locality. The idea pursued in this chapter is to replace static with dynamic optimization, exploiting the information carried by the loop chain. The loop chain must somehow be added to or derived from the input code. The inspector performs data dependence analysis using the information carried by the loop chain and produces a loop reordering, or sparse tiling schedule. This schedule is used by the executor, a piece of code that replaces the original sequence of loops.
 
 Before diving into the description of the loop chain abstraction, it is worth observing that:
 \begin{itemize}
 \item The computation of the inspection phase introduces an overhead. In many scientific computations, the data dependence pattern is static -- or, more informally, ``the mesh does not change over time''. This means that the inspection cost may be amortized over multiple iterations of the executor. If instead the mesh changes over time (e.g., in case of adaptive mesh refinement), a new inspection must be performed. 
 %We have spent a considerable amount of time in designing and implementing a highly optimized inspector algorithm; this hopefully will make the overhead negligible even in the unfortunate case of frequent changes to the data dependence pattern. 
-\item To write an inspector/executor scheme for sparse tiling there are several options. One possibility is to provide a library and leave the application specialists in charge of rewriting their code. As observed in the previous sections, this is a very optimistic perspective. An alternative is to raise the level of abstraction: programs can be written in a domain-specific language; loop chain, inspector, and executor can then be automatically derived at the level of the intermediate representation. The tools developed in this thesis enable both approaches.
+\item To write an inspector/executor scheme for sparse tiling there are several options. One possibility is to provide a library and leave the application specialists with the burden of manually transforming their codes. A more promising alternative consists of raising the level of abstraction: programs can be written in a domain-specific language; loop chain, inspector, and executor can then be automatically derived at the level of the intermediate representation. The tools developed in this thesis enable both approaches.
 \end{itemize}
-We will further elaborate on these points in the later sections. 
+These points will further be elaborated in later sections.
 
 \subsection{Definition of a Loop Chain}
 In~\cite{ST-KriegerHIPS2013}, a loop chain is defined as follows:
@@ -172,12 +172,12 @@ Motivated by the issues raised in Section~\ref{sec:tiling:difficult} and inspire
 \begin{itemize}
 \item A loop chain $\mathbb{L}$ consists of $n$ loops, $L_0, L_1, ..., L_{n-1}$. There are no global synchronization points in between the loops. The execution order of a loop's iterations does not influence the result. 
 
-\item $\mathbb{S}$ is a set of disjoint $m$ sets, $S_0, S_1, ..., S_{m-1}$. Sets are used to define iteration spaces. Possible sets are the cells in the mesh or the degrees of freedom associated with a function.  
+\item $\mathbb{S}$ is a set of disjoint $m$ sets, $S_0, S_1, ..., S_{m-1}$. Sets are used to represent iteration and data spaces. Possible sets are the cells in the mesh or the degrees of freedom associated with a function.  
 
-A set $S$ is logically split into three contiguous regions: core ($S^{c}$), boundary ($S^{b}$), and non-exec ($S^{ne}$). Given a process $P$ and a set $S$, we have that:
+A set $S$ is logically split into three contiguous regions: core ($S^{c}$), boundary ($S^{b}$), and non-exec ($S^{ne}$). Given a process $P$ and a set $S$:
 \begin{description}
  \item[$S^{c}$:] the iterations of $S$ that exclusively belong to $P$.
- \item[$S^{b}$:] the boundary region can be seen as the union of two sub-regions, owned ($S^{owned}$) and exec ($S^{exec}$). As previously shown in Figure~\ref{fig:bkg:sets-division}, $S^{owned}$ are iterations that belong to $P$ which will be executed redundantly by some other processes; $S^{exec}$ are iterations from other processes which are redundantly executed by $P$. We will see that redundant computation is exploited to preserve atomic execution -- a property that enables executing tiles without the need for synchronization.
+ \item[$S^{b}$:] the boundary region can be seen as the union of two sub-regions, owned ($S^{owned}$) and exec ($S^{exec}$). As shown in Figure~\ref{fig:bkg:sets-division}, $S^{owned}$ are iterations that belong to $P$ which are redundantly executed by some other processes; $S^{exec}$ are iterations from other processes which are redundantly executed by $P$. We will see that redundant computation preserves atomic execution -- a property that enables executing tiles without the need for synchronization.
   \item[$S^{ne}$:] these are iterations of other processes that are communicated to $P$ because they need be read to correctly compute $S^{b}$.
  \end{description} 
  
@@ -188,12 +188,10 @@ A set is uniquely identified by a name and the sizes of its three regions. For e
 
 \item $\mathbb{M}$ is a set of $k$ maps, $M_0, M_1, ..., M_{k-1}$. A map of arity $a$ is a vector-valued function $M : S_i \rightarrow S_j^0 \times S_j^1 \times ... \times S_j^{a-1}$ that connects each element of $S_i$ to one or more elements in $S_j$. For example, if a triangular cell $c$ is connected to three vertices $v_0,v_1,v_2$, we have $M(c) = [v_0,\ v_1,\ v_2]$. 
 
-\item A loop $L_i$ over the iteration space $S$ is associated with $d$ descriptors, $D_0, D_1, ..., D_{d-1}$. A descriptor $D$ is a 2-tuple $D = {<}M,\ \texttt{mode}{>}$. $M$ is either a map from $S$ to some other sets or the special placeholder $\perp$, which indicates that the access is direct to some data associated with $S$. $\texttt{mode}$ is one of $[r,\ w,\ i]$, meaning that a memory access is respectively of type read, write or increment.
+\item A loop $L_i$ over the iteration space $S$ is associated with $d$ descriptors, $D_0, D_1, ..., D_{d-1}$. A descriptor $D$ is a 2-tuple $D = {<}M,\ \texttt{mode}{>}$. $M$ is either a map from $S$ to some other sets or the special placeholder $\perp$, which indicates that memory accesses are direct to some data associated with $S$ itself. $\texttt{mode}$ is one of $[r,\ w,\ i]$, meaning that a memory access is respectively of type read, write or increment.
 \end{itemize}
 
-With respect to the original definition, one crucial difference is the presence of sets in place of data spaces. In unstructured mesh applications, a loop tends to access multiple data spaces associated with the same set. The idea is to rely on sets, rather than data spaces, to perform data dependence analysis. This can significantly improve the inspection cost, because typically $|\mathbb{S}| << |\mathbb{D}|$. 
-
-Another important difference is the characterization of sets into the three regions core, boundary and non-exec. This separation is essential for enabling distributed-memory parallelism. The extent of the boundary regions is captured by the {\em depth} of the loop chain. Informally, the {\em depth} tells how many extra ``strips'' of elements are provided by the neighboring processes. This allows some redundant computation along the partition boundary and also limits the depth of the loop chain (i.e., how many loops can be fused). The role of the parameter {\em depth} will be clear by the end of Section~\ref{sec:tiling:algo}. 
+With respect to the original definition, one crucial difference is the presence of sets in place of data spaces. In unstructured mesh applications, a loop tends to access multiple data spaces associated with the same set. The idea is to rely on sets, rather than data spaces, to perform data dependence analysis. This can significantly improve the inspection cost, because typically $|\mathbb{S}| << |\mathbb{D}|$. Another crucial difference is the characterization of sets into the three regions core, boundary and non-exec. This separation is essential for enabling distributed-memory parallelism. The extent of the boundary regions is captured by the {\em depth} of the loop chain. Informally, the {\em depth} tells how many extra ``strips'' of elements are provided by the neighboring processes. This allows some redundant computation along the partition boundary and also limits the depth of the loop chain (i.e., how many loops can be fused). The role of the parameter {\em depth} will be clear by the end of Section~\ref{sec:tiling:algo}. 
 
 % (we simply have that both $S^{b}$ and $S^{ne}$  contain no elements in the special case of execution entirely based on shared-memory parallelism). 
 
@@ -205,32 +203,32 @@ Another important difference is the characterization of sets into the three regi
 \SetAlgorithmName{LISTING}{}
 
 \KwSty{for} t = 0 \KwSty{to} T $\lbrace$\\
-~~// Loop over edges\\
+~~// $L_0$: loop over edges\\
 ~~\KwSty{for} e = 0 \KwSty{to} E $\lbrace$\\
-~~~~x = X[e];\\
+~~~~x = X + e;\\
 ~~~~tmp$\_$0 = tmp + edges2vertices[e + 0];\\
 ~~~~tmp$\_$1 = tmp + edges2vertices[e + 1]; \\
-~~~~kernel1 (x, tmp$\_0$, tmp$\_$1);\\
+~~~~kernel1 (x, tmp$\_$0, tmp$\_$1);\\
 ~~$\rbrace$\\
 ~\\
-~~// Loop over cells\\
+~~// $L_1$: loop over cells\\
 ~~\KwSty{for} c = 0 \KwSty{to} C $\lbrace$\\
-~~~~res = R[C];\\
+~~~~res = R + c;\\
 ~~~~tmp$\_$0 = tmp + cells2vertices[c + 0];\\
 ~~~~tmp$\_$1 = tmp + cells2vertices[c + 1];\\
 ~~~~tmp$\_$2 = tmp + cells2vertices[c + 2];\\
-~~~~kernel2 (res, tmp$\_0$, tmp$\_$1, tmp$\_$2);\\
+~~~~kernel2 (res, tmp$\_$0, tmp$\_$1, tmp$\_$2);\\
 ~~$\rbrace$\\
 ~\\
-~~// Loop over edges\\
+~~// $L_2$: loop over edges\\
 ~~\KwSty{for} e = 0 \KwSty{to} E $\lbrace$\\
 ~~~~tmp$\_$0 = tmp + edges2vertices[e + 0];\\
 ~~~~tmp$\_$1 = tmp + edges2vertices[e + 1]; \\
-~~~~kernel3 (tmp$\_0$, tmp$\_$1);\\
+~~~~kernel3 (tmp$\_$0, tmp$\_$1);\\
 ~~$\rbrace$\\
 $\rbrace$\\
 
-\caption{Section of a toy program that is used as a running example to illustrate the loop chain abstraction and show how the tiling algorithm works.}
+\caption{Section of a toy program that is used as a running example to illustrate the loop chain abstraction and show how the tiling algorithm works. Note that all parameters passed to the kernels are pointers.}
 \label{code:tiling-runningexample}
 \end{algorithm}
 
@@ -241,18 +239,19 @@ $\rbrace$\\
 inspector = init$\_$inspector (...);\\
 ~\\
 // Three sets, edges, cells, and vertices\\
-E = set (inspector, core$\_$edges, boundary$\_$edges, nonexec$\_$edges, ...);\\
-C = set (inspector, core$\_$cells, boundary$\_$cells, nonexec$\_$cells, ...);\\
-V = set (inspector, core$\_$vertices, boundary$\_$vertices, nonexec$\_$vertices, ...);\\ 
+E = set (inspector, "edges", core$\_$edges, boundary$\_$edges, nonexec$\_$edges, ...);\\
+C = set (inspector, "cells", core$\_$cells, boundary$\_$cells, nonexec$\_$cells, ...);\\
+V = set (inspector, "verts", core$\_$vertices, boundary$\_$vertices, nonexec$\_$vertices, ...);\\ 
 ~\\
 // Two maps, from edges to vertices and from cells to vertices\\
 e2vMap = map (inspector, E, V, edges2vertices, ...);\\
 c2vMap = map (inspector, C, V, cells2vertices, ...);\\
 ~\\
-// The loop chain comprises three loops; each loop has a set of descriptors\\
-loop (inspector, E, $\lbrace \perp$, READ$\rbrace$, $\lbrace$e2vMap, INC$\rbrace$);\\
-loop (inspector, C, $\lbrace \perp$, READ$\rbrace$, $\lbrace$c2vMap, INC$\rbrace$);\\
-loop (inspector, E, $\lbrace$e2vMap, INC$\rbrace$); \\
+// The loop chain comprises three loops; each loop has some descriptors\\
+// recall that {\tt r} and {\tt i} in a descriptor stand for ``read'' and ``increment''\\ 
+loop (inspector, E, $\lbrace \perp$, {\tt r}$\rbrace$, $\lbrace$e2vMap, {\tt i}$\rbrace$);\\
+loop (inspector, C, $\lbrace \perp$, {\tt r}$\rbrace$, $\lbrace$c2vMap, {\tt i}$\rbrace$);\\
+loop (inspector, E, $\lbrace$e2vMap, {\tt i}$\rbrace$); \\
 ~\\
 // Now can run the inspector\\
 inspection = run$\_$inspection (mode, inspector, tile$\_$size, ...)\\ \label{code:tiling-inspector:run}
@@ -273,7 +272,7 @@ The inspector starts with partitioning the iteration space of a \textit{seed loo
 \label{fig:st-initial-part-sm}
 \end{figure}
 
-As explained in the next two sections, the inspection proceeds by populating $T_i$ with iterations from $L_1$ and $L_2$. The challenge of this task is guaranteeing that all data dependencies -- read after write, write after read, write after write -- are honored. The output of the inspector is eventually passed to the executor. The inspection carries sufficient information for computing sets of tiles in parallel. $T_i$ is always executed by a single thread/process and the execution is atomic; that is, it does not require communication with other threads/processes. When executing $T_i$, first all iterations from $L_0$ are executed, then all iterations from $L_1$ and finally those from $L_2$.
+As detailed in the next two sections, the inspection proceeds by populating $T_i$ with iterations from $L_1$ and $L_2$. The challenge of this task is guaranteeing that all data dependencies -- read after write, write after read, write after write -- are honored. The output of the inspector is eventually passed to the executor. The inspection carries sufficient information for computing sets of tiles in parallel. $T_i$ is always executed by a single thread/process and the execution is atomic; that is, it does not require communication with other threads/processes. When executing $T_i$, first all iterations from $L_0$ are executed, then all iterations from $L_1$ and finally those from $L_2$.
 
 \subsection*{Inspection for Shared-Memory Parallelism}
 Similarly to OP2, to achieve shared-memory parallelism we use coloring. Two tiles that are given the same color can be executed in parallel by different threads. Two tiles can have the same color if they are not connected, because this ensures the absence of race conditions through indirect memory accesses during parallel execution. In the example we can use three colors: red (R), green (G), and blue (B). $T_0$ and $T_3$ are not connected, so they are assigned the same color. The colored tiles are shown in Figure~\ref{fig:st-loop-0}. In the following, with the notation $T_i^c$ we indicate that the $i$-th tile has color $c$. 
@@ -292,7 +291,7 @@ To schedule the iterations of $L_1$ to $[T_0^G,\ T_1^B,\ T_2^R,\ T_3^G]$, we nee
 \begin{figure}
 \centering
 \includegraphics[scale=0.6]{sparsetiling/figures/loop_0_with_vertices.pdf}
-\caption{Illustration of the projection function computed after tiling $L_0$. The projection is used by $L_1$ for a correct scheduling of cells.}
+\caption{The vertices are written by $L_0$, so a projection must be computed before tiling $L_1$. Here, the projection is represented by the colored vertices.}
 \label{fig:st-loop-0-proj}
 \end{figure}
 
@@ -303,7 +302,7 @@ To schedule the iterations of $L_1$ to $[T_0^G,\ T_1^B,\ T_2^R,\ T_3^G]$, we nee
 \label{fig:st-loop-1}
 \end{figure}
 
-We now use $\phi$ to schedule $L_1$, a loop over cells, to the tiles. Consider again $v_0$ and the adjacent cells $[c_0,\ c_1,\ c_2]$ in Figure~\ref{fig:st-loop-0-proj}. These three cells have in common the fact that they are adjacent to both green and blue vertices. For $c_1$, and similarly for the other cells, we compute $\operatorname{MAX}(\phi(v_0),\ \phi(v_1),\ \phi(v_2)) = \operatorname{MAX}(B, G, G) = B = 1$. This establishes that $c_1$ must be assigned to $T_1^B$, because otherwise ($c_1$ assigned instead to $T_0^G$) a read to $v_0$ would occur before the last increment from $T_1^B$ took place. We indeed recall that the execution order, for correctness, must be ``all iterations from $[L_0, L_1, L_2]$ in the green tiles before all iterations from $[L_0, L_1, L_2]$ in the blue tiles''. The scheduling $L_1$ to tiles is displayed in Figure~\ref{fig:st-loop-1}.
+We now use $\phi$ to schedule $L_1$, a loop over cells, to the tiles. Consider again $v_0$ and the adjacent cells $[c_0,\ c_1,\ c_2]$ in Figure~\ref{fig:st-loop-0-proj}. These three cells have in common the fact that they are adjacent to both green and blue vertices. For $c_1$, and similarly for the other cells, we compute $\operatorname{MAX}(\phi(v_0),\ \phi(v_1),\ \phi(v_2)) = \operatorname{MAX}(B, G, G) = B = 1$. This establishes that $c_1$ must be assigned to $T_1^B$, because otherwise ($c_1$ assigned instead to $T_0^G$) a read to $v_0$ would occur before the last increment from $T_1^B$ took place. Indeed, we recall that the execution order, for correctness, must be ``all iterations from $[L_0, L_1, L_2]$ in the green tiles before all iterations from $[L_0, L_1, L_2]$ in the blue tiles''. The scheduling of $L_1$ to tiles is displayed in Figure~\ref{fig:st-loop-1}.
 
 \begin{figure}[h]
 \centering
@@ -317,7 +316,7 @@ To schedule $L_2$ to $[T_0^G,\ T_1^B,\ T_2^R,\ T_3^G]$ we employ a similar proce
 
 
 \paragraph{Conflicting Colors}
-It is worth noting how $T_2^R$ ``consumed'' the frontier elements of all other tiles every time a new loop was scheduled. Tiling a loop chain consisting of $k$ loops has the effect of expanding the frontier of a tile of at most $k$ vertices. With this in mind, we re-inspect the loop chain of the running example, although this time employing a different execution order -- blue (B), red (R), and green (G) -- and and a different seed partitioning. Figure~\ref{fig:st-conflicts} shows that, by applying the procedure described in this section, $T_0^G$ and $T_3^G$ will become adjacent. This violates the precondition: {\it tiles can be given the same color, and thus run in parallel, as long as they are not adjacent}. Race conditions during the execution of iterations belonging to $L_2$ are now possible. We will solve this problem in Section~\ref{sec:tiling:inspector}.
+It is worth noting how $T_2^R$ ``consumed'' the frontier elements of all other tiles every time a new loop was scheduled. Tiling a loop chain consisting of $k$ loops has the effect of expanding the frontier of a tile of at most $k$ vertices. With this in mind, we re-inspect the loop chain of the running example, although this time employing a different execution order -- blue (B), red (R), and green (G) -- and and a different seed partitioning. Figure~\ref{fig:st-conflicts} shows that, by applying the same procedure described in this section, $T_0^G$ and $T_3^G$ will eventually become adjacent. This violates the precondition that {\it tiles can be given the same color, and thus run in parallel, as long as they are not adjacent}. Race conditions during the execution of iterations belonging to $L_2$ are now possible. This problem will be solved in Section~\ref{sec:tiling:inspector}.
 
 \begin{figure}[h]
 \centering
