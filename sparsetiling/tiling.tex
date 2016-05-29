@@ -195,7 +195,7 @@ With respect to the original definition, one crucial difference is the presence 
 
 % (we simply have that both $S^{b}$ and $S^{ne}$  contain no elements in the special case of execution entirely based on shared-memory parallelism). 
 
-\section{Loop Chain and Inspection Examples}
+\section{Loop Chain, Inspection and Execution Examples}
 \label{sec:tiling:examples}
 
 \begin{algorithm}
@@ -345,33 +345,30 @@ It is worth noting how $T_2^R$ ``consumed'' the frontier elements of all other t
 \end{figure}
 
 \subsection*{Inspection for Distributed-Memory Parallelism}
-In the case of distributed-memory parallelism, the mesh is partitioned and distributed to multiple processes. As shown in Listing~\ref{code:tiling-struct}, neighboring processes may exchange (MPI) messages before executing a loop $L_j$. A message includes all dataset values required by $L_j$ modified by any $L_k$, with $L_k \prec L_j$. In the running example, $L_0$ writes to vertices, so a subset of values associated with border vertices must be communicated prior to the execution of $L_1$. To apply sparse tiling, the idea is to push all communications at the beginning of the loop chain: as we shall see, this increases the amount of data to be communicated, but also reduces  synchronization (only 1 synchronization between each pair of neighboring processes per loop chain execution).
+In the case of distributed-memory parallelism, the mesh is partitioned and distributed to a set of processes. As shown in Listing~\ref{code:tiling-struct}, neighboring processes may exchange (MPI) messages before executing a loop $L_j$. A message includes all dataset values required by $L_j$ modified by any $L_k$, with $L_k \prec L_j$. In the running example, $L_0$ writes to vertices, so a subset of values associated with border vertices must be communicated prior to the execution of $L_1$. To apply sparse tiling, the idea is to push all communications at the beginning of the loop chain: as we shall see, this increases the amount of data to be communicated, but also reduces  the number of synchronizations (only 1 synchronization between each pair of neighboring processes per loop chain execution).
 
-From Section~\ref{sec:tiling:lc-unstruct}, we know that a set in a loop chain is logically split into three regions, \textit{core}, \textit{boundary}, and \textit{non-exec}. The boundary region includes all iterations that cannot be executed until the required MPI communications have terminated. Taking this into consideration, we modify the procedure described for shared-memory parallelism as follows:
+From Section~\ref{sec:tiling:lc-unstruct} it is known that, in a loop chain, a set is logically split into three regions, \textit{core}, \textit{boundary}, and \textit{non-exec}. The boundary tiles, which originate from the seed partitioning of the boundary region, will include all iterations that cannot be executed until the communications have terminated. The procedure described for shared-memory parallelism -- now performed individually by each process on a partition of the input mesh -- is modified as follows:
 \begin{enumerate}
-\item We take the core region of the seed loop $L_0$ and partition it into tiles. Unless aiming for a mixed distributed/shared-memory scheme, there is no need to assign identical colors to unconnected tiles, as processes execute their own tiles sequentially. We can assign colors increasingly, with $T_i$ given color $i$. As long as tiles with contiguous ID are also physically contiguous in the mesh, this assignment retains spatial locality when ``jumping'' from executing $T_i$ to $T_{i+1}$.
-\item The same process is applied to the boundary region. Thus, by construction, a situation in which a tile includes iterations from both regions is prevented. Further, all tiles within the boundary region are assigned colors higher than those used in the core region. This constrains the execution order: no boundary tiles will be executed until all core tiles are computed.
+\item The core region of the seed loop $L_0$ is partitioned into tiles. Unless aiming for a mixed distributed/shared-memory scheme, there is no need to assign identical colors to unconnected tiles, as a process will execute its own tiles sequentially. Colors are assigned increasingly, with $T_i$ given color $i$. As long as tiles with contiguous ID are also physically contiguous in the mesh, this assignment retains spatial locality when ``jumping'' from executing $T_i$ to $T_{i+1}$.
+\item The same process is applied to the boundary region. Thus, a situation in which a tile includes iterations from both the core and the boundary regions is prevented by construction. Further, all tiles within the boundary region are assigned colors higher than those used for the core tiles. This constrains the execution order: no boundary tiles will be executed until all core tiles are computed.
 \item We map the whole non-exec region of $L_0$ to a single special tile, $T_{ne}$. This tile has the highest color and will actually never be executed. 
 \end{enumerate}
 
 From this point on, the inspection proceeds as in the case of shared-memory parallelism. The application of the $\operatorname{MAX}$ function when scheduling $L_1$ and $L_2$ makes higher color tiles (i.e., those having lower priority) ``expand over'' lower color ones. 
 
-The schedule produced by the inspector is subsequently used by the executor. On each process, the executor starts with triggering the MPI communications required to the computation of the boundary tiles. All core tiles are then computed, since no data from the boundary region is necessary. Hence, computation is overlapped with communication. As all core tiles are computed and the MPI communications performed, the boundary tiles can finally be computed.
+In Figure~\ref{fig:st-mpi-init}, a mesh is partitioned over two processes and a possible seed partitioning and tiling of $L_0$ illustrated. We observe that the two boundary tiles (the red and light blue ones) will expand over the core tiles as $L_1$ and $L_2$ are tiled, which eventually results in the scheduling illustrated in Figure~\ref{fig:st-mpi-growth}. Roughly speaking, if a loop chain consists of $n$ loops and, on each process, $n-1$ extra layers of iterations are provided (the exec regions in Figure~\ref{fig:st-mpi-init}), then all boundary tiles are correctly computed. 
 
-In Figure~\ref{fig:st-mpi-init}, a mesh is distributed to two processes and a possible tiling of $L_0$ illustrated. It is worth observing that: (i) the tiles in the boundary region will expand over the core tiles as $L_1$ and $L_2$ are scheduled; (ii) the size of the boundary region is such that no synchronizations amongst neighboring processes are required while executing the core tiles first, and the boundary tiles after. Intuitively, this is because enough information is provided before approaching the execution of the fused sequence of loops. Roughly speaking, if a loop chain consists of $n$ loops, then the boundary region may need up to $n-1$ extra layers of iterations. 
-
-\begin{figure}
+\begin{figure}[thpb]
 \centering
 \includegraphics[width=\textwidth]{sparsetiling/figures/base_mesh_doppio.pdf}
 \caption{Seed partitioning for distributed memory execution.}
 \label{fig:st-mpi-init}
 \end{figure}
 
-Our hypothesis for this inspector/executor scheme is that the increase in data locality will outweigh the overhead induced by the redundant computation and by the bigger volume of data exchanged. This is motivated by several observations: (i) the loops being memory-bound;  (ii) the core region being much larger than the boundary region; (iii) the amount of redundant computation being minimized through the special tile $T_{ne}$, will progressively expands over the boundary region and thus avoids unnecessary calculations.
+The schedule produced by the inspector is subsequently used by the executor. On each process, the executor starts with triggering the MPI communications required to the computation of the boundary tiles. All core tiles are then computed, since no data from the boundary region is necessary. Hence, computation is overlapped with communication. As all core tiles are computed and the MPI communications terminated, the boundary tiles can finally be computed.
 
-
-
-%The main difference with respect to frameworks such as OP2 (see Section~\ref{sec:bkg:op2}) is that here, for reasons that will be more evident next, two regions, \textit{owned} and \textit{exec}, have been merged into a single one, \textit{boundary}. In essence, 
+\paragraph{Efficiency considerations}
+The underlying hypothesis is that the increase in data locality will outweigh the overhead induced by the redundant computation and by the bigger volume of data exchanged. This is motivated by several facts: (i) the loops being memory-bound;  (ii) the core region being much larger than the boundary region; (iii) the amount of redundant computation being minimized through the special tile $T_{ne}$, which progressively expands over the boundary region, thus avoiding unnecessary calculations.
 
 
 \section{Data Dependency Analysis for Loop Chains}
@@ -694,17 +691,11 @@ $\mathbb{T}^{c}$, $\mathbb{T}^{b}$ $\gets$ \GTBR{$\mathbb{T}$}\;
 \end{algorithm}
 
 
-The sparse tiling executor is illustrated in Algorithm~\ref{algo:st-executor}. It consists of four main phases: (i) boundary exchange between processes through non-blocking MPI communications, (ii) execution of core tiles (in overlap with communication), (iii) waiting for the termination of all MPI communications, (iv) execution of boundary tiles.
+The sparse tiling executor is illustrated in Algorithm~\ref{algo:st-executor}. It consists of four main phases: (i) exchange of halo regions amongst neighboring processes through non-blocking communications; (ii) execution of core tiles (in overlap with communication); (iii) wait for the termination of the communications; (iv) execution of boundary tiles. 
 
-As seen in the example in Section~\ref{sec:tiling:examples} and based on the explanation in Section~\ref{sec:tiling:inspector}, we know that the core tiles do not require any off-process information to execute as long as the boundary regions are (i) up-to-date and (ii) ``sufficiently deep''. If both conditions hold, the execution is semantically correct and it is safe to overlap computation of core tiles with the communication of boundary data. 
+As explained in Sections~\ref{sec:tiling:examples} and~\ref{sec:tiling:inspector}, a sufficiently deep halo region enables correct computation of the boundary tiles. Further, tiles are executed atomically, meaning that all iterations in a tile are computed without ever synchronizing with other processes. The depth of the boundary region, which affects the amount of off-process data to be redundantly computed, increases with the number $n$ of loops to be fused. In the example in Figure~\ref{fig:st-mpi-init}, there are $n=3$ loops, and three ``strips'' of extra vertices are necessary for correctly computing the fused loops without tile-to-tile synchronizations.
 
-
-\paragraph{The depth of the boundary region}
-In $\mathbb{L}$ we have $n$ loops. A tile ``crosses'' all of these loops and is executed atomically; that is, once it starts executing its iterations, it reaches the end without the need for synchronization with other processes. With this execution model, the boundary region must include a sufficient amount of off-process iterations for a correct computation of the tiles along the border with the core region. 
-
-In the extreme case $n=1$ (i.e., no loop fusion), only a single ``strip'' of elements belonging to adjacent processes need be redundantly executed for overlapping computation and communication. As $n$ increases, more off-process data is required. In the example in Figure~\ref{fig:st-mpi-growth} we had $n=3$, so three ``strips'' of off-process elements were necessary for computing correctly the dataset associated with vertices when executing iterations belonging to $L_3$.
-
-The {\em depth} is a parameter provided through the loop chain abstraction that informs the inspector about the extent of the boundary region. For correctness, we cannot fuse more than {\em depth} loops, so if $n$ is found to be larger than {\em depth}, we will need $\lceil \frac{n}{depth} \rceil$ different loop chains.
+The {\em depth} of the loop chain establishes the extent of the boundary region. This parameter imposes a limit to the number of fusible loops, so if $n > \text{{\em depth}}$, then it may be needed to split the input into shorter loop chains.
 
 %For ease of explanation, this aspect has been neglected in the inspector algorithms described in the previous section. 
 
