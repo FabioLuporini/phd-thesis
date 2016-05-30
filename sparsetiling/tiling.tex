@@ -360,9 +360,16 @@ In Figure~\ref{fig:st-mpi-init}, a mesh is partitioned over two processes and a 
 
 \begin{figure}[thpb]
 \centering
-\includegraphics[width=\textwidth]{sparsetiling/figures/base_mesh_doppio.pdf}
-\caption{Seed partitioning for distributed memory execution.}
+\includegraphics[scale=0.6]{sparsetiling/figures/mpi_loop0.pdf}
+\caption{A snapshot of the two mesh partitions on {\tt Process 0} and {\tt Process 1} after inspecting the seed loop $L_0$ for distributed-memory parallelism. On each process, there are 5 tiles in total: 2 in the core region (green and violet), 2 in the boundary region (red and light blue), and $T_{ne}$. The boundary tiles can safely cross the owned and exec sub-regions (i.e., the private local iterations and the iterations to be redundantly computed, respectively). However, no tile can include iterations from both the core and the boundary regions. }
 \label{fig:st-mpi-init}
+\end{figure}
+
+\begin{figure}[thpb]
+\centering
+\includegraphics[scale=0.6]{sparsetiling/figures/mpi_loop2.pdf}
+\caption{A snapshot of the two mesh partitions on {\tt Process 0} and {\tt Process 1} at the end of the inspection for distributed-memory parallelism. $T_{ne}$ expands over the boundary region, which minimizes the amount of redundant computation to be performed. After execution the orange edges will contain ``dirty  values'', but correctness is not affected as the exec region only includes off-process data. The boundary tiles expand over the core region: this is essential for correctness since none of the red and blue entities from $[L_0,\ L_1,\ L_2]$ can be executed until the MPI communications have terminated.}
+\label{fig:st-mpi-growth}
 \end{figure}
 
 The schedule produced by the inspector is subsequently used by the executor. On each process, the executor starts with triggering the MPI communications required to the computation of the boundary tiles. All core tiles are then computed, since no data from the boundary region is necessary. Hence, computation is overlapped with communication. As all core tiles are computed and the MPI communications terminated, the boundary tiles can finally be computed.
