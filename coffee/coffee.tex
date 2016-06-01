@@ -55,7 +55,7 @@ We start with highlighting peculiarities of the hierarchy of AST nodes.
 Some nodes have special semantics. A first example is the {\it expression node} described in the previous section. Furthermore, a whole sub-hierarchy of \texttt{LinAlg} nodes is available, with objects such as \texttt{Invert} and \texttt{Determinant} representing basic linear algebra operation. Code generation for these objects can be specialized based upon the underlying architecture and the size of the involved tensors. For instance, a manually-optimized loop nest may be preferred to a BLAS function when the tensors are small\footnote{It is well-known that BLAS libraries are highly optimized for big tensors, while their performance tends to be sub-optimal with small tensors, which are very common in assembly kernels.}. Yet another special type of node is \texttt{ArrayInit}, used for static initialization of arrays. An \texttt{ArrayInit} wraps an $N$-dimensional Numpy array~\citep{Numpy} and provides a simple interface to obtain information useful for sparsity optimization, like the sparsity pattern of the array. 
 
 \paragraph{Symbols}
-A \texttt{Symbol} represents a variable in the code. The \textit{rank} of a \texttt{Symbol} captures the dimensionality of a variable, with a rank equal to $N$ indicating that the variable is an $N$-dimensional array ($N=0$ implies that the variable is a scalar). The rank is implemented as an $N$-tuple, each entry being either an integer or a string representing a loop dimension. The \textit{offset} of a \texttt{Symbol} is again an $N$-tuple where each element is a 2-tuple. For each entry $r$ in the rank, there is a corresponding entry ${<}scale,\ stride{>}$ in the offset. Rank and offset are used as in Figure~\ref{fig:coffee-ast-vs-c} to access specific memory locations. By clearly separating the rank and the offset of a \texttt{Symbol} -- rather than storing a generic expression -- the data dependency analysis required by the rewrite operators is greatly simplified. The underlying assumption is that symbols' access functions (Section~\ref{sec:bkg:terminology}) are affine in the loop indices. This is definitely the case for the class of kernels in which we are interested.
+A \texttt{Symbol} represents a variable in the code. The \textit{rank} of a \texttt{Symbol} captures the dimensionality of a variable, with a rank equal to $N$ indicating that the variable is an $N$-dimensional array ($N=0$ implies that the variable is a scalar). The rank is implemented as an $N$-tuple, each entry being either an integer or a string representing a loop dimension. The \textit{offset} of a \texttt{Symbol} is again an $N$-tuple where each element is a 2-tuple. For each entry $r$ in the rank, there is a corresponding entry ${<}scale,\ stride{>}$ in the offset. Rank and offset are used as in Figure~\ref{fig:coffee-ast-vs-c} to access specific memory locations. By clearly separating the rank and the offset of a \texttt{Symbol} -- rather than storing a generic expression -- the data dependency analysis required by the rewrite operators is greatly simplified. The underlying assumption is that all symbols' access functions (Section~\ref{sec:bkg:terminology}) are affine in the loop indices. This is definitely the case for the class of kernels in which we are interested.
 
 \begin{figure}
 \begin{center}
@@ -85,7 +85,7 @@ The enriched FFC AST is intercepted prior to code generation and forwarded to a 
 \end{itemize}
 
 \paragraph{TSFC and COFFEE}
-TSFC was conceived with the idea of producing an input suitable for COFFEE. This is accomplished through an AST-to-AST converter, which translates the GEM representation (the internal language used by TSFC) of an assembly kernel into a COFFEE AST. The implementation was carried out by Myklos Homolya, one of the main designers of TSFC.
+TSFC was conceived to produce an input suitable for COFFEE. This is accomplished through an AST-to-AST converter, which translates the GEM representation (the internal language used by TSFC) of an assembly kernel into a COFFEE AST. The implementation was carried out by Myklos Homolya, the lead designer of TSFC.
 
 
 \section{Rewrite Operators}
@@ -95,19 +95,19 @@ COFFEE implements sharing elimination and pre-evaluation by composing ``building
 The most important rewrite operators in COFFEE are:
 \begin{description}
 \item[Generalized code motion] A sub-expression that is invariant with respect to one or more loops can be hoisted at the level of an outer loop, thus reducing the operation count. This requires introducing a temporary (scalar, array) for each invariant sub-expression and, possibly, adding a ``clone'' loop to the nest (Several examples, e.g. Figure~\ref{code:loopnest}, have been provided throughout the thesis). 
-\item[Expansion] Exploiting the distributivity rule, this transformation expands a product between two sub-expressions. Expansion has several effects: (i) exposing factorization opportunities (see Chapter~\ref{ch:optimality}); (ii) increasing the operation count; (iii) in some circumstances, relieving the register pressure by creating code motion opportunities.
+\item[Expansion] Exploiting distributivity, this transformation expands a product between two sub-expressions. Expansion has several effects: (i) exposing factorization opportunities (see Chapter~\ref{ch:optimality}); (ii) increasing the operation count; (iii) in some circumstances, relieving the register pressure by creating code motion opportunities.
 \item[Factorization] The impact of factorizing, or collecting, identical symbols is twofold: (i) reducing the number of multiplications to be performed; (ii) more importantly, exposing code motion opportunities, as illustrated through sharing elimination and pre-evaluation.
 \item[Symbolic evaluation] This operator evaluates sub-expressions that only involve statically initialized, read-only arrays (e.g., basis function tables). The result is stored into a new array, and the AST modified accordingly
 \end{description}
 All these operators are used by both sharing elimination and pre-evaluation (apart from symbolic evaluation, only employed by pre-evaluation).
 
-The rewrite operators accept a number of options that help users steering the transformation process. With code motion, for example, one can specify what kind of sub-expressions should be hoisted (by indicating the expected invariant loops) or the maximum amount of memory that is spendable in temporaries. Factorization can be either ``explicit'' -- in which case, a list of symbols to be collected or a loop dimension along which searching for factorizable symbols are provided -- or ``heuristic'' -- with groups of recurring identical symbols being searched and collected.
+The rewrite operators accept a number of options to let users steering the transformation process. With code motion, for example, one can specify what kind of sub-expressions should be hoisted (by indicating the invariant loops) or the maximum amount of memory that is spendable in temporaries. Factorization can be either ``explicit'' -- in which case, a list of symbols to be collected or a loop dimension along which searching for factorizable symbols are provided -- or ``heuristic'' -- with groups of recurring identical symbols being collected.
 
 \section{Features of the Implementation}
 This section focuses on the ``toolkit'' available in COFFEE for implementing and extending rewrite operators.
 
 \subsection{Tree Visitor Pattern}
-The need for a generic infrastructure for traversing ASTs has grown rapidly, together with the complexity of the compiler. In the early stages of COFFEE, any time a new transformation (e.g., a rewrite operator) or inspector (e.g., for dependence analysis) were required, a full AST traversal had to be implemented. The lack of a common interface for tree traversals also made the code less homogeneous and, therefore, more difficult to understand. This led to the introduction of a tree visitor design pattern\footnote{The tree visitor infrastructure was mainly developed by Lawrence Mitchell, and was inspired by that adopted in UFL, the language used to specify forms in Firedrake.}, whose aim is to decouple the algorithms from the data structure on which they are applied. 
+The need for a generic infrastructure for traversing ASTs has grown rapidly, together with the complexity of the compiler. In the early stages of COFFEE, any time a new transformation (e.g., a rewrite operator) or inspector (e.g., for dependence analysis) was required, one or more full AST traversals had to be implemented. The lack of a common interface for tree traversals also made the code less homogeneous and, as such, more difficult to understand. This led to the introduction of a tree visitor design pattern\footnote{The tree visitor infrastructure was mainly developed by Lawrence Mitchell, and was inspired by that adopted in UFL, the language used to specify forms in Firedrake.}, whose aim is to decouple the algorithms from the data structure on which they are applied. 
 
 As an example, consider an algorithm that needs to perform special actions when a \texttt{Symbol} or a \texttt{ForLoop} nodes are encountered (e.g., to collect loop dependence information). Then, a tree visitor will only need to implement three methods, namely \texttt{visit$\_$Symbol} and \texttt{visit$\_$ForLoop} -- the actual handlers -- as well as \texttt{visit$\_$Node}, which will implement the ``fallback'' action for all other node types (e.g., a propagation of the visit).
 
@@ -124,10 +124,10 @@ When applying the operator, several pieces of information must be known:
 \item What sub-expression should be hoisted; for instance, should they be constant or invariant in at most one of the linear loops.
 \item Where sub-expressions should be hoisted; that is, how far in the loop nest (which affects the size of the temporaries).
 \item How much memory are we allowed to use in total for the temporaries.
-\item A list of previously hoisted sub-expressions, for common sub-expressions elimination.
+\item A list of previously hoisted sub-expressions, for applying common sub-expressions elimination.
 \end{itemize}
 
-COFFEE tracks all of the hoisted sub-expressions for quick later retrieval. A dictionary mapping temporaries to metadata is employed. For a temporary \texttt{t}, the dictionary records:
+COFFEE tracks all of the hoisted sub-expressions for quick retrieval. A dictionary mapping temporaries to metadata is employed. For a temporary \texttt{t}, the dictionary records:
 \begin{itemize}
 \item A reference to the hoisted expression \texttt{e} assigned to \texttt{t}.
 \item A reference to the loop in which \texttt{e} is lifted (if any).
@@ -136,7 +136,7 @@ COFFEE tracks all of the hoisted sub-expressions for quick later retrieval. A di
 \end{itemize}
 This dictionary is updated after each invocation to the code motion operator and forms part of the ``global state'' that COFFEE maintains for each assembly kernel. Not only is the dictionary accessed by later calls to the code motion operator, but also by other operators, thus speeding-up the AST transformation process.
 
-The code motion operator ``silently'' applies common sub-expression elimination. A look-up to the dictionary tells whether a hoistable sub-expression \texttt{e} has already been assigned to a temporary \texttt{t} by a prior call to the operator; in such a case, \texttt{e} is replaced with \texttt{t} and no useless temporaries are introduced. 
+The code motion operator ``silently'' applies common sub-expressions elimination. A look-up to the dictionary tells whether a hoistable sub-expression \texttt{e} has already been assigned to a temporary \texttt{t} by a prior call to the operator; in such a case, \texttt{e} is replaced with \texttt{t} and no useless temporaries are introduced. 
 
 %The code motion operator is ``smart'', in the sense that common sub-expressions,  every time a sub-expression is about to be hoisted, \texttt{e} is lifted out of the iteration space \texttt{I}, three further ``extra'' optimizations are attempted. 
 %
@@ -157,7 +157,7 @@ Data dependency analysis is necessary to ensure the legality of transformations.
 COFFEE uses a dependency graph for tracking data dependencies. The dependency graph has as many vertices as symbols in the code; a direct edge from \texttt{A} to \texttt{B} indicates that symbol \texttt{B} depends on (i.e., is going to read) symbol \texttt{A}. Since COFFEE relies on \textit{static single assignment} -- a property that ensures that variables are assigned exactly once -- such a minimalistic data structure suffices for data dependence analysis.
 
 \subsection{Minimizing Temporaries}
-Both the code motion operator and loop fusion (Section~\ref{sec:coffee-loopfusion}) impact the number of temporaries in an assembly kernel. Once the AST has been transformed, a special routine attempts to remove the unnecessary temporaries. In addition to (potentially, depending on how smart is the underlying general-purpose compiler) reliving the register pressure, this has the effect of making the code more readable.
+Both the code motion operator and loop fusion (Section~\ref{sec:coffee-loopfusion}) impact the number of temporaries in an assembly kernel. Once the AST has been transformed, a special routine attempts to remove the unnecessary temporaries. In addition to reliving the register pressure (this actually depends on how smart is the underlying general-purpose compiler), this has the effect of making the code more readable.
 
 The main rule for removing a temporary \texttt{t} storing an expression \texttt{e} is that if \texttt{t} is accessed only in a single statement \texttt{s}, then \texttt{e} is inlined into \texttt{s} and \texttt{t} is removed. Secondly, if some of the transformations in the optimization pipeline reduced \texttt{e} to a symbol, then any appearance of \texttt{t} is also replaced by \texttt{e}.
 
