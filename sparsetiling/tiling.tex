@@ -837,7 +837,7 @@ In all the experiments presented in this section, the optimal tile size (i.e. th
 \begin{tabulary}{1.0\columnwidth}{c | c | c}
 \hline
 Matrix name & Execution time reduction & Speed-up  \\
-\hline
+\hline \hline
 {\em ldoor} & 40.34 & 12.11 \\
 {\em pwtk} & 38.42 & 11.98 \\
 {\em thermal2} & 25.78 & 11.08 \\
@@ -867,17 +867,17 @@ The values in Table~\ref{table:st-jacobi} do not include the inspection time nec
 
 \begin{table}[t]
 \centering
-\begin{tabulary}{1.0\columnwidth}{c | c | c}
+\begin{tabulary}{1.0\columnwidth}{c | c | c | c}
 \hline
-Implementation & Execution time & Speed-up \\
-\hline
-Westmere {\em omp} & 36.87 & 6.43\\
-Westmere {\em mpi} & 31.0 & 7.66 \\
-Westmere {\em tiled} & 26.49 & 8.96 \\
+Architecture & Implementation & Execution time & Speed-up \\
 \hline \hline
-Sandy Bridge {\em omp} & 30.01 & 6.65 \\
-Sandy Bridge {\em mpi} & 24.42 & 8.17 \\
-Sandy Bridge {\em tiled} & 20.63 & 9.67 \\
+\multirow{3}{*}{Westmere} & {\em omp} & 36.87 & 6.43\\
+~ & {\em mpi} & 31.0 & 7.66 \\
+~ & {\em tiled} & 26.49 & 8.96 \\
+\hline \hline
+\multirow{3}{*}{Sandy Bridge} & {\em omp} & 30.01 & 6.65 \\
+~ & {\em mpi} & 24.42 & 8.17 \\
+~ & {\em tiled} & 20.63 & 9.67 \\
 \hline
 \end{tabulary}
 \caption{Execution time (in seconds) and speed-ups over the slowest single-threaded implementation for the Airfoil benchmark. The values are obtained from simulations with fully-loaded machines (16 and 24 threads/processes on the Sandy Bridge and the Westmere architectures, respectively).}
@@ -910,29 +910,62 @@ The Airfoil experiments highlighted that shared-memory parallelism over multi-so
 \label{sec:tiling:seigen}
 In this section, we apply sparse tiling to a real-world computation written in Firedrake, Seigen. 
 
-\subsection{Application}
+\subsection{The Computation}
 
 \subsubsection{The Seismic Model}
-Seigen is a novel seismological modelling framework capable of solving the elastic wave equation on unstructured meshes. Exploiting the well-known velocity-stress formulation~\citep{Seigen-3}, the seismic model is expressible as two first-order linear PDEs, which we refer to as {\tt velocity} and {\tt stress}. These governing equations are discretized in space through the discontinuous-Galerkin finite element method. The evolution over time is obtained by using a fourth-order explicit leapfrog scheme based on a truncated Taylor series expansion of the velocity and stress fields. The particular choices of spatial and temporal discretization have been proven to be non-dissipative~\citep{Seigen-1}. More details can be found in~\cite{Seigen-paper}.
+Seigen is a novel seismological modelling framework capable of solving the elastic wave equation on unstructured meshes. Exploiting the well-known velocity-stress formulation~\citep{Seigen-3}, the seismic model is expressible as two first-order linear PDEs, which we refer to as {\tt velocity} and {\tt stress}. These governing equations are discretized in space through the discontinuous-Galerkin finite element method. The evolution over time is obtained by using a fourth-order explicit leapfrog scheme based on a truncated Taylor series expansion of the velocity and stress fields. The particular choice of spatial and temporal discretizations have been proven to be non-dissipative~\citep{Seigen-1}. More details can be found in~\cite{Seigen-paper}.
+
+\subsubsection{Choice of the Test Case}
+The Seigen framework has been implemented in Firedrake by Christian Jacobs, along with a set test cases. In this experimentation, we use the {\tt explosive$\_$source} test case. The test cases may differ in various aspects, including the initial conditions of the system, the way the waves propagate, and the dimensionality of the unstructured mesh. The same seismological model is used in all test cases, however. From a computational point of view, this means that independently of the test case we select, the sequence of loops to be executed in a time step is unchanged. Consequently, the analysis of {\tt explosive$\_$source} in Section~\ref{sec:tiling:seigen-results} is expected to be easily generalizable to the other test cases. In fact, some of the conclusions we draw are so general that it would be surprising if they did not recur in different applications. 
 
 \subsubsection{Implementation}
-The Seigen framework has been implemented in Firedrake by Christian Jacobs, along with a set test cases. The test cases may differ, amongst the various aspects, in the initial conditions of the system, in the way the waves propagate, in the dimensionality of the unstructured mesh, and many more. The same seismological model is used in all test cases, however. From a computational point of view, this means that independently of the test case we pick, the sequence of loops to be executed in a time step is unchanged. In this experimentation, we use the {\tt explosive$\_$source} test case, but we are confident that similar considerations transfer to most of the other test cases.
-
 In a time loop iteration, eight linear systems need be solved, four for {\tt velocity} and four for {\tt stress}. Each solve consists of three macro-steps (see also Section~\ref{sec:bkg:assembly}): assembling a global matrix $A$; assembling a global vector $b$; computing $x$ in the system $Ax = b$. There are in total two global matrices, one for {\tt velocity} and one for {\tt stress}, and both are time invariant. They are therefore computed before entering the time stepping loop. In particular, the employed discretization makes the two global matrices block-diagonal. The inverse of a block-diagonal matrix is again a block-diagonal matrix and is easily computable. Each block in the inverse matrix logically belongs to an element in the mesh. This means that the solution of the linear system $Ax = b$, expressible as $x = b A^{-1}$, can be evaluated by looping over the mesh and computing a small matrix-vector product in each element, where both the matrix and the vector represent local data. Assembling global vectors reduces to a sequence of loops over mesh elements, particularly over cells, interior facets, and exterior facets. Overall, 25 loops are executed in each time loop iteration.
 
 Being a Firedrake code, most loops are not visible directly in the source code. All loops arising from the assembly of global vectors (17 in total) are derived automatically from the symbolic specification of {\tt velocity} and {\tt stress}. However, thanks to the hierarchy of ``software caches'' employed by Firedrake, the translation from mathematical syntax into loops is performed only once. 
 
-\subsubsection{Applying Sparse Tiling}
-Introducing generalized sparse tiling into Seigen is relatively straightforward. Once the body of the time stepping loop is embedded within the {\em loop$\_$chain} construct (see Section~\ref{sec:tiling:lcinterface}), two more things need be done: (i) propagating the relevant user input to the {\em loop$\_$chain} (trivial, but fundamental for performance tuning); (ii) setting one or more {\em fusion schemes}. A fusion scheme establishes which sub-sequences of loops within a {\em loop$\_$chain} will be fused and as many seed tile sizes. By default, all of the 25 loops are fused with a given seed tile size. As we shall see, however, operating with smaller loop chains and different tile sizes can be more efficient, so one may want to specify other fusion schemes. For example, the two $[0-11]$ and $[12-24]$ sub-sequences, arising respectively from the {\tt velocity} and {\tt stress} equations, could be fused separately. 
+\subsubsection{Application of Sparse Tiling}
+Introducing generalized sparse tiling into Seigen is relatively straightforward. Once the body of the time stepping loop is embedded within the {\em loop$\_$chain} construct (see Section~\ref{sec:tiling:lcinterface}), two more things need be done: (i) propagating the relevant user input to the {\em loop$\_$chain} (trivial, but fundamental for performance tuning); (ii) setting one or more {\em fusion schemes}. A fusion scheme establishes which sub-sequences of loops within a {\em loop$\_$chain} will be fused and the respective seed tile sizes. By default, all of the 25 loops are fused with a given seed tile size. As we shall see, however, operating with smaller loop chains and different tile sizes can be more efficient, so specifying multiple fusion schemes is fundamental. For example, the two $[0-11]$ and $[12-24]$ sub-sequences, arising respectively from the {\tt velocity} and {\tt stress} equations, could be treated as two separate loop chains. 
 
-\subsubsection{Verification and Validation}
+\subsubsection{Validation}
+Seigen has several mechanisms to validate the correctness of the seismological model and of the test cases. Some of these mechanisms have been used during the development of SLOPE itself, when {\tt explosive$\_$source} has been used to stress the implementation. The numerical results of all code versions (with and without tiling) have been properly validated. It is also possible to use Paraview to display the output of the tiled simulation, which systematically matches the one produced by the non-tiled {\tt explosive$\_$source} version.
 
+\subsubsection{Parametrization of the Computation}
+In essence, there are two parameters that we can change in the {\tt explosive$\_$source} test case: the polynomial order of the method and the input mesh. 
+
+\begin{description}
+\item[Polynomial order $q$] We will test the spectrum $q \in \lbrace 1, 2, 3, 4 \rbrace$. For testing higher polynomial orders a change in the spatial discretization would be necessary (i.e., the adoption of tensor product function spaces), but this functionality is currently under development in Firedrake.
+\item[Mesh] We use as input a two-dimensional rectangular mesh of fixed size 300$\times$150. We will instead vary the mesh spacing $h$, which impacts the number of elements in the rectangle.
+\end{description}  
 
 \subsubsection{Computational Analysis of the Loops}
 
-\subsection{Results}
+
+\subsection{Setup}
 ...
 
+\subsection{Results}
+\label{sec:tiling:seigen-results}
+
+\begin{table}[htpb]
+\centering
+\begin{tabulary}{1.0\columnwidth}{c | c | c | c}
+\hline
+$n$ & $q$ & $m_1^p$ & $m_2^p$  \\
+\hline \hline
+\multirow{4}{*}{\shortstack{4 \\ (Sandy Bridge)}} & 1 & ... & ...\\
+& 2 & ... & ... \\
+& 3 & ... & ... \\
+& 4 & ... & ... \\
+\hline \hline
+\multirow{4}{*}{\shortstack{20 \\ (Ivy Bridge, \\ Haswell)}} & 1 & ... & ...\\
+& 2 & ... & ... \\
+& 3 & ... & ... \\
+& 4 & ... & ... \\
+\hline
+\end{tabulary}
+\caption{Depending on the polynomial order $q$, the mesh spacing $h$ and the number of cores $n$ in a node, the average number of degrees of freedom received by a process varies. We test each problem instance $p = {<}n,\ q{>}$ with two different meshes, which we refer to as $m_1^p$ and $m_2^p$. Using the same meshes with different values of $q$ is impractical as the search space is large, and $p$ can last hours for higher values of $q$. The criteria behind the choice of $m_1^p$ and $m_2^p$ are: (i) they must fit the main memory of a node; (ii) the partitions must exceed the last level of cache; (iii) there must be enough elements to make the simulation converge.}
+\label{table:seigen-meshes}
+\end{table}
 
 \section{Conclusions and Future Work}
 %1) ... aggressive mode of firedrake, automatic tiling ?
