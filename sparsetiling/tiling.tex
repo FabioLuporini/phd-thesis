@@ -910,7 +910,7 @@ The Airfoil experiments highlighted that shared-memory parallelism over multi-so
 \label{sec:tiling:seigen}
 In this section, we apply sparse tiling to a real-world computation written in Firedrake, Seigen. 
 
-\subsection{The Computation}
+\subsection{Computation}
 
 \subsubsection{The Seismic Model}
 Seigen is a novel seismological modelling framework capable of solving the elastic wave equation on unstructured meshes. Exploiting the well-known velocity-stress formulation~\citep{Seigen-3}, the seismic model is expressible as two first-order linear PDEs, which we refer to as {\tt velocity} and {\tt stress}. These governing equations are discretized in space through the discontinuous-Galerkin finite element method. The evolution over time is obtained by using a fourth-order explicit leapfrog scheme based on a truncated Taylor series expansion of the velocity and stress fields. The particular choice of spatial and temporal discretizations have been proven to be non-dissipative~\citep{Seigen-1}. More details can be found in~\cite{Seigen-paper}.
@@ -938,10 +938,39 @@ In essence, there are two parameters that we can change in the {\tt explosive$\_
 \end{description}  
 
 \subsubsection{Computational Analysis of the Loops}
+We here discuss the bottlenecks characterizing the 25 loops in the {\em loop$\_$chain} of Seigen. The following considerations derive from an analytical study of the data movement in the loop chain, extensive profiling through the Intel VTune Amplifier tool~\citep{vtune}, and roofline models (available in~\cite{Seigen-paper}).
+
+\begin{itemize}
+\item Consecutive pairs of loops are characterized by indirect data dependencies. Therefore, not only does data reuse arise within a given loop (in many ways, for instance by accessing vertex coordinates from adjacent cells), but also across the entire loop chain. This makes Seigen seem a natural fit for sparse tiling. 
+\item 8 loops perform matrix-vector multiplications in each mesh element. It is well established that this kind of linear algebra operations are memory-bound. 4 loops arise from {\tt velocity}, while 4 loops arise from {\tt stress}. For a given mesh element, the loops in each of these two groups access the same specific block in the diagonal of the global matrix. There is therefore significant data reuse amongst the loops in a block, so it is reasonable to hypothesize performance gains if these were fused through sparse tiling.
+\item 3 loops implement boundary conditions by iterating over the exterior facets of the mesh. Since we employ relatively big rectangular meshes, the iteration space of these loops is small, so the impact on the completion time is negligible.
+\item 8 loops implement cell integrals, which contribute to the assembly of the global vectors in each of the 8 solves of the loop chain. In particular, 3 loops need evaluate a field, which we informally call {\tt absorption}, to compute the local vector in a cell. In {\tt explosive$\_$source}, and similarly in other test cases, {\tt absorption} is represented with a 4th order polynomial in a discontinuous-Galerkin function space. When $q$ is low, the operation count for evaluating {\tt absorption} is dominant: the 3 {\tt absorption} loops tend to be compute-bound and to outweigh not only the other 5 cells loops, but but also many of the interior facet loops. In the following, when discussing performance results, we will refer to this phenomenon as the ``absorption-effect''. With high values of $q$, the absorption-effect becomes less relevant. In theory, the absorption-effect could be eliminated entirely by pre-computing the field outside of the time-stepping loop, as  {\tt absorption} does not change over time. Unfortunately, this is not possible in the current version of Firedrake. 
+\item 6 loops iterate over the interior facets of the mesh to compute so called facet integrals. Being a discontinuous-Galerkin method, facet integrals ensure the transfer of information between two adjacent cells. The operational intensity is much lower in these loops than in the cells loops, and memory-boundedness is expected. Consecutive facet and cell integrals loops share some fields, which creates cross-loop data reuse opportunities. Again, sparse tiling may play a key role in transforming this data reuse into data locality.
+\end{itemize}
+
 
 
 \subsection{Setup}
-...
+\begin{table}[htpb]
+\footnotesize
+\makebox[\textwidth][c]
+{
+\begin{tabulary}{1.2\textwidth}{c | c | c | c}
+\hline
+System & Erebus & CX1-Haswell & CX1-Ivy \\
+\hline \hline 
+Node & \shortstack{1x4-core\\Intel I7-2600 3.4GHz} & \shortstack{2x20-core\\Intel Xeon E5-2650 2.30GHz} & \shortstack{2x20-core\\Intel Xeon E5-2660 2.20GHz} \\ \hline
+Memory & 16GB & 64GB & 64GB \\ \hline
+\shortstack{Cache\\hierarchy} & \shortstack{L1=32KB, L2=256KB,\\L3=8MB (shared)} & & \\ \hline
+Compilers & Intel {\tt icc} 16.0.2 & Intel {\tt icc} 15.1 & Intel {\tt icc} 15.1 \\ \hline
+\shortstack{Compiler\\flags} & {\tt -O3 -xHost -ip} & {\tt -O3 -xHost -ip} & {\tt -O3 -xHost -ip} \\ \hline
+\end{tabulary}
+}
+\caption{Summary of architectures and configurations used for experimentation.}
+\label{table:seigen-setup}
+\end{table}
+
+%Intel I7-2600 (Sandy Bridge) CPU, running at 3.4GHz, 32KB L1 cache (private), 256KB L2 cache (private) and 8MB L3 cache (shared). The Intel Turbo Boost and Intel Speed Step technologies were disabled. The Intel \texttt{icc 15.2} compiler was used. The compilation flags used were \texttt{-O3, -xHost}
 
 \subsection{Results}
 \label{sec:tiling:seigen-results}
@@ -952,12 +981,12 @@ In essence, there are two parameters that we can change in the {\tt explosive$\_
 \hline
 $n$ & $q$ & $m_1^p$ & $m_2^p$  \\
 \hline \hline
-\multirow{4}{*}{\shortstack{4 \\ (Sandy Bridge)}} & 1 & ... & ...\\
+\multirow{4}{*}{\shortstack{4 \\ (Erebus)}} & 1 & ... & ...\\
 & 2 & ... & ... \\
 & 3 & ... & ... \\
 & 4 & ... & ... \\
 \hline \hline
-\multirow{4}{*}{\shortstack{20 \\ (Ivy Bridge, \\ Haswell)}} & 1 & ... & ...\\
+\multirow{4}{*}{\shortstack{20 \\ (CX1-Hawell, \\ CX1-Ivy)}} & 1 & ... & ...\\
 & 2 & ... & ... \\
 & 3 & ... & ... \\
 & 4 & ... & ... \\
@@ -965,6 +994,50 @@ $n$ & $q$ & $m_1^p$ & $m_2^p$  \\
 \end{tabulary}
 \caption{Depending on the polynomial order $q$, the mesh spacing $h$ and the number of cores $n$ in a node, the average number of degrees of freedom received by a process varies. We test each problem instance $p = {<}n,\ q{>}$ with two different meshes, which we refer to as $m_1^p$ and $m_2^p$. Using the same meshes with different values of $q$ is impractical as the search space is large, and $p$ can last hours for higher values of $q$. The criteria behind the choice of $m_1^p$ and $m_2^p$ are: (i) they must fit the main memory of a node; (ii) the partitions must exceed the last level of cache; (iii) there must be enough elements to make the simulation converge.}
 \label{table:seigen-meshes}
+\end{table}
+
+
+\label{sec:tiling:seigen-results}
+
+\begin{table}[htpb]
+\centering
+\begin{tabulary}{1.0\columnwidth}{c || c | c || c | c || c}
+\hline
+System & Mesh & $q$ & Time original (s) & Time best tiled (s) & Speed-up  \\ 
+\hline \hline 
+\multirow{8}{*}{\shortstack{Erebus\\$(n=4)$}} & \multirow{4}{*}{$m_1^p$} & 1 & ... & ... & ... \\ 
+ & & 2 & ... & ... & ... \\ 
+ & & 3 & ... & ... & ... \\
+ & & 4 & ... & ... & ... \\
+ \cline{2-6}
+ & \multirow{4}{*}{$m_2^p$} & 1 & ... & ... & ... \\ 
+ & & 2 & ... & ... & ... \\ 
+ & & 3 & ... & ... & ... \\
+ & & 4 & ... & ... & ... \\ 
+\hline \hline
+\multirow{8}{*}{\shortstack{CX1-Hawell\\$(n=20)$}} & \multirow{4}{*}{$m_1^p$} & 1 & ... & ... & ... \\ 
+ & & 2 & ... & ... & ... \\ 
+ & & 3 & ... & ... & ... \\
+ & & 4 & ... & ... & ... \\
+ \cline{2-6}
+ & \multirow{4}{*}{$m_2^p$} & 1 & ... & ... & ... \\ 
+ & & 2 & ... & ... & ... \\ 
+ & & 3 & ... & ... & ... \\
+ & & 4 & ... & ... & ... \\ 
+\hline \hline
+\multirow{8}{*}{\shortstack{CX1-Ivy\\$(n=20)$}} & \multirow{4}{*}{$m_1^p$} & 1 & ... & ... & ... \\ 
+ & & 2 & ... & ... & ... \\ 
+ & & 3 & ... & ... & ... \\
+ & & 4 & ... & ... & ... \\
+ \cline{2-6}
+ & \multirow{4}{*}{$m_2^p$} & 1 & ... & ... & ... \\ 
+ & & 2 & ... & ... & ... \\ 
+ & & 3 & ... & ... & ... \\
+ & & 4 & ... & ... & ... \\ 
+\hline
+\end{tabulary}
+\caption{Comparison between original and tiled versions on multiple platforms when running with 1 MPI rank per core (no hyperthreading).}
+\label{table:seigen-speedups}
 \end{table}
 
 \section{Conclusions and Future Work}
