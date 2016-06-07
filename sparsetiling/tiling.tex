@@ -1018,8 +1018,45 @@ $n$ & $q$ & $m_1^p$ & $m_2^p$  \\
 \end{table}
 
 
-\label{sec:tiling:seigen-results}
 
+\subsubsection{Fusion Schemes and Attempted Optimizations}
+The power of automation becomes evident in this section. The flexibility of the {\em loop$\_$chain} interface, the versatility of SLOPE allowing to apply sparse tiling to arbitrary sequences of loops, and the $S{-}depth$ mechanism make it possible to experiment with a variety of fusion schemes without touching the source code. 
+
+We develop in total 6 fusion schemes, based on several criteria: (i) amount of data reuse in the loop chain(s), (ii) extent of the boundary region/amount of redundant computation, (iii) memory footprint of the loop chain(s) -- the larger, the smaller the tile size to fit in cache. The fusion schemes are summarized in Table~\ref{table:seigen-fusion-schemes}, while their specification is available at~\cite{seigen-code}.
+
+\begin{table}[htpb]
+\centering
+\makebox[\textwidth][c]
+{
+\begin{tabulary}{1.0\columnwidth}{M{1.2cm} | M{2.0cm} | M{7.2cm} | M{1.7cm}}
+\hline
+Fusion scheme & $\#$(sub-)loop chains & Criterion & $S{-}depth$  \\
+\hline \hline
+{\tt fs1} & 3 & Fuse {\tt velocity} cells and facets loops & 2 \\ \hline
+{\tt fs2} & 8 & {\tt fs1} and fuse {\tt stress} cells and facets loops & 2 \\ \hline
+{\tt fs3} & 6 & {\tt fs2} and fuse some solver loops & 2 \\ \hline
+{\tt fs4} & 3 & More aggressive than {\tt fs2} & 3 \\ \hline
+{\tt fs5} & 2 & Maximize locality in the {\tt velocity} and {\tt stress} loop chains & 4 \\ \hline
+{\tt fs6} & 1 & The extreme case: fuse all of the 25 loops & 8 \\
+\hline
+\end{tabulary}
+}
+\caption{Summary of the fusion schemes adopted in Seigen. The $S{-}depth$ column is to be interpreted as number of strips of off-process cells.}
+\label{table:seigen-fusion-schemes}
+\end{table}
+
+Furthermore, several optimizations were tried. These optimizations are applicable to all of the fusion schemes.
+
+\begin{description}
+\item[Global and local maps] Algorithm~\ref{algo:st-inspector} computes so called local maps to avoid double indirections in the executor. We regard this as a potential optimization. Although there is no data reuse for the local maps, the benefits from hardware prefetching and memory latency could be dominant. We will experiment with both global (i.e., original, as provided by the application itself) and local (i.e., computed by SLOPE) maps.
+
+\item[Tile shape] 
+\item[Software prefetching]
+\item[Extended boundary region]
+\end{description}
+
+
+\subsubsection{Summary of the Attained Speed-ups}
 \begin{table}[htpb]
 \centering
 \begin{tabulary}{1.0\columnwidth}{c || c | c || c | c || c}
@@ -1061,10 +1098,7 @@ System & Mesh & $q$ & Time original (s) & Time best tiled (s) & Speed-up  \\
 \label{table:seigen-speedups}
 \end{table}
 
-\subsubsection{Fusion Schemes}
-...
-
-\subsubsection{Attempted Optimizations}
+\subsubsection{In-depth Search Space Exploration}
 ...
 
 \subsubsection{Proving the Hypothesis}
