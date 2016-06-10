@@ -1116,7 +1116,28 @@ System & Mesh & $q$ & Time original (s) & Time best tiled (s) & Speed-up  \\
 \end{table}
 
 \subsubsection{In-depth Search Space Exploration}
-...
+
+
+\begin{figure}[htpb]
+\begin{subfigure}[]{1\textwidth}
+\includegraphics[scale=0.55]{sparsetiling/perf-eval/grid_erebus_plexmesh_h10_mpi.pdf}
+\caption{h10}
+\label{fig:st-erebus-expl-h10}
+\end{subfigure}%
+\par\bigskip
+\par\medskip
+\begin{subfigure}[]{1\textwidth}
+\includegraphics[scale=0.55]{sparsetiling/perf-eval/grid_erebus_plexmesh_h12_mpi.pdf}
+\caption{h12}
+\label{fig:st-erebus-expl-h12}
+\end{subfigure}%
+
+\caption{Search space exploration on Erebus.}
+\label{fig:st-erebus-expl}
+\end{figure}
+
+
+
 
 \subsubsection{Testing the Hypothesis}
 Our hypothesis was that speed-ups could be achieved as sparse tiling turns data reuse into data locality, thus diminishing the memory pressure and improving the memory latency. The combination of three different analyses provides compelling evidence that this was correct.
