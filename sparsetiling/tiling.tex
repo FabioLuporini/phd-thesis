@@ -987,10 +987,10 @@ The execution times were determined as follows
 We perform extensive experimentation on three Intel architectures, whose specification is detailed in Table~\ref{table:seigen-setup}. 
 
 \begin{table}[htpb]
-\footnotesize
+\scriptsize
 \makebox[\textwidth][c]
 {
-\begin{tabulary}{1.2\textwidth}{M{2.5cm} | M{3.5cm} | M{3.5cm} | M{3.5cm} N}
+\begin{tabulary}{1.2\textwidth}{M{2.2cm} | M{3.1cm} | M{3.1cm} | M{3.1cm} N}
 \hline
 System & Erebus & CX1-Haswell & CX1-Ivy \\
 \hline \hline 
@@ -1010,6 +1010,7 @@ Compiler flags & {\tt -O3 -xHost -ip} & {\tt -O3 -xHost -ip} & {\tt -O3 -xHost -
 The (average) number of degrees of freedom $d$ assigned to a process mainly depends on the polynomial order $q$, the mesh spacing $h$ and the number of cores $n$ in a node. Meshes are chosen such that: (i) $d$ fits in main memory; (ii) $d$ exceeds the last level of cache; (iii) ${<}d,\ q,\ h{>}$ ensure convergence of the simulation. A summary of the meshes used for experimentation is provided in Table~\ref{table:seigen-meshes}.
 
 \begin{table}[htpb]
+\footnotesize
 \centering
 \begin{tabulary}{1.0\columnwidth}{c | c | c}
 \hline
@@ -1032,17 +1033,18 @@ $n$ & $h$ & $d$  \\
 
 
 \subsubsection{Fusion Schemes and Attempted Optimizations}
-The flexibility of the {\em loop$\_$chain} interface, the versatility of SLOPE allowing to apply sparse tiling to arbitrary sequences of loops, and the {\em S-depth} mechanism make it possible to experiment with a variety of fusion schemes without changes to the source code. 
+The generality of the sparse tiling algorithms, the flexibility of the {\em loop$\_$chain} interface, and the {\em S-depth} mechanism make it possible to experiment with a variety of fusion schemes without changes to the source code. 
 
 We devise 6 fusion schemes, based on the following criteria: (i) amount of data reuse in the loop chain(s), (ii) extent of the boundary region/amount of redundant computation, (iii) memory footprint of the loop chain(s) -- the larger, the smaller the tile size to fit in cache. The fusion schemes are summarized in Table~\ref{table:seigen-fusion-schemes}, while the full specification is available at~\cite{seigen-code}.
 
 \begin{table}[htpb]
+\footnotesize
 \centering
 \makebox[\textwidth][c]
 {
 \begin{tabulary}{1.0\columnwidth}{M{1.2cm} | M{2.0cm} | M{7.2cm} | M{1.7cm} N}
 \hline
-Fusion scheme & $\#$(sub-)loop chains & Criterion & $S{-}depth$  \\
+Fusion scheme & $\#$(sub-)loop chains & Criterion & {\em S-depth}  \\
 \hline \hline
 {\tt fs1} & 3 & Fuse {\tt velocity} cells and facets loops & 2 & \\[5pt] \hline
 {\tt fs2} & 8 & {\tt fs1} and fuse {\tt stress} cells and facets loops & 2 & \\[5pt] \hline
@@ -1053,7 +1055,7 @@ Fusion scheme & $\#$(sub-)loop chains & Criterion & $S{-}depth$  \\
 \hline
 \end{tabulary}
 }
-\caption{Summary of the fusion schemes adopted in Seigen. The $S{-}depth$ column is to be interpreted as number of strips of off-process cells.}
+\caption{Summary of the fusion schemes adopted in Seigen. The {\em S-depth} column is to be interpreted as number of strips of off-process cells.}
 \label{table:seigen-fusion-schemes}
 \end{table}
 
@@ -1072,10 +1074,18 @@ Furthermore, several optimizations, applicable to all fusion schemes, were tried
 
 \subsection{Results}
 \label{sec:tiling:seigen-results}
+In this section, we report on hundreds of experiments aimed at quantifying the performance improvements obtainable in Seigen by applying sparse tiling. We use the {\tt explosive$\_$source} test case and we explore a large set of parameters, which includes polynomial order, mesh, architecture, fusion scheme, and others. A generalization of the study -- in particular, of the factors limiting sparse tiling -- to different programs is also provided. In the following, a generic instance of {\tt explosive$\_$source} making use of sparse tiling is referred to as a ``tiled version'', otherwise the term ``original version'' is used.
 
 \subsubsection{Summary of the Attained Speed-ups}
+The support for shared-memory parallelism is discontinued in Firedrake, so only distributed-memory tiled versions were tested. The execution times reported derive from runs at maximum parallelism degree, that is, with 1 MPI process on each physical core. Other types of runs, for instance sequential runs, are less interesting as the tiled versions are almost always outperformed by the original Seigen. This is a results of two main factors: (i) when the bandwidth is shared by a small set of processes, the memory access latency is relatively low; (ii) the memory access pattern is more irregular in the tiled versions, which severely impairs hardware prefetching. 
+
+We here start with showing the maximum speed-ups achieved by the tiled versions on Erebus, CX1-Haswell, and CX1-Ivy. The maximum speed-up was determined by picking the best execution time out of a set of tiled versions, for each node, polynomial order $q$, and mesh. The search for the best tiled version is described in the next section. The results are summarized in Table~\ref{table:seigen-speedups}.
+
 \begin{table}[htpb]
+\footnotesize
 \centering
+\makebox[\textwidth][c]
+{
 \begin{tabulary}{1.0\columnwidth}{c || c | c || c | c || c}
 \hline
 System & Mesh & $q$ & Time original (s) & Time best tiled (s) & Speed-up  \\ 
@@ -1111,9 +1121,15 @@ System & Mesh & $q$ & Time original (s) & Time best tiled (s) & Speed-up  \\
  & & 4 & ... & ... & ... \\ 
 \hline
 \end{tabulary}
-\caption{Comparison between original and tiled versions on multiple platforms when running with 1 MPI rank per core (no hyperthreading).}
+}
+\caption{Comparison between the original and tiled versions of Seigen on three different platforms. All physical cores are used (1 MPI process per core, no hyperthreading).}
 \label{table:seigen-speedups}
 \end{table}
+
+Overall, the performance improvements tend to be greater than 1.10$\times$, and sometimes even exceed 1.20$\times$. In light of the limiting factors discussed in the next sections, this is extremely promising. Indeed, while some of these limiting factors are inherent in the sparse tiling execution model, others are simply due to the current implementation of Seigen/Firedrake, so we envisage ample space for larger improvements. 
+
+%Moreover, scaling up to architectures with smaller available bandwidth per core
+
 
 \subsubsection{In-depth Search Space Exploration}
 
@@ -1143,7 +1159,7 @@ System & Mesh & $q$ & Time original (s) & Time best tiled (s) & Speed-up  \\
 Our hypothesis was that speed-ups could be achieved as sparse tiling turns data reuse into data locality, thus diminishing the memory pressure and improving the memory latency. The combination of three different analyses provides compelling evidence that this was correct.
 
 \begin{itemize}
-\item The time spent in executing Python code is insignificantly affected by sparse tiling, irrespective of the number of loops fused. This was verified by timing SLOPE with just one tile covering the whole iteration space, for several types of loop chains, and then comparing to the case with no sparse tiling. On one hand, loop fusion reduces the number of ``jumps'' between Python and just-in-time compiled code proportionately to the loop chain length. On the other hand, however, the Python processing takes longer when sparse tiling is enabled, as a fused loop must be constructed from the original sequence of loops generated by Firedrake. These two changes appear to neutralize one another's costs.
+\item The time spent in executing Python code is insignificantly affected by sparse tiling, irrespective of the number of loops fused. This was verified by timing the experiments with just one tile covering the whole iteration space, for several types of loop chains, and then comparing to the case with no sparse tiling. On one hand, loop fusion reduces the number of ``jumps'' between Python and just-in-time compiled code proportionately to the loop chain length. On the other hand, however, the Python processing takes longer when sparse tiling is enabled, as a fused loop must be constructed from the original sequence of loops generated by Firedrake. These two changes appear to neutralize one another's costs.
 \item Several VTune ``general-exploration'' and ``advanced-hotspots'' analyses repeatedly showed that speed-ups derive from increased data locality. This was evident in all types of fusion schemes. For example, consider {\tt fs5} and the loop chain characterized by 3 solver loops for {\tt stress}. VTune clearly shows that the execution time of the second and third loops is much smaller than that of the first loop; in addition, less cache misses occur when loading the data values for the matrix-vector multiplication. Similar evidence arise from fusing cells and facets integral loops.
 \item A VTune ``bandwidth analysis'' displays memory usage as a function of application time (in GB/s). By comparing the tiled and non-tiled versions, we observed that the former constantly consumes much less memory bandwidth (for both reads and writes). This suggests that the processes are able to retrieve data from cache more often.
 \end{itemize}
@@ -1174,3 +1190,6 @@ Sparse tiling, and more generally time tiling, aim to turn the data reuse in a s
 
 Extensive experimentation is the most impelling need of this research. Although the thorough performance analysis of Seigen has shed many lights on sparse tiling, testing other applications is fundamental to characterize and stretch the limits of this optimization. Unfortunately, this type of analyses require a great deal of effort. Yet another open question of this chapter concerns the mesh numbering. The {\tt chunk} and {\tt metis} partitioning strategies were tested. Our hypothesis, however, is that much higher gains can be obtained by using Hilbert curves. These particular space-filling curves are extremely likely to improve the tile shape and to mitigate the performance penalties due to TLB misses and ineffective hardware prefetching. Finally, a requirement of this work is the definition of a cost model to automatically derive fusion schemes or to drive auto-tuning systems. This is essential for a widespread adoption of sparse tiling.
 
+% shared memory runs
+% multi node runs ?
+% other architectures with higher parallelism degree: power8, knights landing
