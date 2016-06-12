@@ -968,7 +968,7 @@ We here discuss computational aspects of the 25 fusible loops. The following con
 
 
 
-\subsection{Setup}
+\subsection{Setup and Reproducibility}
 
 \subsubsection{Timing Criteria}
 The execution times were determined as follows
@@ -980,11 +980,10 @@ The execution times were determined as follows
 \item The inspection cost due to sparse tiling {\it is} included in the reported times.
 \item Additional costs were minimized: no check-pointing, only two I/O sessions (at the beginning and at the end of the computation), and minimal logging.
 \item The time loop has a fixed duration $T$, while the time step depends on the mesh spacing. In essence, finer meshes require proportionately smaller time steps to ensure convergence. Furthermore, $T$ cannot be reduced arbitrarily, which complicates the performance exploration. A (prolonged) transitory period $P$ is necessary so that the waves fully propagate across the domain. During $P$, the data movement is greatly reduced as most data values are unchanged. The effects of sparse tiling, if any, become evident only if $T$ is sufficiently longer than $P$. We therefore only execute complete seismological simulations.
-\item The runs on CX1-Hawell and CX1-Ivy were performed with exclusive access to the machines. Processes are pinned to cores.
 \end{itemize}
 
 \subsubsection{Systems Configuration}
-We perform extensive experimentation on three Intel architectures, whose specification is detailed in Table~\ref{table:seigen-setup}. 
+Extensive experimentation was performed on three Intel architectures, whose specification is detailed in Table~\ref{table:seigen-setup}. 
 
 \begin{table}[htpb]
 \scriptsize
@@ -999,12 +998,15 @@ Memory & 16GB & 64GB & 64GB & \\[5pt] \hline
 Cache hierarchy & L1=32KB, L2=256KB, L3=8MB (shared) & & & \\[15pt] \hline
 Compilers & Intel {\tt icc} 16.0.2 & Intel {\tt icc} 15.1 & Intel {\tt icc} 15.1 & \\[5pt] \hline
 Compiler flags & {\tt -O3 -xHost -ip} & {\tt -O3 -xHost -ip} & {\tt -O3 -xHost -ip} & \\[5pt] \hline
+MPI version & Open MPI 1.6.5  & Intel MPI 5.1 & Intel MPI 5.1 & \\[5pt] \hline
 \end{tabulary}
 }
-\caption{Summary of architectures and configurations used for experimentation.}
+\caption{Systems specification.}
 \label{table:seigen-setup}
 \end{table}
 
+\subsubsection{Execution Modes}
+Support for shared-memory parallelism is discontinued in Firedrake, so only distributed-memory parallelism was tested. MPI processes were pinned to cores. The hyperthreading technology was not used. Erebus, CX1-Haswell, and CX1-Ivy were unstressed and exclusive access had been obtained when the runs were performed. 
 
 \subsubsection{Meshes}
 The (average) number of degrees of freedom $d$ assigned to a process mainly depends on the polynomial order $q$, the mesh spacing $h$ and the number of cores $n$ in a node. Meshes are chosen such that: (i) $d$ fits in main memory; (ii) $d$ exceeds the last level of cache; (iii) ${<}d,\ q,\ h{>}$ ensure convergence of the simulation. A summary of the meshes used for experimentation is provided in Table~\ref{table:seigen-meshes}.
@@ -1062,24 +1064,27 @@ Fusion scheme & $\#$(sub-)loop chains & Criterion & {\em S-depth}  \\
 Furthermore, several optimizations, applicable to all fusion schemes, were tried.
 
 \begin{description}
-\item[Global and local maps] Algorithm~\ref{algo:st-inspector} computes so called local maps to avoid double indirections in the executor. We regard this as a {\it potential optimization}. Although no data reuse is available for the local maps (each fused loop has its own local maps), the benefits from improved hardware prefetching and memory latency could be dominant. We will experiment with both global (i.e., original, as constructed by Firedrake) and local (i.e., computed by SLOPE) maps. The runs using local maps will be represented with the suffix {\tt lm}.
+\item[Global and local maps] Algorithm~\ref{algo:st-inspector} computes so called local maps to avoid double indirections in the executor. We regard this as a {\it potential optimization}. Although no data reuse is available for the local maps (each fused loop has its own local maps), the benefits from improved hardware prefetching and memory latency could be dominant. We will experiment with both global (i.e., original, as constructed by Firedrake) and local (i.e., computed by SLOPE) maps. 
+%The runs using local maps will be represented with the suffix {\tt lm}.
 
 \item[Tile shape] The seed loop partitioning sets the tile shape. The simplest way of creating tiles consists of ``chunking'' the seed iteration space every $ts$ iterations, with $ts$ being the ``initial'' tile size, as explained in Section~\ref{sec:tiling:inspector}. The {\tt chunk} partitioning inherits the original mesh numbering. In Firedrake, and therefore in Seigen, meshes are renumbered during initialization applying the reverse Cuthill–McKee (RCM) algorithm. Using {\tt chunk} partitioning on top of an RCM-renumbered mesh has the effect of producing thin, rectangular tiles. This affects tile expansion as a large proportion of elements lie on the tile border. There are potential solutions to this problem. The most promising one is using a Hilbert curve, rather than RCM, to renumber the mesh. This would lead to ``blobby'' tiles when applying {\tt chunk} partitioning. Unfortunately, Hilbert curves are at the moment not supported in Firedrake. Another alternative consists of partitioning the seed iteration space with a library like METIS before applying RCM. As we shall see, despite improving the tile shape, this strategy is not side effects free. We refer to it as {\tt metis} partitioning.
 
-\item[Software prefetching] There may be more than one regular memory access pattern amenable to hardware prefetching (e.g., accesses to the indirection maps; direct accesses to data values; indirect accesses to data values if the mesh has a good numbering). Sparse tiling, unfortunately, may impair hardware prefetching because of two reasons: (i) the virtual addresses streams are considerably shorter; (ii) tile expansion introduces irregularities in these streams. Software prefetching can be used together with hardware prefetching to minimize memory stalls. PyOP2 and SLOPE have been extended to emit intrinsics instructions for prefetching the iteration $i$'s maps and data values while executing iteration $i-1$. The runs using software prefetching will be represented with the suffix {\tt sw-pre}.
+\item[Software prefetching] There may be more than one regular memory access pattern amenable to hardware prefetching (e.g., accesses to the indirection maps; direct accesses to data values; indirect accesses to data values if the mesh has a good numbering). Sparse tiling, unfortunately, may impair hardware prefetching because of two reasons: (i) the virtual addresses streams are considerably shorter; (ii) tile expansion introduces irregularities in these streams. Software prefetching can be used together with hardware prefetching to minimize memory stalls. PyOP2 and SLOPE have been extended to emit intrinsics instructions for prefetching the iteration $i$'s maps and data values while executing iteration $i-1$. 
+%The runs using software prefetching will be represented with the suffix {\tt sw-pre}.
 
-\item[Extended boundary region] The special non-exec tile $T_{ne}$ can reduce the amount of redundant computation in long loop chains by expanding over the boundary tiles. To create $T_{ne}$ there are two options: either an extra level of off-process data, marked as ``non-exec'', is communicated or the inspection has additional logic. The current implementation only supports the first option as deriving $T_{ne}$ in the inspection would be not only complex, but also particularly costly. The fusion schemes {\tt fs1}, {\tt fs2}, and {\tt fs3} do not benefit from the presence of $T_{ne}$, so by default no extra off-process data is communicated. The other fusion schemes may instead benefit from this optimization, which in the following will be referred to as {\tt extra-halo}.
+\item[Extended boundary region] The special non-exec tile $T_{ne}$ can reduce the amount of redundant computation in long loop chains by expanding over the boundary tiles. To create $T_{ne}$ there are two options: either an extra level of off-process data, marked as ``non-exec'', is communicated or the inspection has additional logic. The current implementation only supports the first option as deriving $T_{ne}$ in the inspection would be not only complex, but also particularly costly. The fusion schemes {\tt fs1}, {\tt fs2}, and {\tt fs3} do not benefit from the presence of $T_{ne}$, so by default no extra off-process data is communicated. The other fusion schemes may instead benefit from this optimization.
+%, which in the following will be referred to as {\tt extra-halo}.
 \end{description}
 
 
 \subsection{Results}
 \label{sec:tiling:seigen-results}
-In this section, we report on hundreds of experiments aimed at quantifying the performance improvements obtainable in Seigen by applying sparse tiling. We use the {\tt explosive$\_$source} test case and we explore a large set of parameters, which includes polynomial order, mesh, architecture, fusion scheme, and others. A generalization of the study -- in particular, of the factors limiting sparse tiling -- to different programs is also provided. In the following, a generic instance of {\tt explosive$\_$source} making use of sparse tiling is referred to as a ``tiled version'', otherwise the term ``original version'' is used.
+In this section, we report on hundreds of experiments aimed at quantifying the performance improvements obtainable in Seigen by applying sparse tiling. Using the {\tt explosive$\_$source} test case, we explore a large set of parameters, which includes polynomial order, mesh, node architecture, fusion scheme, and many others. A generalization of this study -- in particular, of the factors limiting sparse tiling -- to different programs is provided. A generic instance of {\tt explosive$\_$source} optimized with sparse tiling will be referred to as a ``tiled version'', otherwise the term ``original version'' will be used.
 
 \subsubsection{Summary of the Attained Speed-ups}
-The support for shared-memory parallelism is discontinued in Firedrake, so only distributed-memory tiled versions were tested. The execution times reported derive from runs at maximum parallelism degree, that is, with 1 MPI process on each physical core. Other types of runs, for instance sequential runs, are less interesting as the tiled versions are almost always outperformed by the original Seigen. This is a results of two main factors: (i) when the bandwidth is shared by a small set of processes, the memory access latency is relatively low; (ii) the memory access pattern is more irregular in the tiled versions, which severely impairs hardware prefetching. 
+The execution times that we report below derive from runs at maximum parallelism degree (i.e., 1 MPI process per physical core). In other types of runs, for instance sequential runs, the tiled versions tend to be outperformed by the original Seigen. This is a consequence of two factors: (i) the memory access latency is not affected if the bandwidth is shared by only a small set of processes; (ii) the memory access pattern is more irregular in the tiled versions, which severely impairs hardware prefetching. 
 
-We here start with showing the maximum speed-ups achieved by the tiled versions on Erebus, CX1-Haswell, and CX1-Ivy. The maximum speed-up was determined by picking the best execution time out of a set of tiled versions, for each node, polynomial order $q$, and mesh. The search for the best tiled version is described in the next section. The results are summarized in Table~\ref{table:seigen-speedups}.
+We here show the maximum speed-ups achieved by applying sparse tiling to Seigen on Erebus, CX1-Haswell, and CX1-Ivy. The maximum speed-ups were determined by picking the best execution time out of a set of tiled versions, for each node architecture, polynomial order $q$, and mesh. The search for the best tiled version is described in the next section. The results are summarized in Table~\ref{table:seigen-speedups}.
 
 \begin{table}[htpb]
 \footnotesize
@@ -1122,17 +1127,41 @@ System & Mesh & $q$ & Time original (s) & Time best tiled (s) & Speed-up  \\
 \hline
 \end{tabulary}
 }
-\caption{Comparison between the original and tiled versions of Seigen on three different platforms. All physical cores are used (1 MPI process per core, no hyperthreading).}
+\caption{Comparison between the original and tiled versions of Seigen on Erebus, CX1-Haswell, and CX1-Ivy. 4 physical cores are used on Erebus, while 20 physical cores are used on both CX1-Haswell and CX1-Ivy.}
 \label{table:seigen-speedups}
 \end{table}
 
-Overall, the performance improvements tend to be greater than 1.10$\times$, and sometimes even exceed 1.20$\times$. In light of the limiting factors discussed in the next sections, this is extremely promising. Indeed, while some of these limiting factors are inherent in the sparse tiling execution model, others are simply due to the current implementation of Seigen/Firedrake, so we envisage ample space for larger improvements. 
+Overall, the performance improvements are greater than 1.10$\times$, and sometimes even exceed 1.20$\times$. In light of the limiting factors discussed in the next sections, this is extremely promising. Indeed, while some of these limiting factors are inherent in the sparse tiling execution model, others are only due to shortcomings of the current implementation. We therefore envisage ample space for larger improvements. 
 
 %Moreover, scaling up to architectures with smaller available bandwidth per core
 
 
-\subsubsection{In-depth Search Space Exploration}
+\subsubsection{Structure of the Search Space Exploration}
+The best tiled version for a specific problem instance was determined empirically, trying all possible combinations of a set of parameters. The space of parameters is summarized below.
 
+\begin{description}
+\item[Fusion scheme] The six fusion schemes studied, {\tt fs}$\lbrace${\tt 1, 2, 3, 4, 5, 6}$\rbrace$, were summarized in Table~\ref{table:seigen-fusion-schemes}.
+\item[Seed tile size] For each {\tt fs} and $q$, three or four tile sizes were tested. Four tile sizes were used with $q \in \lbrace 1, 2\rbrace$. The tile sizes were chosen to maximize the likelihood of a tile to fit in L2 or L3 cache. A less extensive experimentation with adverse tile sizes showed that: (i) a very small tile size causes dramatic slow-downs (up to 8$\times$ slower than the original versions); (ii) larger tile sizes cause proportionately greater slow-downs.
+\item[Indirection maps] Two types of maps were tested: local and global. 
+\item[Partitioning] Two partitioning strategies were tested: {\tt chunk} and {\tt metis}.
+\item[Extended boundary region] Three fusion schemes out of six may benefit from an extended boundary region to minimize redundant computation.
+\end{description}
+
+Software prefetching and a small set of prefetch distances were also tested in a few instances of {\tt explosive$\_$source}, but no significant changes to the execution times were observed. It was decided, therefore, to exclude this parameter from the search space; this made it possible executing the whole test suite in slightly less than five days. 
+
+We know that an {\tt explosive$\_$source} instance is uniquely determined by three parameters:
+
+\begin{description}
+\item[Node architecture] The three systems shown in Table~\ref{table:seigen-setup} were used.
+\item[Polynomial order] $q \in \lbrace 1, 2, 3, 4\rbrace$.
+\item[Mesh] The meshes shown in Table~\ref{table:seigen-meshes} were used, with two meshes for each node architecture.
+\end{description}
+
+Overall, we experimented with $3 \times 4 \times 2 = 24$ {\tt explosive$\_$source} instances. For each of these instances, we tested the original Seigen version and a set of tiled versions. When $q \in \lbrace 1, 2 \rbrace$, a set of tiled version consists of $3 \times 4 \times 2 \times 2 \times 1 + 3 \times 4 \times 2 \times 2 \times 2 = 144$ instances (otherwise, with $q \in \lbrace 3, 4 \rbrace$, the instances are 108). In total, we executed $12 \times (144 + 1) + 12 \times (108 + 1) = 3048$ instances of Seigen. 
+
+Given the large number of problem instances, the search space exploration is organized as follows. We will show one plot for each of the 24 {\tt explosive$\_$source} instances. Each plot illustrates the search space exploration for a given node architecture, mesh and $q$. The execution times of the original version and of a subset of tiled versions are shown. The impact of the indirection maps and the extended boundary region optimization on a tiled version (i.e., a point in a plot) will only be discussed qualitatively; a point, therefore, represents the best execution time out of these two parameters. It is quite straightforward to draw general conclusions about the indirection maps and extended boundary region optimization, so it was decided to remove them from the plots for increased readability. The raw execution times are available at~\cite{seigen-times-raw-values}.
+
+\subsubsection{Results of the Search Space Exploration}
 
 \begin{figure}[htpb]
 \begin{subfigure}[]{1\textwidth}
