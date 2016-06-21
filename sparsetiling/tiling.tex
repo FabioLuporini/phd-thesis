@@ -431,7 +431,7 @@ The pseudo-code for the generalized sparse tiling inspector is showed in Algorit
 \begin{tabulary}{1.0\columnwidth}{C|C}
 \hline
 Symbol & Meaning \\
-\hline \hline
+\hlineB{4}
 $\mathbb{L}$ & The loop chain \\
 $L_j$ & The $j$-th loop in $\mathbb{L}$ \\ 
 $S_j$ & The iteration space of $L_j$ \\
@@ -526,7 +526,7 @@ In the special case in which there is no need to distinguish between core and bo
 \begin{tabulary}{1.0\columnwidth}{P{2.7cm} | P{8.5cm}}
 \hline
 Field & Possible values \\
-\hline
+\hlineB{4}
 {\em region} & core, boundary, non-exec \\
 {\em iterations lists} & one list of iterations $[T_i]_j$ for each $L_j \in \mathbb{L}$\\ 
 {\em local maps} & one list of local maps for each $L_j \in \mathbb{L}$; one local map for each map used in $L_j$\\
@@ -725,7 +725,7 @@ Let $N$ be the maximum size of a set in $\mathbb{L} = [L_0, L_1, ..., L_{n-1}]$ 
 \begin{tabulary}{1.0\columnwidth}{P{2.7cm} | c | c}
 \hline
 Phase & Cost shared memory & Cost distributed memory \\
-\hline
+\hlineB{4}
 Partitioning & $N$ & $N$ \\
 Coloring & $R K $ & $N$ \\ 
 Projection & $R (n M N K^2) $ & $n M N K^2 $ \\ 
@@ -839,7 +839,7 @@ In all experiments presented in this section, the optimal tile size (i.e. the on
 \begin{tabulary}{1.0\columnwidth}{c | c | c}
 \hline
 Matrix name & Execution time reduction & Speed-up  \\
-\hline \hline
+\hlineB{4}
 {\em ldoor} & 40.34 & 12.11 \\
 {\em pwtk} & 38.42 & 11.98 \\
 {\em thermal2} & 25.78 & 11.08 \\
@@ -872,11 +872,11 @@ The values in Table~\ref{table:st-jacobi} do not include the inspection time nec
 \begin{tabulary}{1.0\columnwidth}{c | c | c | c}
 \hline
 Architecture & Implementation & Execution time & Speed-up \\
-\hline \hline
+\hlineB{4}
 \multirow{3}{*}{Westmere} & {\em omp} & 36.87 & 6.43\\
 ~ & {\em mpi} & 31.0 & 7.66 \\
 ~ & {\em tiled} & 26.49 & 8.96 \\
-\hline \hline
+\hline 
 \multirow{3}{*}{Sandy Bridge} & {\em omp} & 30.01 & 6.65 \\
 ~ & {\em mpi} & 24.42 & 8.17 \\
 ~ & {\em tiled} & 20.63 & 9.67 \\
@@ -982,10 +982,10 @@ We devise 6 fusion schemes, based on the following criteria: (i) amount of data 
 \centering
 \makebox[\textwidth][c]
 {
-\begin{tabulary}{1.0\columnwidth}{M{1.2cm} | M{2.0cm} | M{7.2cm} | M{1.7cm} N}
+\begin{tabulary}{1.0\columnwidth}{M{1.2cm} V{4} M{2.0cm} | M{7.2cm} | M{1.7cm} N}
 \hline
 Fusion scheme & $\#$(sub-)loop chains & Criterion & {\em S-depth}  \\
-\hline \hline
+\hlineB{4}
 {\tt fs1} & 3 & Fuse {\tt velocity} cells and facets loops & 2 & \\[5pt] \hline
 {\tt fs2} & 8 & {\tt fs1} and fuse {\tt stress} cells and facets loops & 2 & \\[5pt] \hline
 {\tt fs3} & 6 & {\tt fs2} and fuse some solver loops & 2 & \\[5pt] \hline
@@ -1018,22 +1018,23 @@ Furthermore, several optimizations, applicable to all fusion schemes, were tried
 
 
 \subsubsection{Systems Configuration}
-Extensive experimentation was performed on three Intel architectures, whose specification is detailed in Table~\ref{table:seigen-setup}. 
+Extensive experimentation was performed on two Intel architectures, whose specification is detailed in Table~\ref{table:seigen-setup}. 
 
 \begin{table}[htpb]
 \scriptsize
 \makebox[\textwidth][c]
 {
-\begin{tabulary}{1.2\textwidth}{M{2.2cm} | M{3.1cm} | M{3.1cm} | M{3.1cm} N}
+\begin{tabulary}{1.2\textwidth}{M{2.2cm} V{4} M{4.8cm} | M{4.8cm} N}
 \hline
-System & Erebus & CX1-Haswell & CX1-Ivy \\
-\hline \hline 
-Node & 1x4-core Intel I7-2600 3.4GHz & 2x20-core Intel Xeon E5-2650 2.30GHz & 2x20-core Intel Xeon E5-2660 2.20GHz & \\[15pt] \hline
-Memory & 16GB & 64GB & 64GB & \\[5pt] \hline
-Cache hierarchy & L1=32KB, L2=256KB, L3=8MB (shared) & & & \\[15pt] \hline
-Compilers & Intel {\tt icc} 16.0.2 & Intel {\tt icc} 15.1 & Intel {\tt icc} 15.1 & \\[5pt] \hline
-Compiler flags & {\tt -O3 -xHost -ip} & {\tt -O3 -xHost -ip} & {\tt -O3 -xHost -ip} & \\[5pt] \hline
-MPI version & Open MPI 1.6.5  & Intel MPI 5.1 & Intel MPI 5.1 & \\[5pt] \hline
+System & Erebus & CX1-Ivy \\
+\hlineB{4}
+Node & 1x4-core Intel I7-2600 3.4GHz & 2x20-core Intel Xeon E5-2660 2.20GHz & \\[15pt] \hline
+Memory & 16GB & 64GB & \\[5pt] \hline
+STREAM performance & 18.5 GB/s (4.6 GB/s per core)&  92.0 GB/s (4.6 GB/s per core) & \\[15pt] \hline
+Cache hierarchy & \shortstack{L1=32KB, L2=256KB, L3=8MB\\ L3 is shared} & \shortstack{L1=32KB, L2=256KB, L3=25MB\\L3 is shared per socket (50MB total)} & \\[15pt] \hline
+Compilers & Intel {\tt icc} 16.0.2 & Intel {\tt icc} 15.1 & \\[5pt] \hline
+Compiler flags & {\tt -O3 -xHost -ip} & {\tt -O3 -xHost -ip} & \\[5pt] \hline
+MPI version & Open MPI 1.6.5 & Intel MPI 5.1 & \\[5pt] \hline
 \end{tabulary}
 }
 \caption{Systems specification.}
@@ -1041,7 +1042,7 @@ MPI version & Open MPI 1.6.5  & Intel MPI 5.1 & Intel MPI 5.1 & \\[5pt] \hline
 \end{table}
 
 \subsubsection{Execution Modes}
-Support for shared-memory parallelism is discontinued in Firedrake, so only distributed-memory parallelism was tested. MPI processes were pinned to cores. The hyperthreading technology was not used. Erebus, CX1-Haswell, and CX1-Ivy were unstressed and exclusive access had been obtained when the runs were performed. 
+Support for shared-memory parallelism is discontinued in Firedrake, so only distributed-memory parallelism was tested. MPI processes were pinned to cores. The hyperthreading technology was not used. Erebus and CX1-Ivy were unstressed and exclusive access had been obtained when the runs were performed. 
 
 \subsubsection{Meshes}
 The (average) number of degrees of freedom $d$ assigned to a process mainly depends on the polynomial order $q$, the mesh spacing $h$ and the number of cores $n$ in a node. Meshes are chosen such that: (i) $d$ fits in main memory; (ii) $d$ exceeds the last level of cache; (iii) ${<}d,\ q,\ h{>}$ ensure convergence of the simulation. A summary of the meshes used for experimentation is provided in Table~\ref{table:seigen-meshes}.
@@ -1049,22 +1050,19 @@ The (average) number of degrees of freedom $d$ assigned to a process mainly depe
 \begin{table}[htpb]
 \footnotesize
 \centering
-\begin{tabulary}{1.0\columnwidth}{c | c | c}
+\begin{tabulary}{1.0\columnwidth}{c V{4} c V{4} c | c | c | c V{4} c | c | c | c N}
 \hline
-$n$ & $h$ & $d$  \\
-\hline \hline
-\multirow{4}{*}{\shortstack{4 \\ (Erebus)}} & \multirow{2}{*}{1.0} & \multirow{2}{*}{...} \\
-& & \\
-& \multirow{2}{*}{1.2} & \multirow{2}{*}{...}  \\
-& & \\
-\hline \hline
-\multirow{4}{*}{\shortstack{20 \\ (CX1-Hawell, \\ CX1-Ivy)}} & \multirow{2}{*}{0.6} & \multirow{2}{*}{...} \\
-& & \\
-& \multirow{2}{*}{0.8} & \multirow{2}{*}{...}\\
-& & \\
+\multirow{2}{*}{$n$} & \multirow{2}{*}{$h$}  & \multicolumn{4}{c V{4}}{$d$ {\tt velocity}} & \multicolumn{4}{c}{$d$ {\tt stress}} & \\[4pt] \cline{3-11}
+ & & $q=1$ & $q=2$ & $q=3$ & $q=4$ & $q=1$ & $q=2$ & $q=3$ & $q=4$ & \\[4pt]
+\hlineB{4}
+\rule{0pt}{3ex}  \multirow{2}{*}{4 (Erebus)} & 1.0 & & & & & & & & \\[4pt]
+& 1.2 & & & & & & & & \\[4pt]
+\hline
+\rule{0pt}{3ex}  \multirow{2}{*}{20 (CX1-Ivy)} & 0.6 & 78k & 157k & 262k & 393k & 157k & 314k & 525k & 787k  \\[4pt]
+& 0.8 & 44k & 89k & 149k & 223k & 89k & 178k & 298k & 447k \\[4pt]
 \hline
 \end{tabulary}
-\caption{Summary of the meshes used for single-node experimentation in Seigen.}
+\caption{Summary of the meshes used for single-node experimentation in Seigen. $d$ is the average number of freedom assigned assigned to a process for a given variational form.}
 \label{table:seigen-meshes}
 \end{table}
 
@@ -1091,17 +1089,17 @@ In this section, we report on hundreds of experiments aimed at quantifying the p
 \subsubsection{Summary of the Attained Speed-ups}
 The execution times that we report below derive from runs at maximum degree of parallelism (i.e., 1 MPI process per physical core). In other types of runs, for instance sequential runs, the tiled versions tend to provide no benefits or even be outperformed. This is a consequence of two factors: (i) the memory access latency is only marginally affected if the bandwidth is shared by a small set of processes; (ii) the memory access pattern is more irregular in the tiled versions, which severely impairs hardware prefetching. 
 
-We here show the maximum speed-ups achieved by applying sparse tiling to Seigen on Erebus, CX1-Haswell, and CX1-Ivy. The maximum speed-ups were determined by picking the best execution time out of a set of tiled versions, for each node architecture, polynomial order $q$, and mesh. The search for the best tiled version is described in the next section. The results are summarized in Table~\ref{table:seigen-speedups}.
+We here show the maximum speed-ups achieved by applying sparse tiling to Seigen on Erebus and CX1-Ivy. The maximum speed-ups were determined by picking the best execution time out of a set of tiled versions, for each node architecture, polynomial order $q$, and mesh. The search for the best tiled version is described in the next section. The results are summarized in Table~\ref{table:seigen-speedups}.
 
 \begin{table}[htpb]
 \footnotesize
 \centering
 \makebox[\textwidth][c]
 {
-\begin{tabulary}{1.0\columnwidth}{c || c | c || c | c || c}
+\begin{tabulary}{1.0\columnwidth}{c V{4} c V{4} c V{4} c | c V{4} c}
 \hline
 System & Mesh & $q$ & Time original (s) & Time best tiled (s) & Speed-up  \\ 
-\hline \hline 
+\hlineB{4}
 \multirow{8}{*}{\shortstack{Erebus\\$(n=4)$}} & \multirow{4}{*}{$m_1^p$} & 1 & ... & ... & ... \\ 
  & & 2 & ... & ... & ... \\ 
  & & 3 & ... & ... & ... \\
@@ -1111,17 +1109,7 @@ System & Mesh & $q$ & Time original (s) & Time best tiled (s) & Speed-up  \\
  & & 2 & ... & ... & ... \\ 
  & & 3 & ... & ... & ... \\
  & & 4 & ... & ... & ... \\ 
-\hline \hline
-\multirow{8}{*}{\shortstack{CX1-Hawell\\$(n=20)$}} & \multirow{4}{*}{$m_1^p$} & 1 & ... & ... & ... \\ 
- & & 2 & ... & ... & ... \\ 
- & & 3 & ... & ... & ... \\
- & & 4 & ... & ... & ... \\
- \cline{2-6}
- & \multirow{4}{*}{$m_2^p$} & 1 & ... & ... & ... \\ 
- & & 2 & ... & ... & ... \\ 
- & & 3 & ... & ... & ... \\
- & & 4 & ... & ... & ... \\ 
-\hline \hline
+\hlineB{4}
 \multirow{8}{*}{\shortstack{CX1-Ivy\\$(n=20)$}} & \multirow{4}{*}{$m_1^p$} & 1 & ... & ... & ... \\ 
  & & 2 & ... & ... & ... \\ 
  & & 3 & ... & ... & ... \\
@@ -1134,7 +1122,7 @@ System & Mesh & $q$ & Time original (s) & Time best tiled (s) & Speed-up  \\
 \hline
 \end{tabulary}
 }
-\caption{Comparison between the original and tiled versions of Seigen on Erebus, CX1-Haswell, and CX1-Ivy. 4 physical cores are used on Erebus, while 20 physical cores are used on both CX1-Haswell and CX1-Ivy.}
+\caption{Comparison between the original and tiled versions of Seigen on Erebus (number of processes $n=4$) and CX1-Ivy ($n=20$).}
 \label{table:seigen-speedups}
 \end{table}
 
@@ -1160,14 +1148,14 @@ Software prefetching and a small set of prefetch distances were also tested in a
 An {\tt explosive$\_$source} instance is determined by three parameters:
 
 \begin{description}
-\item[Node architecture] The three systems shown in Table~\ref{table:seigen-setup} were used.
+\item[Node architecture] The two systems shown in Table~\ref{table:seigen-setup} were used.
 \item[Polynomial order] $q \in \lbrace 1, 2, 3, 4\rbrace$.
 \item[Mesh] The meshes shown in Table~\ref{table:seigen-meshes} were used (two meshes for each node architecture).
 \end{description}
 
-Overall, we experimented with $3 \times 4 \times 2 = 24$ {\tt explosive$\_$source} instances. For each of these instances, we tested the original Seigen version and a set of tiled versions. When $q \in \lbrace 1, 2 \rbrace$, a set of tiled version consists of $3 \times 4 \times 2 \times 2 \times 1 + 3 \times 4 \times 2 \times 2 \times 2 = 144$ instances (otherwise, with $q \in \lbrace 3, 4 \rbrace$, the instances are 108). In total, we executed $12 \times (144 + 1) + 12 \times (108 + 1) = 3048$ versions of Seigen. 
+We experimented with $2 \times 4 \times 2 = 16$ {\tt explosive$\_$source} instances. For each of these instances, we tested the original Seigen version and a set of tiled versions. When $q \in \lbrace 1, 2 \rbrace$, a set of tiled version consists of $3 \times 4 \times 2 \times 2 \times 1 + 3 \times 4 \times 2 \times 2 \times 2 = 144$ instances (otherwise, with $q \in \lbrace 3, 4 \rbrace$, the instances are 108). In total, we executed $8 \times (144 + 1) + 8 \times (108 + 1) = 2032$ versions of Seigen. 
 
-Given the large number of problem instances, the search space exploration is organized as follows. We will show one plot for each of the 24 {\tt explosive$\_$source} instances. Each plot illustrates the search space exploration for a given node architecture, mesh and $q$. The execution times of original version and a subset of tiled versions are shown. The impact of both the local/global indirection maps and the extended boundary region optimizations will only be discussed qualitatively; a plot point will represent the best execution time out of these two parameters. This is because it is quite straightforward to draw general conclusions about the effect of these two optimizations, and removing them from the plots could increase readability. The raw execution times are available at~\cite{seigen-times-raw-values}.
+Given the large number of problem instances, the search space exploration is organized as follows. We will show one plot for each of the 16 {\tt explosive$\_$source} instances. Each plot illustrates the search space exploration for a given node architecture, mesh and $q$. The execution times of original version and a subset of tiled versions are shown. The impact of both the local/global indirection maps and the extended boundary region optimizations will only be discussed qualitatively; a plot point will represent the best execution time out of these two parameters. This is because it is quite straightforward to draw general conclusions about the effect of these two optimizations, and removing them from the plots could increase readability. The raw execution times are available at~\cite{seigen-times-raw-values}.
 
 \subsubsection{Results of the Search Space Exploration}
 
