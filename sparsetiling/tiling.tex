@@ -1092,36 +1092,34 @@ The execution times that we report below derive from runs at maximum degree of p
 We here show the maximum speed-ups achieved by applying sparse tiling to Seigen on Erebus and CX1-Ivy. The maximum speed-ups were determined by picking the best execution time out of a set of tiled versions, for each node architecture, polynomial order $q$, and mesh. The search for the best tiled version is described in the next section. The results are summarized in Table~\ref{table:seigen-speedups}.
 
 \begin{table}[htpb]
-\footnotesize
+\small
 \centering
-\makebox[\textwidth][c]
-{
-\begin{tabulary}{1.0\columnwidth}{c V{4} c V{4} c V{4} c | c V{4} c}
+\STautoround*{2}
+\begin{spreadtab}{{tabular}{c V{4} c V{4} c V{4} c | c V{4} c}}
 \hline
-System & Mesh & $q$ & Time original (s) & Time best tiled (s) & Speed-up  \\ 
-\hlineB{4}
-\multirow{8}{*}{\shortstack{Erebus\\$(n=4)$}} & \multirow{4}{*}{$m_1^p$} & 1 & ... & ... & ... \\ 
- & & 2 & ... & ... & ... \\ 
- & & 3 & ... & ... & ... \\
- & & 4 & ... & ... & ... \\
- \cline{2-6}
- & \multirow{4}{*}{$m_2^p$} & 1 & ... & ... & ... \\ 
- & & 2 & ... & ... & ... \\ 
- & & 3 & ... & ... & ... \\
- & & 4 & ... & ... & ... \\ 
-\hlineB{4}
-\multirow{8}{*}{\shortstack{CX1-Ivy\\$(n=20)$}} & \multirow{4}{*}{$m_1^p$} & 1 & ... & ... & ... \\ 
- & & 2 & ... & ... & ... \\ 
- & & 3 & ... & ... & ... \\
- & & 4 & ... & ... & ... \\
- \cline{2-6}
- & \multirow{4}{*}{$m_2^p$} & 1 & ... & ... & ... \\ 
- & & 2 & ... & ... & ... \\ 
- & & 3 & ... & ... & ... \\
- & & 4 & ... & ... & ... \\ 
-\hline
-\end{tabulary}
-}
+@ System & @ Mesh & @ $q$ & @ Time original (s) & @ Time best tiled (s) & @ Speed-up  \\ 
+@ \hlineB{4}
+@ \multirow{8}{*}{\shortstack{Erebus\\$(n=4)$}} & @ \multirow{4}{*}{$h=1.0$} & @ 1 & 687.96 & 596.03 & [-2,0]/[-1,0] \\ 
+@ & @ & @ 2 & 1453.18 & 1200.01 & [-2,0]/[-1,0]  \\ 
+@ & @ & @ 3 & 3570.21 & 2847.36 & [-2,0]/[-1,0] \\
+@ & @ & @ 4 & 1 & 1 & [-2,0]/[-1,0] \\
+@\cline{2-6}
+@ & @ \multirow{4}{*}{$h=1.2$} & @ 1 & 419.43 & 365.39 & [-2,0]/[-1,0] \\ 
+@ & @ & @ 2 & 870.14 & 715.15 & [-2,0]/[-1,0]  \\ 
+@ & @ & @ 3 & 2093.56 & 1658.24 & [-2,0]/[-1,0] \\
+@ & @ & @ 4 & 1 & 1 & [-2,0]/[-1,0] \\
+@\hlineB{4}
+@ \multirow{8}{*}{\shortstack{CX1-Ivy\\$(n=20)$}} & @ \multirow{4}{*}{$h=0.6$} & @ 1 & 1 & 1 & [-2,0]/[-1,0] \\ 
+@ & @ & @ 2 & 1 & 1 & [-2,0]/[-1,0]  \\ 
+@ & @ & @ 3 & 1 & 1 & [-2,0]/[-1,0] \\
+@ & @ & @ 4 & 1 & 1 & [-2,0]/[-1,0] \\
+@\cline{2-6}
+@ & @ \multirow{4}{*}{$h=0.8$} & @ 1 & 1 & 1 & [-2,0]/[-1,0] \\ 
+@ & @ & @ 2 & 1 & 1 & [-2,0]/[-1,0]  \\ 
+@ & @ & @ 3 & 1 & 1 & [-2,0]/[-1,0] \\
+@ & @ & @ 4 & 1 & 1 & [-2,0]/[-1,0] \\
+@ \hline
+\end{spreadtab}
 \caption{Comparison between the original and tiled versions of Seigen on Erebus (number of processes $n=4$) and CX1-Ivy ($n=20$).}
 \label{table:seigen-speedups}
 \end{table}
