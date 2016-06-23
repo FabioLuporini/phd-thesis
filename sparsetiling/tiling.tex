@@ -914,26 +914,26 @@ The Airfoil experiments highlighted that shared-memory parallelism over multi-so
 
 \section{Performance Evaluation - Seigen: an Elastic Wave Equation Solver for Seismological Problems}
 \label{sec:tiling:seigen}
-In this section, we apply sparse tiling to a real-world computation built on top of Firedrake, Seigen. The performance analysis is quite vast and it can be considered an actual methodological contribution of this thesis.
+In this section, we apply sparse tiling to a real-world computation built on top of Firedrake, Seigen. The performance analysis is vast and is actually a methodological contribution of the thesis.
 
 \subsection{Computation}
 \label{sec:tiling:seigen:comp}
 
 \subsubsection{The Seismic Model}
-Seigen is a novel seismological modelling framework capable of solving the elastic wave equation on unstructured meshes. Exploiting the well-known velocity-stress formulation~\citep{Seigen-3}, the seismic model is expressible as two first-order linear PDEs, which we refer to as {\tt velocity} and {\tt stress}. These governing equations are discretized in space through the discontinuous-Galerkin finite element method. The evolution over time is obtained by using a fourth-order explicit leapfrog scheme based on a truncated Taylor series expansion of the velocity and stress fields. The particular choice of spatial and temporal discretizations has been proven to be non-dissipative~\citep{Seigen-1}. More details can be found in~\cite{Seigen-paper}.
+Seigen is a novel seismological modelling framework capable of solving the elastic wave equation on unstructured meshes. Exploiting the well-known velocity-stress formulation~\citep{Seigen-3}, the seismic model is expressible as two first-order linear PDEs, which we refer to as {\tt velocity} and {\tt stress}. These governing equations are discretized in space through the discontinuous-Galerkin finite element method. The evolution over time is obtained by using a fourth-order explicit leapfrog scheme based on a truncated Taylor series expansion of the velocity and stress fields. The particular choice of spatial and temporal discretizations has been proven to be non-dissipative~\citep{Seigen-1}. More details can be found in~\cite{Seigen-paper}. Seigen is part of a larger ecosystem of software for elastic wave modeling, called OPESCI~\citep{opesci-project}. 
 
 \subsubsection{Choice of the Test Case}
-The Seigen framework has been implemented using Firedrake by Christian Jacobs, along with a set of test cases. In this experimentation, we use the {\tt explosive$\_$source} test case. The test cases may differ in various aspects, such as the initial conditions of the system and the way the waves propagate. The same seismological model is used in all test cases, however. From a computational viewpoint, this means that the sequence of loops in a time step is independent of the test case. Consequently, the performance analysis of {\tt explosive$\_$source} in Section~\ref{sec:tiling:seigen-results} is generalizable to the other test cases. In fact, some of the study conclusions appear to be generalizable even to completely different codes. 
+The Seigen framework has been implemented using Firedrake by Christian Jacobs\footnote{Christian Jacobs is a former researcher at Imperial College London, where the development of Seigen took place; he is now a Research Fellow at University of Southampton}, along with a set of test cases. In this experimentation, we use the {\tt explosive$\_$source} test case. The test cases may differ in various aspects, such as the initial conditions of the system and the way the waves propagate. The same seismological model is used in all test cases, however. From a computational viewpoint, this means that the sequence of loops in a time step is independent of the test case. Consequently, the performance analysis of {\tt explosive$\_$source} in Section~\ref{sec:tiling:seigen-results} is generalizable to the other test cases. In fact, some of the conclusions appear to be generalizable even to completely different codes. 
 
 \subsubsection{Implementation}
 In a time loop iteration, eight linear systems need be solved, four from {\tt velocity} and four from {\tt stress}. Each solve consists of three macro-steps (see also Section~\ref{sec:bkg:assembly}): assembling a global matrix $A$; assembling a global vector $b$; computing $x$ in the system $Ax = b$. There are two global ``mass'' matrices, one for {\tt velocity} and one for {\tt stress}. Both matrices are
 \begin{itemize}
-\item Time invariant, so they can be assembled before entering the time loop.
-\item Block-diagonal, as a consequence of the employed spatial discretization; a block belongs to an element in the mesh. The inverse of a block-diagonal matrix is again a block-diagonal matrix, and it can be determined by computing the inverse of each block. The solution of the linear system $Ax = b$, expressible as $x = b A^{-1}$, can therefore be evaluated by looping over the mesh and computing a ``small'' matrix-vector product in each element, where the matrix is a block in $A^{-1}$.
+\item Time invariant, so they are assembled before entering the time loop.
+\item Block-diagonal, as a consequence of the employed spatial discretization; a block belongs to an element in the mesh. The inverse of a block-diagonal matrix is again block-diagonal and is determined by computing the inverse of each block. The solution of the linear system $Ax = b$, expressible as $x = b A^{-1}$, can therefore be evaluated by looping over the mesh and computing a ``small'' matrix-vector product in each element, where the matrix is a block in $A^{-1}$.
 \end{itemize}
-Assembling the global vectors reduces to a set of loops over mesh elements, particularly over cells, interior facets, and exterior facets. Overall, 25 loops are executed in each time loop iteration.
+Assembling the global vectors reduces to a set of loops over mesh elements, particularly over cells, interior facets, and exterior facets. Overall, 25 loops are executed in each time loop iteration. Thanks to the hierarchy of ``software caches'' employed by Firedrake, the translation from mathematical syntax into loops is only performed once. 
 
-Seigen is implemented on top of Firedrake, so most loops are not directly visible in the source code. In particular, all loops arising from the assembly of global vectors (17 in total) are derived automatically from the symbolic specification of {\tt velocity} and {\tt stress}. Thanks to the hierarchy of ``software caches'' employed by Firedrake, the translation from mathematical syntax into loops is performed only once. 
+%Seigen is implemented on top of Firedrake, so most loops are not directly visible in the source code. In particular, all loops arising from the assembly of global vectors (17 in total) are derived automatically from the symbolic specification of {\tt velocity} and {\tt stress}. 
 
 \subsubsection{Application of Sparse Tiling}
 Introducing generalized sparse tiling into Seigen is relatively straightforward. Once the body of the time stepping loop is embedded within a {\em loop$\_$chain} (see Section~\ref{sec:tiling:lcinterface}), only two more features are left: (i) propagating the relevant user input to the {\em loop$\_$chain} (trivial, but fundamental for performance tuning); (ii) setting one or more {\em fusion schemes}. A fusion scheme establishes which sub-sequences of loops within a {\em loop$\_$chain} will be fused and the respective seed tile sizes. By default, all of the 25 loops are fused with a given seed tile size. As we shall see, however, operating with smaller loop chains and heterogeneous tile sizes can be more effective. Hence, specifying multiple fusion schemes is fundamental. For example, the two $[0-11]$ and $[12-24]$ sub-sequences, arising respectively from the {\tt velocity} and {\tt stress} equations, could be treated as two separate loop chains. 
@@ -1018,13 +1018,13 @@ Furthermore, several optimizations, applicable to all fusion schemes, were tried
 
 
 \subsubsection{Systems Configuration}
-Extensive experimentation was performed on two Intel architectures, whose specification is detailed in Table~\ref{table:seigen-setup}. 
+Extensive experimentation was performed on two Intel architectures, whose specification is reported in Table~\ref{table:seigen-setup}. 
 
 \begin{table}[htpb]
 \scriptsize
 \makebox[\textwidth][c]
 {
-\begin{tabulary}{1.2\textwidth}{M{2.2cm} V{4} M{4.8cm} | M{4.8cm} N}
+\begin{tabulary}{1.2\textwidth}{M{2.0cm} V{4} M{4.4cm} | M{5.4cm} N}
 \hline
 System & Erebus & CX1-Ivy \\
 \hlineB{4}
@@ -1035,11 +1035,14 @@ Cache hierarchy & \shortstack{L1=32KB, L2=256KB, L3=8MB\\ L3 is shared} & \short
 Compilers & Intel {\tt icc} 16.0.2 & Intel {\tt icc} 15.1 & \\[5pt] \hline
 Compiler flags & {\tt -O3 -xHost -ip} & {\tt -O3 -xHost -ip} & \\[5pt] \hline
 MPI version & Open MPI 1.6.5 & Intel MPI 5.1 & \\[5pt] \hline
+MPI options & {\tt --bind-to-core} & \shortstack{{\tt I$\_$MPI$\_$DEVICE ssm}\\{\tt I$\_$MPI$\_$PIN yes}\\{\tt I$\_$MPI$\_$PIN$\_$MODE lib}\\{\tt I$\_$MPI$\_$PIN$\_$PROCESSOR$\_$LIST map=bunch}} & \\[35pt] \hline
 \end{tabulary}
 }
 \caption{Systems specification.}
 \label{table:seigen-setup}
 \end{table}
+
+%-genv I_MPI_PIN yes -genv I_MPI_PIN_MODE lib -genv I_MPI_PIN_PROCESSOR_LIST allcores:map=bunch
 
 \subsubsection{Execution Modes}
 Support for shared-memory parallelism is discontinued in Firedrake, so only distributed-memory parallelism was tested. MPI processes were pinned to cores. The hyperthreading technology was not used. Erebus and CX1-Ivy were unstressed and exclusive access had been obtained when the runs were performed. 
@@ -1126,7 +1129,7 @@ We here show the maximum speed-ups achieved by applying sparse tiling to Seigen 
 
 Overall, the performance improvements are greater than 1.10$\times$, and sometimes even exceed 1.20$\times$. In light of the limiting factors discussed in the next sections, this is extremely promising. Indeed, while some of these limiting factors are inherent in the sparse tiling execution model, others are only due to shortcomings of the current implementation. We therefore envisage ample space for larger improvements. 
 
-%Moreover, scaling up to architectures with smaller available bandwidth per core
+%gain grows with q
 
 
 \subsubsection{Structure of the Search Space Exploration}
@@ -1182,8 +1185,8 @@ Given the large number of problem instances, the search space exploration is org
 Our hypothesis was that speed-ups could be achieved as sparse tiling turns data reuse into data locality, thus diminishing the memory pressure and improving the memory latency. The combination of three different analyses provides compelling evidence that this was correct.
 
 \begin{itemize}
-\item The time spent in executing Python code is insignificantly affected by sparse tiling, irrespective of the number of loops fused. This was verified by timing the experiments with just one tile covering the whole iteration space, for several types of loop chains, and then comparing to the case with no sparse tiling. On one hand, loop fusion reduces the number of ``jumps'' between Python and just-in-time compiled code proportionately to the loop chain length. On the other hand, however, the Python processing takes longer when sparse tiling is enabled, as a fused loop must be constructed from the original sequence of loops generated by Firedrake. These two changes appear to neutralize one another's costs.
-\item Several VTune ``general-exploration'' and ``advanced-hotspots'' analyses repeatedly showed that speed-ups derive from increased data locality. This was evident in all types of fusion schemes. For example, consider {\tt fs5} and the loop chain characterized by 3 solver loops for {\tt stress}. VTune clearly shows that the execution time of the second and third loops is much smaller than that of the first loop; in addition, less cache misses occur when loading the data values for the matrix-vector multiplication. Similar evidence arise from fusing cells and facets integral loops.
+\item The time spent in executing Python code is insignificantly affected by sparse tiling, irrespective of the number of loops fused. This was verified by timing the experiments with just one tile covering the whole iteration space, for several types of loop chains, and then comparing to the case with no sparse tiling. On one hand, loop fusion reduces the number of ``jumps'' between Python and just-in-time compiled code proportionately to the loop chain length. On the other hand, the Python processing takes longer when sparse tiling is enabled, as a fused loop must be constructed from the original sequence of loops generated by Firedrake. These two changes appear to neutralize one another's costs.
+\item Several VTune ``general-exploration'' and ``advanced-hotspots'' analyses repeatedly showed that speed-ups derive from increased data locality. This was evident in all types of fusion schemes. For example, consider {\tt fs5} and the loop chain characterized by 3 solver loops for {\tt stress}. VTune shows that the execution time of the second and third loops is much smaller than that of the first loop; in addition, less L3 cache misses occur when loading the data values for the matrix-vector multiplication. Similar evidence arise from fusing cells and facets integral loops, although the gains are less pronounced.
 \item A VTune ``bandwidth analysis'' displays memory usage as a function of application time (in GB/s). By comparing the tiled and non-tiled versions, we observed that the former constantly consumes much less memory bandwidth (for both reads and writes). This suggests that the processes are able to retrieve data from cache more often.
 \end{itemize}
 
