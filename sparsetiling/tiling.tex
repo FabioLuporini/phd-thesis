@@ -810,13 +810,13 @@ All loops in a trace that were created within a {\em loop$\_$chain} scope are sp
 \end{enumerate}
 
 
-\subsection{Firedrake/DMPlex: the S-depth mechanism for MPI}
+\subsection{Firedrake/DMPlex: the S-depth mechanism for Extended Halo Regions}
 \label{sec:tiling:impl-firedrake}
 Firedrake uses DMPlex~\citep{dmplex-cite} to handle meshes. DMPlex is responsible for partitioning, distributing over multiple processes, and locally reordering a mesh. The MPI parallelization is therefore managed through Firedrake/DMPlex.
 
 During the start-up phase, each MPI process receives a contiguous partition of the original mesh from DMPlex. The required PyOP2 sets, which can represent either topological components (e.g., cells, vertices) or function spaces, are created. As explained in Section~\ref{sec:bkg:op2}, these sets distinguish between multiple regions: core, owned, exec, and non-exec. Firedrake initializes the four regions exploiting the information provided by DMPlex. 
 
-To support the loop chain abstraction, Firedrake must be able to allocate arbitrarily deep halo regions. Both Firedrake and DMPlex have been extended to support this feature\footnote{The implementation was mostly carried out by Michael Lange.}. A parameter called {\em S-depth} (the name has historical origins, see for instance~\cite{s-depth-paper}) regulates the extent of the halo regions. A value {\em S-depth}$=n$ indicates the presence of $n$ strips of off-process data elements in each set. The default value is {\em S-depth}$=1$, which enables computation-communication overlap when executing a single loop at the price of a small amount of redundant computation along partition boundaries. This is the default execution model in Firedrake.
+To support the loop chain abstraction, Firedrake must be able to allocate arbitrarily deep halo regions. Both Firedrake and DMPlex have been extended to support this feature\footnote{The implementation was mostly carried out by Michael Lange.}. A parameter called {\em S-depth} (the name has historical origins, see for instance~\cite{s-depth-paper}) regulates the extent of the halo regions. A value {\em S-depth} $=n$ indicates the presence of $n$ strips of off-process data elements in each set. The default value is {\em S-depth} $=1$, which enables computation-communication overlap when executing a single loop at the price of a small amount of redundant computation along partition boundaries. This is the default execution model in Firedrake.
 
 
 \section{Performance Evaluation - Benchmarks}
@@ -1029,7 +1029,7 @@ Extensive experimentation was performed on two Intel architectures, whose specif
 System & Erebus & CX1-Ivy \\
 \hlineB{4}
 Node & 1x4-core Intel I7-2600 3.4GHz & 2x20-core Intel Xeon E5-2660 2.20GHz & \\[15pt] \hline
-Memory & 16GB & 64GB & \\[5pt] \hline
+DRAM & 16 GB & 64 GB & \\[5pt] \hline
 STREAM performance & 18.5 GB/s (4.6 GB/s per core)&  92.0 GB/s (4.6 GB/s per core) & \\[15pt] \hline
 Cache hierarchy & \shortstack{L1=32KB, L2=256KB, L3=8MB\\ L3 is shared} & \shortstack{L1=32KB, L2=256KB, L3=25MB\\L3 is shared per socket (50MB total)} & \\[15pt] \hline
 Compilers & Intel {\tt icc} 16.0.2 & Intel {\tt icc} 15.1 & \\[5pt] \hline
@@ -1158,7 +1158,7 @@ We experimented with $2 \times 4 \times 2 = 16$ {\tt explosive$\_$source} instan
 
 Given the large number of problem instances, the search space exploration is organized as follows. We will show one plot for each of the 16 {\tt explosive$\_$source} instances. Each plot illustrates the search space exploration for a given node architecture, mesh and $q$. The execution times of original version and a subset of tiled versions are shown. The impact of both the local/global indirection maps and the extended boundary region optimizations will only be discussed qualitatively; a plot point will represent the best execution time out of these two parameters. This is because it is quite straightforward to draw general conclusions about the effect of these two optimizations, and removing them from the plots could increase readability. The raw execution times are available at~\cite{seigen-times-raw-values}.
 
-\subsubsection{Results of the Search Space Exploration}
+\subsubsection{Outcome of the Search Space Exploration}
 
 \begin{figure}[htpb]
 \begin{subfigure}[]{1\textwidth}
