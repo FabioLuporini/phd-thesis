@@ -810,7 +810,7 @@ All loops in a trace that were created within a {\em loop$\_$chain} scope are sp
 \end{enumerate}
 
 
-\subsection{Firedrake/DMPlex: the S-depth mechanism for Extended Halo Regions}
+\subsection{Firedrake/DMPlex: the S-depth Mechanism for Extended Halo Regions}
 \label{sec:tiling:impl-firedrake}
 Firedrake uses DMPlex~\citep{dmplex-cite} to handle meshes. DMPlex is responsible for partitioning, distributing over multiple processes, and locally reordering a mesh. The MPI parallelization is therefore managed through Firedrake/DMPlex.
 
@@ -1065,7 +1065,7 @@ The (average) number of degrees of freedom $d$ assigned to a process mainly depe
 & 0.8 & 44k & 89k & 149k & 223k & 89k & 178k & 298k & 447k \\[4pt]
 \hline
 \end{tabulary}
-\caption{Summary of the meshes used for single-node experimentation in Seigen. $d$ is the average number of freedom assigned assigned to a process for a given variational form.}
+\caption{Summary of the meshes used for single-node experimentation in Seigen. $d$ is the average number of degrees of freedom assigned to a process for a given variational form.}
 \label{table:seigen-meshes}
 \end{table}
 
