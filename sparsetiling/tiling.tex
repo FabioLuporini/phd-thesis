@@ -1096,12 +1096,13 @@ In this section, we report on hundreds of experiments aimed at quantifying the p
 \subsubsection{Summary of the Attained Speed-ups}
 The times that we report below derive from runs at maximum degree of parallelism (i.e., 1 MPI process per physical core). In other types of runs, for instance sequential runs, the tiled versions tend to provide no benefits or be outperformed. This is a consequence of two factors: (i) the memory access latency is only marginally affected if a larger proportion of bandwidth is available; (ii) the memory access pattern is more irregular in the tiled versions, which severely impairs hardware prefetching. 
 
-Table~\ref{table:seigen-speedups} reports the completion times ({\em OT}) for the original and tiled versions of Seigen, on both Erebus and CX1-Ivy. For each node architecture, polynomial order $q$ and mesh, the best tiled version time is reported; the search space exploration to determine the best tiled version will be described in the next section. The table also shows the speed-ups for {\em OT}, as $\Omega^{OT}$. Tables~\ref{} and~\ref{} show analogous information for {\em ACT} and {\em ACCT}.
+Table~\ref{table:seigen-speedups} reports the completion times ({\em OT}) for the original and tiled versions of Seigen, on both Erebus and CX1-Ivy. For each node architecture, polynomial order $q$ and mesh, the best tiled version time is reported; the search space exploration to determine the best tiled version will be described in the next section. The speed-up for {\em OT} is indicated as $\Omega^{OT}$. Tables~\ref{table:seigen-speedups-ACT} and~\ref{table:seigen-speedups-ACCT} show analogous information for {\em ACT} and {\em ACCT}.
 
-\begin{table}[htpb]
+\begin{table}[btph]
+\large
 \centering
 %\STautoround*{2}
-\begin{spreadtab}{{tabular}{c V{4} c V{4} c V{4} c | c V{4} c}}
+\begin{spreadtab}{{tabular}{c V{4} c V{4} c V{4} M{2.2cm} | M{2.2cm} V{4} M{2.0cm}}}
 \hline
 @ System & @ Mesh & @ $q$ & @ {\em OT} (s) & @ {\em OT} tiled (s) & @ $\Omega^{OT}$  \\ 
 @ \hlineB{4}
@@ -1112,7 +1113,7 @@ Table~\ref{table:seigen-speedups} reports the completion times ({\em OT}) for th
 @\cline{2-6}
 @ & @ \multirow{4}{*}{$h=1.2$} & @ 1 & 419 & 365 & round([-2,0]/[-1,0],2) \\ 
 @ & @ & @ 2 & 870 & 715 & round([-2,0]/[-1,0],2)  \\ 
-@ & @ & @ 3 & 2093 & 1658 & round([-2,0]/[-1,0],2) \\
+@ & @ & @ 3 & 1937 & 1549 & round([-2,0]/[-1,0],2) \\
 @ & @ & @ 4 & 4110 & 3390 & round([-2,0]/[-1,0],2) \\
 @\hlineB{4}
 @ \multirow{8}{*}{\shortstack{CX1-Ivy\\$(n=20)$}} & @ \multirow{4}{*}{$h=0.6$} & @ 1 & 859 & 813 & round([-2,0]/[-1,0],2) \\ 
@@ -1129,6 +1130,77 @@ Table~\ref{table:seigen-speedups} reports the completion times ({\em OT}) for th
 \caption{Comparing the Seigen completion time {\em OT} on Erebus (number of processes $n=4$) and CX1-Ivy ($n=20$).}
 \label{table:seigen-speedups}
 \end{table}
+
+
+
+\begin{table}[htpb]
+\large
+\centering
+%\STautoround*{2}
+\begin{spreadtab}{{tabular}{c V{4} c V{4} c V{4} M{2.2cm} | M{2.4cm} V{4} M{2.0cm}}}
+\hline
+@ System & @ Mesh & @ $q$ & @ {\em ACT} (s) & @ {\em ACT} tiled (s) & @ $\Omega^{ACT}$  \\ 
+@ \hlineB{4}
+@ \multirow{8}{*}{\shortstack{Erebus\\$(n=4)$}} & @ \multirow{4}{*}{$h=1.0$} & @ 1 & 533 & 455 & round([-2,0]/[-1,0],2) \\ 
+@ & @ & @ 2 & 1252 & 999 &round([-2,0]/[-1,0],2)  \\ 
+@ & @ & @ 3 & 3255 & 2549 & round([-2,0]/[-1,0],2) \\
+@ & @ & @ 4 & 6585 & 5401 & round([-2,0]/[-1,0],2) \\
+@\cline{2-6}
+@ & @ \multirow{4}{*}{$h=1.2$} & @ 1 & 313 & 267 & round([-2,0]/[-1,0],2) \\ 
+@ & @ & @ 2 & 729 & 579 & round([-2,0]/[-1,0],2)  \\ 
+@ & @ & @ 3 & 1746 & 1360 & round([-2,0]/[-1,0],2) \\
+@ & @ & @ 4 & 3837 & 3127 & round([-2,0]/[-1,0],2) \\
+@\hlineB{4}
+@ \multirow{8}{*}{\shortstack{CX1-Ivy\\$(n=20)$}} & @ \multirow{4}{*}{$h=0.6$} & @ 1 & 484 & 448 & round([-2,0]/[-1,0],2) \\ 
+@ & @ & @ 2 &  1149 & 1015 & round([-2,0]/[-1,0],2)  \\ 
+@ & @ & @ 3 & 2740 & 2471 & round([-2,0]/[-1,0],2) \\
+@ & @ & @ 4 & 6354 & 5423 & round([-2,0]/[-1,0],2) \\
+@\cline{2-6}
+@ & @ \multirow{4}{*}{$h=0.8$} & @ 1 & 191 & 175 & round([-2,0]/[-1,0],2) \\ 
+@ & @ & @ 2 & 486 & 434 & round([-2,0]/[-1,0],2)  \\ 
+@ & @ & @ 3 & 1159 & 1068 & round([-2,0]/[-1,0],2) \\
+@ & @ & @ 4 & 2654 & 2307 & round([-2,0]/[-1,0],2) \\
+@ \hline
+\end{spreadtab}
+\caption{Comparing the Seigen average compute time {\em ACT} on Erebus (number of processes $n=4$) and CX1-Ivy ($n=20$).}
+\label{table:seigen-speedups-ACT}
+\end{table}
+
+
+
+\begin{table}[htpb]
+\large
+\centering
+%\STautoround*{2}
+\begin{spreadtab}{{tabular}{c V{4} c V{4} c V{4} M{2.2cm} | M{2.5cm} V{4} M{2.0cm}}}
+\hline
+@ System & @ Mesh & @ $q$ & @ {\em ACCT} (s) & @ {\em ACCT} tiled (s) & @ $\Omega^{ACCT}$  \\ 
+@ \hlineB{4}
+@ \multirow{8}{*}{\shortstack{Erebus\\$(n=4)$}} & @ \multirow{4}{*}{$h=1.0$} & @ 1 & 581 & 503 & round([-2,0]/[-1,0],2) \\ 
+@ & @ & @ 2 & 1334 & 1071 &round([-2,0]/[-1,0],2)  \\ 
+@ & @ & @ 3 & 3438 & 2712 & round([-2,0]/[-1,0],2) \\
+@ & @ & @ 4 & 6881 & 5661 & round([-2,0]/[-1,0],2) \\
+@\cline{2-6}
+@ & @ \multirow{4}{*}{$h=1.2$} & @ 1 & 340 & 293 & round([-2,0]/[-1,0],2) \\ 
+@ & @ & @ 2 & 776 & 618 & round([-2,0]/[-1,0],2)  \\ 
+@ & @ & @ 3 & 1827 & 1437 & round([-2,0]/[-1,0],2) \\
+@ & @ & @ 4 & 3987 & 3265 & round([-2,0]/[-1,0],2) \\
+@\hlineB{4}
+@ \multirow{8}{*}{\shortstack{CX1-Ivy\\$(n=20)$}} & @ \multirow{4}{*}{$h=0.6$} & @ 1 & 638 & 586 & round([-2,0]/[-1,0],2) \\ 
+@ & @ & @ 2 &  1468 & 1336 & round([-2,0]/[-1,0],2)  \\ 
+@ & @ & @ 3 & 3398 & 3087 & round([-2,0]/[-1,0],2) \\
+@ & @ & @ 4 & 7745 & 6649 & round([-2,0]/[-1,0],2) \\
+@\cline{2-6}
+@ & @ \multirow{4}{*}{$h=0.8$} & @ 1 & 230 & 247 & round([-2,0]/[-1,0],2) \\ 
+@ & @ & @ 2 & 603 & 543 & round([-2,0]/[-1,0],2)  \\ 
+@ & @ & @ 3 & 1378 & 1278 & round([-2,0]/[-1,0],2) \\
+@ & @ & @ 4 & 3061 & 2730 & round([-2,0]/[-1,0],2) \\
+@ \hline
+\end{spreadtab}
+\caption{Comparing the Seigen average compute and communication time {\em ACCT} on Erebus (number of processes $n=4$) and CX1-Ivy ($n=20$).}
+\label{table:seigen-speedups-ACCT}
+\end{table}
+
 
 Overall, the performance improvements are greater than 1.10$\times$, and sometimes even exceed 1.20$\times$. In light of the limiting factors discussed in the next sections, this is extremely promising. Indeed, while some of these limiting factors are inherent in the sparse tiling execution model, others are only due to shortcomings of the current implementation. We therefore envisage ample space for larger improvements. 
 
