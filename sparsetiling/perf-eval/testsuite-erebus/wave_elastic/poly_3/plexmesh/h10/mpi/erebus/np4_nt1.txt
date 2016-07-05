@@ -1,0 +1,26 @@
+|         time |          ACT |         ACCT |         mode |     tilesize | partitioning |    extrahalo |      glbmaps |     coloring |     prefetch | 
+-------------------------------------------------------------------------------------------------------------------------------------------------------
+|      2868.22 |     2549.857 |     2712.626 |          fs4 |           60 |        chunk |          yes |          yes |      default |           no | 
+|     2870.124 |     2562.577 |     2718.037 |          fs4 |           45 |        chunk |          yes |          yes |      default |           no | 
+|      2878.75 |     2566.393 |     2726.901 |          fs4 |           75 |        chunk |          yes |          yes |      default |           no | 
+|     2895.517 |     2579.774 |     2746.607 |          fs4 |           60 |        chunk |           no |          yes |      default |           no | 
+|     2902.112 |     2595.531 |     2756.173 |          fs4 |           75 |        chunk |           no |          yes |      default |           no | 
+|      2913.23 |     2588.465 |     2746.375 |          fs4 |           45 |        chunk |           no |          yes |      default |           no | 
+|     2915.768 |     2608.016 |     2772.838 |          fs3 |           60 |        chunk |           no |          yes |      default |           no | 
+|     2918.838 |     2615.188 |     2775.271 |          fs3 |           75 |        chunk |           no |          yes |      default |           no | 
+|     2945.344 |     2615.531 |     2782.797 |          fs3 |           45 |        chunk |           no |          yes |      default |           no | 
+|     2955.225 |     2613.428 |     2797.504 |          fs5 |           45 |        chunk |          yes |          yes |      default |           no | 
+|     2957.201 |     2618.749 |     2799.086 |          fs5 |           60 |        chunk |          yes |          yes |      default |           no | 
+|     2961.102 |     2623.322 |     2800.246 |          fs5 |           75 |        chunk |          yes |          yes |      default |           no | 
+|     2992.318 |     2659.876 |     2838.392 |          fs5 |           75 |        chunk |           no |          yes |      default |           no | 
+|      2999.17 |     2654.824 |     2843.874 |          fs5 |           60 |        chunk |           no |          yes |      default |           no | 
+|      3014.15 |     2656.068 |     2839.726 |          fs5 |           45 |        chunk |           no |          yes |      default |           no | 
+|     3221.126 |     2884.722 |     3059.028 |          fs2 |           60 |        chunk |           no |          yes |      default |           no | 
+|     3228.866 |     2885.606 |     3064.782 |          fs2 |           75 |        chunk |           no |          yes |      default |           no | 
+|     3240.311 |     2877.221 |     3054.927 |          fs2 |           45 |        chunk |           no |          yes |      default |           no | 
+|      3396.61 |     3078.746 |     3258.082 |          fs1 |           75 |        chunk |           no |          yes |      default |           no | 
+|     3396.905 |     3076.831 |     3258.463 |          fs1 |           60 |        chunk |           no |          yes |      default |           no | 
+|      3397.35 |     3080.401 |     3251.432 |          fs1 |           45 |        chunk |           no |          yes |      default |           no | 
+|     3584.813 |     3255.961 |     3438.364 |      untiled |            0 |        chunk |           no |           no |      default |           no | 
+|     3594.708 |     3267.149 |     3448.839 |      untiled |            0 |        chunk |           no |           no |      default |           no | 
+|     3598.607 |     3258.257 |      3449.77 |      untiled |            0 |        chunk |           no |           no |      default |           no | 
