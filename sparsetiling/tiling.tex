@@ -959,8 +959,6 @@ We here discuss computational aspects of the 25 fusible loops. The following con
 
 \item[Exterior facet loops have negligible cost] 3 loops implement the boundary conditions of the variational problems by iterating over the exterior mesh facets. Since a relatively large number of elements in a rectangular mesh is employed, the iteration space of these loops is typically very small, which renders their impact on the completion time essentially negligible.
 
-\item[Cells loops and absorption-effect] 8 loops implement cell integrals, which contribute to the assembly of the 8 global vectors computed in the loop chain. 3 of these loops require evaluating a field, which we informally call {\tt absorption}. In {\tt explosive$\_$source}, and similarly in other test cases, {\tt absorption} is represented by means of a 4th order polynomial in a discontinuous-Galerkin function space. With low values of $q$, a significant fraction of time is spent in the evaluation of {\tt absorption}: the 3 {\tt absorption} loops tend to be compute-bound and to outweigh not only the other 5 cells loops, but also many of the interior facet loops. With high values of $q$, the absorption-effect becomes less relevant. In the following, we will refer to this phenomenon as the ``absorption-effect''. Being time-invariant, the absorption-effect could theoretically be eliminated by pre-computing the field outside of the time loop. Unfortunately, this type of code motion cannot be detected in the current version of Firedrake. 
-
 \item[Data reuse across cells and facets loops] 6 loops iterate over the interior mesh facets to compute so called facet integrals. Facet integrals ensure the transfer of information between adjacent cells in discontinuous-Galerkin methods. The operational intensity of these loops is much lower than that of cells loops, and memory-boundedness is expected. Consecutive facet and cell integrals loops share fields, which creates cross-loop data reuse opportunities. Again, sparse tiling will play a key role in transforming this data reuse into data locality.
 
 \item[Optimizing the operational intensity] All computational kernels generated in Seigen are optimized through COFFEE (Chapters~\ref{ch:optimality},~\ref{ch:lowlevelopt},~\ref{ch:coffee}). In essence: (i) the operation count is minimized by restructuring expressions and loop nests; (ii) auto-vectorization opportunities are created by using array padding and by enforcing data alignment.
@@ -1102,26 +1100,26 @@ Table~\ref{table:seigen-speedups} reports the completion times ({\em OT}) for th
 \large
 \centering
 %\STautoround*{2}
-\begin{spreadtab}{{tabular}{c V{4} c V{4} c V{4} M{2.2cm} | M{2.2cm} V{4} M{2.0cm}}}
+\begin{spreadtab}{{tabular}{c V{4} c V{4} M{0.7cm} V{4} M{2.7cm} | M{2.7cm} V{4} M{1.5cm}}}
 \hline
-@ System & @ Mesh & @ $q$ & @ {\em OT} (s) & @ {\em OT} tiled (s) & @ $\Omega^{OT}$  \\ 
+@ System & @ $h$ & @ $q$ & @ {\em OT} (s) & @ {\em OT} tiled (s) & @ $\Omega^{OT}$  \\
 @ \hlineB{4}
-@ \multirow{8}{*}{\shortstack{Erebus\\$(n=4)$}} & @ \multirow{4}{*}{$h=1.0$} & @ 1 & 687 & 596 & round([-2,0]/[-1,0],2) \\ 
+@ \multirow{8}{*}{\shortstack{Erebus\\$(n=4)$}} & @ \multirow{4}{*}{$1.0$} & @ 1 & 687 & 596 & round([-2,0]/[-1,0],2) \\ 
 @ & @ & @ 2 & 1453 & 1200 &round([-2,0]/[-1,0],2)  \\ 
 @ & @ & @ 3 & 3570 & 2847 & round([-2,0]/[-1,0],2) \\
 @ & @ & @ 4 & 7057 & 5827 & round([-2,0]/[-1,0],2) \\
 @\cline{2-6}
-@ & @ \multirow{4}{*}{$h=1.2$} & @ 1 & 419 & 365 & round([-2,0]/[-1,0],2) \\ 
+@ & @ \multirow{4}{*}{$1.2$} & @ 1 & 419 & 365 & round([-2,0]/[-1,0],2) \\ 
 @ & @ & @ 2 & 870 & 715 & round([-2,0]/[-1,0],2)  \\ 
 @ & @ & @ 3 & 1937 & 1549 & round([-2,0]/[-1,0],2) \\
 @ & @ & @ 4 & 4110 & 3390 & round([-2,0]/[-1,0],2) \\
 @\hlineB{4}
-@ \multirow{8}{*}{\shortstack{CX1-Ivy\\$(n=20)$}} & @ \multirow{4}{*}{$h=0.6$} & @ 1 & 859 & 813 & round([-2,0]/[-1,0],2) \\ 
+@ \multirow{8}{*}{\shortstack{CX1-Ivy\\$(n=20)$}} & @ \multirow{4}{*}{$0.6$} & @ 1 & 859 & 813 & round([-2,0]/[-1,0],2) \\ 
 @ & @ & @ 2 &  1712 & 1585 & round([-2,0]/[-1,0],2)  \\ 
 @ & @ & @ 3 & 3680 & 3378 & round([-2,0]/[-1,0],2) \\
 @ & @ & @ 4 & 8051 & 6962 & round([-2,0]/[-1,0],2) \\
 @\cline{2-6}
-@ & @ \multirow{4}{*}{$h=0.8$} & @ 1 & 396 & 390 & round([-2,0]/[-1,0],2) \\ 
+@ & @ \multirow{4}{*}{$0.8$} & @ 1 & 396 & 390 & round([-2,0]/[-1,0],2) \\ 
 @ & @ & @ 2 & 770 & 721 & round([-2,0]/[-1,0],2)  \\ 
 @ & @ & @ 3 & 1562 & 1457 & round([-2,0]/[-1,0],2) \\
 @ & @ & @ 4 & 3263 & 2931 & round([-2,0]/[-1,0],2) \\
@@ -1137,26 +1135,26 @@ Table~\ref{table:seigen-speedups} reports the completion times ({\em OT}) for th
 \large
 \centering
 %\STautoround*{2}
-\begin{spreadtab}{{tabular}{c V{4} c V{4} c V{4} M{2.2cm} | M{2.4cm} V{4} M{2.0cm}}}
+\begin{spreadtab}{{tabular}{c V{4} c V{4} M{0.7cm} V{4} M{2.7cm} | M{2.7cm} V{4} M{1.5cm}}}
 \hline
-@ System & @ Mesh & @ $q$ & @ {\em ACT} (s) & @ {\em ACT} tiled (s) & @ $\Omega^{ACT}$  \\ 
+@ System & @ $h$ & @ $q$ & @ {\em ACT} (s) & @ {\em ACT} tiled (s) & @ $\Omega^{ACT}$  \\ 
 @ \hlineB{4}
-@ \multirow{8}{*}{\shortstack{Erebus\\$(n=4)$}} & @ \multirow{4}{*}{$h=1.0$} & @ 1 & 533 & 455 & round([-2,0]/[-1,0],2) \\ 
+@ \multirow{8}{*}{\shortstack{Erebus\\$(n=4)$}} & @ \multirow{4}{*}{$1.0$} & @ 1 & 533 & 455 & round([-2,0]/[-1,0],2) \\ 
 @ & @ & @ 2 & 1252 & 999 &round([-2,0]/[-1,0],2)  \\ 
 @ & @ & @ 3 & 3255 & 2549 & round([-2,0]/[-1,0],2) \\
 @ & @ & @ 4 & 6585 & 5401 & round([-2,0]/[-1,0],2) \\
 @\cline{2-6}
-@ & @ \multirow{4}{*}{$h=1.2$} & @ 1 & 313 & 267 & round([-2,0]/[-1,0],2) \\ 
+@ & @ \multirow{4}{*}{$1.2$} & @ 1 & 313 & 267 & round([-2,0]/[-1,0],2) \\ 
 @ & @ & @ 2 & 729 & 579 & round([-2,0]/[-1,0],2)  \\ 
 @ & @ & @ 3 & 1746 & 1360 & round([-2,0]/[-1,0],2) \\
 @ & @ & @ 4 & 3837 & 3127 & round([-2,0]/[-1,0],2) \\
 @\hlineB{4}
-@ \multirow{8}{*}{\shortstack{CX1-Ivy\\$(n=20)$}} & @ \multirow{4}{*}{$h=0.6$} & @ 1 & 484 & 448 & round([-2,0]/[-1,0],2) \\ 
+@ \multirow{8}{*}{\shortstack{CX1-Ivy\\$(n=20)$}} & @ \multirow{4}{*}{$0.6$} & @ 1 & 484 & 448 & round([-2,0]/[-1,0],2) \\ 
 @ & @ & @ 2 &  1149 & 1015 & round([-2,0]/[-1,0],2)  \\ 
 @ & @ & @ 3 & 2740 & 2471 & round([-2,0]/[-1,0],2) \\
 @ & @ & @ 4 & 6354 & 5423 & round([-2,0]/[-1,0],2) \\
 @\cline{2-6}
-@ & @ \multirow{4}{*}{$h=0.8$} & @ 1 & 191 & 175 & round([-2,0]/[-1,0],2) \\ 
+@ & @ \multirow{4}{*}{$0.8$} & @ 1 & 191 & 175 & round([-2,0]/[-1,0],2) \\ 
 @ & @ & @ 2 & 486 & 434 & round([-2,0]/[-1,0],2)  \\ 
 @ & @ & @ 3 & 1159 & 1068 & round([-2,0]/[-1,0],2) \\
 @ & @ & @ 4 & 2654 & 2307 & round([-2,0]/[-1,0],2) \\
@@ -1172,27 +1170,27 @@ Table~\ref{table:seigen-speedups} reports the completion times ({\em OT}) for th
 \large
 \centering
 %\STautoround*{2}
-\begin{spreadtab}{{tabular}{c V{4} c V{4} c V{4} M{2.2cm} | M{2.5cm} V{4} M{2.0cm}}}
+\begin{spreadtab}{{tabular}{c V{4} c V{4} M{0.7cm} V{4} M{2.7cm} | M{2.7cm} V{4} M{1.5cm}}}
 \hline
-@ System & @ Mesh & @ $q$ & @ {\em ACCT} (s) & @ {\em ACCT} tiled (s) & @ $\Omega^{ACCT}$  \\ 
+@ System & @ $h$ & @ $q$ & @ {\em ACCT} (s) & @ {\em ACCT} tiled (s) & @ $\Omega^{ACCT}$  \\
 @ \hlineB{4}
-@ \multirow{8}{*}{\shortstack{Erebus\\$(n=4)$}} & @ \multirow{4}{*}{$h=1.0$} & @ 1 & 581 & 503 & round([-2,0]/[-1,0],2) \\ 
-@ & @ & @ 2 & 1334 & 1071 &round([-2,0]/[-1,0],2)  \\ 
+@ \multirow{8}{*}{\shortstack{Erebus\\$(n=4)$}} & @ \multirow{4}{*}{$1.0$} & @ 1 & 581 & 503 & round([-2,0]/[-1,0],2) \\
+@ & @ & @ 2 & 1334 & 1071 &round([-2,0]/[-1,0],2)  \\
 @ & @ & @ 3 & 3438 & 2712 & round([-2,0]/[-1,0],2) \\
 @ & @ & @ 4 & 6881 & 5661 & round([-2,0]/[-1,0],2) \\
 @\cline{2-6}
-@ & @ \multirow{4}{*}{$h=1.2$} & @ 1 & 340 & 293 & round([-2,0]/[-1,0],2) \\ 
-@ & @ & @ 2 & 776 & 618 & round([-2,0]/[-1,0],2)  \\ 
+@ & @ \multirow{4}{*}{$1.2$} & @ 1 & 340 & 293 & round([-2,0]/[-1,0],2) \\
+@ & @ & @ 2 & 776 & 618 & round([-2,0]/[-1,0],2)  \\
 @ & @ & @ 3 & 1827 & 1437 & round([-2,0]/[-1,0],2) \\
 @ & @ & @ 4 & 3987 & 3265 & round([-2,0]/[-1,0],2) \\
 @\hlineB{4}
-@ \multirow{8}{*}{\shortstack{CX1-Ivy\\$(n=20)$}} & @ \multirow{4}{*}{$h=0.6$} & @ 1 & 638 & 586 & round([-2,0]/[-1,0],2) \\ 
-@ & @ & @ 2 &  1468 & 1336 & round([-2,0]/[-1,0],2)  \\ 
+@ \multirow{8}{*}{\shortstack{CX1-Ivy\\$(n=20)$}} & @ \multirow{4}{*}{$0.6$} & @ 1 & 638 & 586 & round([-2,0]/[-1,0],2) \\
+@ & @ & @ 2 &  1468 & 1336 & round([-2,0]/[-1,0],2) \\
 @ & @ & @ 3 & 3398 & 3087 & round([-2,0]/[-1,0],2) \\
 @ & @ & @ 4 & 7745 & 6649 & round([-2,0]/[-1,0],2) \\
 @\cline{2-6}
-@ & @ \multirow{4}{*}{$h=0.8$} & @ 1 & 230 & 247 & round([-2,0]/[-1,0],2) \\ 
-@ & @ & @ 2 & 603 & 543 & round([-2,0]/[-1,0],2)  \\ 
+@ & @ \multirow{4}{*}{$0.8$} & @ 1 & 230 & 247 & round([-2,0]/[-1,0],2) \\
+@ & @ & @ 2 & 603 & 543 & round([-2,0]/[-1,0],2) \\
 @ & @ & @ 3 & 1378 & 1278 & round([-2,0]/[-1,0],2) \\
 @ & @ & @ 4 & 3061 & 2730 & round([-2,0]/[-1,0],2) \\
 @ \hline
@@ -1273,17 +1271,21 @@ Given the large number of problem instances, the search space exploration is org
 \end{figure}
 
 
+To motivate the performance of the various fusion schemes, PyOP2 was enhanced with a loop chain analyzer capable of estimating the best- and worst-case tile memory footprint, as well as the percentage of data reuse ideally achievable\footnote{It is part of our future plans to move this machinery at the level of SLOPE, where the effects of tile expansion can be taken into account to provide better estimates.}. 
+
 \subsubsection{Testing the Hypothesis}
 Our hypothesis was that speed-ups could be achieved as sparse tiling turns data reuse into data locality, thus diminishing the memory pressure and improving the memory latency. The combination of three different analyses provides compelling evidence that this was correct.
 
 \begin{itemize}
-\item The time spent in executing Python code is marginally affected by sparse tiling, irrespective of the number of loops fused. This was verified by timing the experiments with just one tile covering the whole iteration space, for several types of loop chains, and then comparing to the case with no sparse tiling. On one hand, loop fusion reduces the number of ``jumps'' between Python and just-in-time compiled code proportionately to the loop chain length. On the other hand, the Python processing takes longer when sparse tiling is enabled, as a fused loop must be constructed from the original sequence of loops generated by Firedrake. These two changes appear to neutralize one another's costs.
+\item The time spent in executing Python code is marginally affected by sparse tiling, irrespective of the number of loops fused. This was verified in several ways. First, we timed the experiments with just one tile covering the whole iteration space, for several types of loop chains, and then we compared to the case with no sparse tiling. On one hand, loop fusion reduces the number of ``jumps'' between Python and just-in-time compiled code proportionately to the loop chain length. On the other hand, the Python processing takes longer when sparse tiling is enabled, as a fused loop must be constructed from the original sequence of loops generated by Firedrake. These two changes appear to neutralize one another's costs. Second, we profiled some test cases with Python's cProfile, which gave us exact measurements about how much time is spent in each individual function. Illustrative graphs were produced from these profiles, and are available at~\citep{phd-thesis-repo}. Third, an indirect confirmation derives from the trend of {\em ACT}, which only includes the kernel execution time.
 \item Several VTune ``general-exploration'' and ``advanced-hotspots'' analyses repeatedly showed that speed-ups derive from increased data locality. This was evident in all types of fusion schemes. For example, consider {\tt fs5} and the loop chain characterized by 3 solver loops for {\tt stress}. VTune shows that the execution time of the second and third loops is much smaller than that of the first loop; in addition, less L3 cache misses occur when loading the data values for the matrix-vector multiplication. Similar evidence arise from fusing cells and facets integral loops, although the gains are less pronounced.
 \item A VTune ``bandwidth analysis'' displays memory usage as a function of application time (in GB/s). By comparing the tiled and non-tiled versions, we observed that the former constantly consumes much less memory bandwidth (for both reads and writes). This suggests that the processes are able to retrieve data from cache more often.
 \end{itemize}
 
 \subsubsection{Performance Limiting Factors}
-In this section, we discuss the computational and architectural factors that impair sparse tiling. The following considerations derive from a meticulous study of the data movement in Seigen and extensive profiling through VTune. 
+In this section, we discuss the computational and architectural factors that impair sparse tiling. The following considerations derive from a meticulous study of the data movement in Seigen, the information provided by the loop chain analyzer previously introduced, and extensive profiling through VTune. 
+
+There are two types of performance limiting factors: (i) inherent in the application and its loop chains and (ii) due to flaws or deficiencies in the sparse tiling implementation. We start with point (i).
 
 \begin{description}
 \item[S-depth] As reiterated, a large boundary region enables fusing loops in presence of distributed-memory parallelism. The extent of this region grows proportionally with the number $n$ of fused loops. Unfortunately, this has two undesirable effects. First, the redundant computation overhead tends to be non-negligible if some of the fused loops are compute-bound. Sometimes, the overhead could be even larger than the gain due to increased data locality. Second, the size of an {\em S-level} (a ``strip'' of boundary elements) grows with $n$, as outer levels include more elements than inner levels. This increases not only the amount of redundant computation, but also the volume of data to be communicated. 
@@ -1292,21 +1294,41 @@ In this section, we discuss the computational and architectural factors that imp
 
 \item[Some solver loops are too far away in the loop chain] We know that amongst the {\tt velocity} solver loops, and analogously amongst the {\tt stress} solver loops, there is substantial data reuse. Unfortunately, these loops are relatively far from each other in the loop chain. For example, the first and second {\tt velocity} loops are separated by 8 loops. Turning data reuse into data locality is in this case cumbersome, since long loop chains suffer from the {\em S-depth} (discussed earlier) and the constrained tile size (discussed next) issues.
 
-\item[Constrained tile size] The memory footprint of a tile grows quite rapidly with the number of fused loops. In particular, the matrices accessed in the {\tt velocity} and {\tt stress} solver loops have a considerable size. The larger the memory footprint, the smaller the tile size to fit in cache. Allocating small tiles has multiple implications. First, the proportion of iterations lying on the border is often significant, which makes tile expansion (see Section~\ref{sec:tiling:examples}) more aggressive and thus affects data locality. Using small tiles also impairs hardware prefetching, since the virtual addresses streams are more irregular. Moreover, more tiles are needed to cover an iteration space. In the case of shared-memory parallelism, the larger the number of tiles, the higher the probability of detecting a coloring conflict, which results in higher inspection costs.
+\item[Constrained tile size] The memory footprint of a tile grows quite rapidly with the number of fused loops. In particular, the matrices accessed in the {\tt velocity} and {\tt stress} solver loops have considerable size. The larger the memory footprint, the smaller the tile size to fit in cache. Allocating small tiles has multiple implications. First, the proportion of iterations lying on the border is often significant, which worsen tile expansion (see Section~\ref{sec:tiling:examples}) thus affecting data locality. Using small tiles also impairs hardware prefetching, since the virtual addresses streams are more irregular. Moreover, more tiles are needed to cover an iteration space. In the case of shared-memory parallelism, the larger the number of tiles, the higher the probability of detecting a coloring conflict, which results in higher inspection costs.
 
 \item[Limited data reuse in small loop chains] With a large memory footprint, a fusion scheme with multiple, short loop chains (e.g., 2-3 loops each) could appear, at first glance, more promising: the data reuse in consecutive loops could be turned into data locality by using a small {\em S-depth} and relatively big tiles, hence mitigating most of the aforementioned issues. However, other problems arise. By limiting the extent of a loop chain, it may not be possible to fuse some of the {\tt velocity} and {\tt stress} solver loops. These loops are memory-bound, share a significant volume of data, and have a considerable impact on the execution time, so sparse tiling could provide substantial benefits. A second issue is inherent to the fact that data reuse is much smaller in short loop chains. Consider two loops $L_x$ and $L_y$, respectively over cells and interior facets. For a given tile, during the execution of iterations from $L_x$, new fields and indirection maps are loaded from memory into cache. When executing iterations from $L_y$, new indirection maps need be fetched from memory (since $L_y$ has a different iteration space than $L_x$, hence different maps). Locality on the shared data values is then exploitable, but it is evident that the ratio data reuse over total data movement could, in some cases, really be small.
-
-\item[Absorption-effect] The absorption-effect was discussed in Section~\ref{sec:tiling:seigen:comp}. This is responsible for the compute-boundedness of some loops when $q$ is low. We expect larger performance gains once this problem is eliminated: the memory footprint will remain the same, whereas the operation count will be considerably smaller. The changes required by the Firedrake abstraction are however not straightforward.
-
-\item[TLB misses] A translation lookaside buffer (TLB) miss occurs whenever the CPU cannot retrieve the physical page corresponding to a virtual page. Since the TLB has a hierarchical structure, handling a TLB miss usually requires multiple accesses to memory. Hence, TLB misses are much more costly than cache misses. Sparse tiling increases the TLB miss/hit ratio. This is evident (and more pronounced) when the tile size is small, in which a case a TLB miss is likely to occur when jumping to executing a new loop. The problem is exacerbated when relying on {\tt metis} partitioning, which leads to irregular tile shapes. Here, tile expansion may eventually incorporate iterations living in completely different virtual pages. VTune experimentation with $q=1$ and $q=2$ versions of {\tt explosive$\_$source} clearly showed that {\tt chunk}- and {\tt metis}-based sparse tiling suffers from an increase in TLB misses of roughly 16$\%$ and 35$\%$, respectively.
 \end{description}
 
-These performance limiting factors arose in Seigen, but most of them are generalizable to other applications. 
+It is not unreasonable to expect some of these limiting factors to arise in other applications. 
+
+Further issues are implementation-related (point (ii) above):
+
+\begin{description}
+\item[TLB misses] A translation lookaside buffer (TLB) miss occurs whenever the CPU cannot retrieve the physical page corresponding to a virtual page. Since the TLB has a hierarchical structure, handling a TLB miss usually requires multiple accesses to memory. Hence, TLB misses are much more costly than cache misses. Sparse tiling increases the TLB miss/hit ratio. This is evident (and more pronounced) when the tile size is small, in which case a TLB miss is likely to occur when jumping to executing a new loop. The problem is exacerbated by {\tt metis} partitioning, which leads to irregular tile shapes. Here, tile expansion may eventually incorporate iterations living in completely different virtual pages. VTune experimentation with $q=1$ and $q=2$ versions of {\tt explosive$\_$source} showed that {\tt chunk}- and {\tt metis}-based sparse tiling suffer from an increase in TLB misses of roughly 16$\%$ and 35$\%$, respectively. To mitigate this issue, larger virtual pages could be used. Linux's Transparent Huge Pages, if enabled, automatically allocates memory in virtual pages of 2MB (instead of the default 4KB) as long as the base address is properly aligned. As future work, Firedrake could be extended by instantiating 2MB-aligned Numpy arrays; this is not straightforward as arbitrary alignment cannot be specified through the default Numpy interface.
+
+\item[Tile shape and expansion] The {\tt chunk} partitioning strategy, applied on top of the reverse Cuthill–McKee (RCM) algorithm used in Firedrake for mesh renumbering, leads to thin, rectangular tiles. As explained, this maximizes the fraction of iterations on the tile border, which in turn affects data reuse. The {\tt metis} partitioning strategy did not help, for the reasons explained above. A possible solution to this issue would consist of using a Hilbert curve for mesh renumbering, and then {\tt chunk} partitioning on top of it. This would minimize tile expansion while avoiding most of the negative low level implications (i.e., prefetching, TLB misses). 
+
+\end{description}
 
 \section{Conclusions and Future Work}
-Sparse tiling, and more generally time tiling, aim to turn the data reuse in a sequence of loops into data locality. In this chapter, three main problems have been addressed: the generalization of sparse tiling to arbitrary sequences of irregular loops through the loop chain abstraction; automation via DSLs; effective support for shared- and distributed-memory parallelism. The major strength of this work lies in the fact that all algorithmic and technological contributions derive from an in-depth study of real-world applications. The performance issues arose by Seigen would have never been exposed if a set of more or less simplistic benchmarks had instead been used. Our research could be in this sense inspirational: experimentation limited to ``toy programs'' or proxy applications can be dramatically misleading.
+Sparse tiling, and more generally time tiling, aim to turn the data reuse in a sequence of loops into data locality. In this chapter, three main problems have been addressed: the generalization of sparse tiling to arbitrary sequences of irregular loops through the loop chain abstraction; automation via DSLs; effective support for shared- and distributed-memory parallelism. The major strength of this work lies in the fact that all algorithmic and technological contributions derive from an in-depth study of real-world applications. The performance issues we found through Seigen would have never been exposed by a set of simplistic benchmarks, as often used in the literature. 
+%Hopefully, the methodology presented in this chapter will be in this sense inspirational.
 
-Extensive experimentation is the most impelling need of this research. Although the thorough performance analysis of Seigen has shed many lights on sparse tiling, testing other applications is fundamental to characterize and stretch the limits of this optimization. Unfortunately, this type of analyses require a great deal of effort. Yet another open question of this chapter concerns the mesh numbering. The {\tt chunk} and {\tt metis} partitioning strategies were tested. Our hypothesis, however, is that much higher gains can be obtained by using Hilbert curves. These particular space-filling curves are extremely likely to improve the tile shape and to mitigate the performance penalties due to TLB misses and ineffective hardware prefetching. Finally, a requirement of this work is the definition of a cost model to automatically derive fusion schemes or to drive auto-tuning systems. This is essential for a widespread adoption of sparse tiling.
+Extensive experimentation is the most impelling need of this research. We carried out a thorough performance analysis of Seigen, which has shed many lights on sparse tiling. However, to characterize and stretch the limits of this optimization two items are still missing:
+\begin{description}
+\item[Multi-node experiments] The more aggressive fusion schemes, which make use of extended halo regions, may be affected or take advantage from network communication. Other issues or potentials inherent in sparse tiling could be disclosed. Multi-node experiments have highest priority.
+\item[Other applications] Seigen was attractive for its long sequence of loops, which provides a complex, realistic scenario for testing sparse tiling. It would be particularly interesting to experiment with other explicit high-order discontinuous-Galerkin methods. Another class of appealing loop chains arise in matrix-free solvers.
+%, since compelling evidence that the performance gain grows with the memory footprint was provided
+\end{description}
+
+In the longer term, our ambition is to work around the implementation-related performance limiting factors described in the previous section. We believe that using Hilbert curve may lead to a better tile shape, thus mitigating the performance penalties due to tile expansion, TLB misses and hardware prefetching. 
+
+Shared-memory parallelism was not as carefully tested as distributed-memory parallelism. First of all, we would like to replace the current OpenMP implementation in SLOPE with the MPI Shared Memory (SHM) model introduced in MPI-3. Not only does a unified programming model provide significant benefits in terms of maintainability and complexity, but the performance may also be greater as suggested by recent developments in the PETSc community. Secondly, some extra work would be required for a fair comparison of this new hybrid MPI+MPI programming model with and without sparse tiling.
+
+The experimentation was carried out on a number of ``conventional'' Intel Xeon architectures. Intel's Knights Landing and IBM's POWER8 have more bandwidth than a standard Xeon x86, but also a significantly larger number of cores and sockets. General-purpose many-core architectures might play a key role in next-generation high performance computing, so the same performance analysis in Section~\ref{sec:tiling:seigen} should be repeated on these systems.
+
+Finally, for a widespread adoption of sparse tiling, a cost model for automatic derivation of fusion schemes and tile sizes is still missing.
+
 
 % shared memory runs
 % multi node runs ?
