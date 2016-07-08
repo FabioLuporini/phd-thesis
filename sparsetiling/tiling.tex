@@ -931,7 +931,7 @@ In a time loop iteration, eight linear systems need be solved, four from {\tt ve
 \item Time invariant, so they are assembled before entering the time loop.
 \item Block-diagonal, as a consequence of the employed spatial discretization; a block belongs to an element in the mesh. The inverse of a block-diagonal matrix is again block-diagonal and is determined by computing the inverse of each block. The solution of the linear system $Ax = b$, expressible as $x = b A^{-1}$, can therefore be evaluated by looping over the mesh and computing a ``small'' matrix-vector product in each element, where the matrix is a block in $A^{-1}$.
 \end{itemize}
-Assembling the global vectors reduces to a set of loops over mesh elements, particularly over cells, interior facets, and exterior facets. Overall, 25 loops are executed in each time loop iteration. Thanks to the hierarchy of ``software caches'' employed by Firedrake, the translation from mathematical syntax into loops is only performed once. 
+Assembling the global vectors reduces to a set of loops over mesh elements, particularly over cells, interior facets, and exterior facets. Overall, 25 loops are executed in a time loop iteration. Thanks to the hierarchy of ``software caches'' employed by Firedrake, the translation from mathematical syntax into loops is only performed once. 
 
 %Seigen is implemented on top of Firedrake, so most loops are not directly visible in the source code. In particular, all loops arising from the assembly of global vectors (17 in total) are derived automatically from the symbolic specification of {\tt velocity} and {\tt stress}. 
 
@@ -945,7 +945,7 @@ Seigen has several mechanisms to validate the correctness of the seismological m
 There are two parameters that we can vary in {\tt explosive$\_$source}: the polynomial order of the method and the input mesh. 
 
 \begin{description}
-\item[Polynomial order $q$] We will test the spectrum $q \in \lbrace 1, 2, 3, 4 \rbrace$. For testing higher polynomial orders, changes to both the spatial and temporal discretizations would be necessary. For the spatial discretization, the most obvious choice would be tensor product function spaces. This functionality is currently under development in Firedrake.
+\item[Polynomial order $q$] We will test the spectrum $q \in \lbrace 1, 2, 3, 4 \rbrace$. For testing higher polynomial orders, changes to both the spatial and temporal discretizations would be necessary. For the spatial discretization, the most obvious choice would be tensor product function spaces. However, this functionality is still under development in Firedrake.
 \item[Mesh] We use as input a two-dimensional rectangular mesh of fixed size 300$\times$150. We will vary the mesh spacing $h$, which impacts the number of elements in the domain.
 \end{description}
 
@@ -957,9 +957,9 @@ We here discuss computational aspects of the 25 fusible loops. The following con
 
 \item[Data reuse across solvers] 8 ``solver'' loops perform matrix-vector multiplications in each mesh element. It is well established that this kind of linear algebra operations are memory-bound. 4 of these loops arise from {\tt velocity}, the others from {\tt stress}. There is significant data reuse amongst the 4 {\tt velocity} loops and amongst the 4 {\tt stress} loops, since the same blocks in the global inverse matrices are accessed. We hypothesize performance gains if these loops were fused through sparse tiling.
 
-\item[Exterior facet loops have negligible cost] 3 loops implement the boundary conditions of the variational problems by iterating over the exterior mesh facets. Since a relatively large number of elements in a rectangular mesh is employed, the iteration space of these loops is typically very small, which renders their impact on the completion time essentially negligible.
+\item[Exterior facet loops have negligible cost] 3 loops implement the boundary conditions of the variational problems by iterating over the exterior mesh facets. The impact of these loops on the completion time is negligible, since their iteration space is order of magnitude smaller than that of cells and facets loops.
 
-\item[Data reuse across cells and facets loops] 6 loops iterate over the interior mesh facets to compute so called facet integrals. Facet integrals ensure the transfer of information between adjacent cells in discontinuous-Galerkin methods. The operational intensity of these loops is much lower than that of cells loops, and memory-boundedness is expected. Consecutive facet and cell integrals loops share fields, which creates cross-loop data reuse opportunities. Again, sparse tiling will play a key role in transforming this data reuse into data locality.
+\item[Data reuse across cells and facets loops] 6 loops iterate over the interior mesh facets to compute so called facet integrals. Facet integrals ensure the propagation of information between adjacent cells in discontinuous-Galerkin methods. The operational intensity of these loops is much lower than that of cells loops, and memory-boundedness is expected. Consecutive facet and cell integrals loops share fields, which creates cross-loop data reuse opportunities. Again, sparse tiling might play a key role in transforming this data reuse into data locality.
 
 \item[Optimizing the operational intensity] All computational kernels generated in Seigen are optimized through COFFEE (Chapters~\ref{ch:optimality},~\ref{ch:lowlevelopt},~\ref{ch:coffee}). In essence: (i) the operation count is minimized by restructuring expressions and loop nests; (ii) auto-vectorization opportunities are created by using array padding and by enforcing data alignment.
 \end{description}
@@ -1012,7 +1012,7 @@ Furthermore, several optimizations, applicable to all fusion schemes, were tried
 
 
 
-\subsubsection{Systems Configuration}
+\subsubsection{Systems Configuration and Execution Modes}
 Extensive experimentation was performed on two Intel architectures, whose specification is reported in Table~\ref{table:seigen-setup}. 
 
 \begin{table}[htpb]
@@ -1037,9 +1037,6 @@ MPI options & {\tt --bind-to-core} & \shortstack{{\tt I$\_$MPI$\_$DEVICE ssm}\\{
 \label{table:seigen-setup}
 \end{table}
 
-%-genv I_MPI_PIN yes -genv I_MPI_PIN_MODE lib -genv I_MPI_PIN_PROCESSOR_LIST allcores:map=bunch
-
-\subsubsection{Execution Modes}
 Support for shared-memory parallelism is discontinued in Firedrake, so only distributed-memory parallelism was tested. MPI processes were pinned to cores. The hyperthreading technology was not used. Erebus and CX1-Ivy were unstressed and exclusive access had been obtained when the runs were performed. 
 
 \subsubsection{Meshes}
@@ -1070,13 +1067,13 @@ The (average) number of degrees of freedom $d$ assigned to a process mainly depe
 For each experiment, we collect three measurements.
 
 \begin{description}
-\item[Overall completion time (OT)] Used to compute the maximum application speed-up due to applying sparse tiling. 
+\item[Overall completion time (OT)] Used to compute the maximum application speed-up by applying sparse tiling. 
 \item[Average compute time (ACT)] Sparse tiling impacts the kernel execution time by increasing data locality. For more aggressive fusion schemes, it also impacts communication: the rounds of communication decrease, while the volume of data exchanged may increase. ACT isolates the gain due to increased data locality from (i) the communication cost and (ii) any other action performed in Firedrake (i.e., executing Python) between the invocation of kernels. This value is averaged across the MPI ranks.
 \item[Average compute and communication time (ACCT)] With respect to ACT, ACCT also includes the communication cost. By comparing ACCT and ACT, the MPI overhead can be isolated. 
 \end{description}
 As we shall see, all of these metrics are essential for a complete understanding of the sparse tiling performance. It is true that for much larger meshes ACT and ACCT should converge to OCT, but such an experimentation is not feasible as it would require weeks, possibly months, of compute time.
 
-To collect {\em OT, ACT} and ACCT, the following configuration was used.
+To collect OT, ACT and ACCT, the following configuration was used.
 \begin{itemize}
 \item All experiments were executed with ``warm cache''; that is, with all kernels retrieved directly from the Firedrake's cache, so code generation and compilation times are not counted.
 \item All of the non-tiled {\tt explosive$\_$source} tests were repeated three times. The sparse tiling search space is big (the product of all $q$, fusion schemes, tile sizes, meshes and a set of additional optimizations) and some tests can last longer than a hour, so for practical reasons the tiled {\tt explosive$\_$source} tests were repeated two times, instead of three. The minimum times are reported (negligible variance).
