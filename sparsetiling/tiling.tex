@@ -365,7 +365,7 @@ In Figure~\ref{fig:st-mpi-init}, a mesh is partitioned over two processes and a 
 \begin{figure}[thpb]
 \centering
 \includegraphics[scale=0.6]{sparsetiling/figures/mpi_loop0.pdf}
-\caption{A snapshot of the two mesh partitions on {\tt Process 0} and {\tt Process 1} after inspecting the seed loop $L_0$ for distributed-memory parallelism. On each process, there are 5 tiles in total: 2 in the core region (green and violet), 2 in the boundary region (red and light blue), and $T_{ne}$. The boundary tiles can safely cross the owned and exec sub-regions (i.e., the private local iterations and the iterations to be redundantly computed, respectively). However, no tile can include iterations from both the core and the boundary regions. }
+\caption{A snapshot of the two mesh partitions on {\tt Process 0} and {\tt Process 1} after inspecting the seed loop $L_0$ for distributed-memory parallelism. On each process, there are five tiles in total: two in the core region (green and violet), two in the boundary region (red and light blue), and $T_{ne}$. The boundary tiles can safely cross the owned and exec sub-regions (i.e., the private local iterations and the iterations to be redundantly computed, respectively). However, no tile can include iterations from both the core and the boundary regions. }
 \label{fig:st-mpi-init}
 \end{figure}
 
@@ -971,6 +971,7 @@ We here discuss computational aspects of the 25 fusible loops. The following con
 
 
 \subsubsection{Fusion Schemes and Attempted Optimizations}
+\label{sec:tiling:seigen:opts}
 The generality of the sparse tiling algorithms, the flexibility of the {\em loop$\_$chain} interface, and the {\em S-depth} mechanism made it possible to experiment with a variety of fusion schemes without changes to the source code. 
 
 Five fusion schemes were devised, based on the following criteria: (i) amount of data reuse in the loop chain(s), (ii) extent of the boundary region/amount of redundant computation, (iii) memory footprint of the loop chain(s) -- the larger, the smaller the tile size to fit in cache. The fusion schemes are summarized in Table~\ref{table:seigen-fusion-schemes}, while the full specification is available at~\cite{seigen-code}.
@@ -1087,9 +1088,17 @@ To collect {\em OT, ACT} and ACCT, the following configuration was used.
 
 
 
-\subsection{Results}
+\subsection{Results and Analysis}
 \label{sec:tiling:seigen-results}
-In this section, we report on hundreds of experiments aimed at quantifying the performance improvements in Seigen due to sparse tiling. Using the {\tt explosive$\_$source} test case, we explore a large set of parameters, which includes polynomial order, mesh, node architecture, fusion scheme, and many others. A generalization of this study -- in particular, of the factors limiting sparse tiling -- to different programs is provided. A generic instance of {\tt explosive$\_$source} optimized with sparse tiling will be referred to as a ``tiled version'', otherwise the term ``original version'' will be used.
+In this section, we report on hundreds of experiments aimed at quantifying the performance improvements in Seigen due to sparse tiling. Using the {\tt explosive$\_$source} test case, we explore a large set of parameters, which includes polynomial order, mesh, node architecture, fusion scheme, and many others. A generalization of this study -- in particular, of the factors limiting sparse tiling -- to different programs is provided. A generic instance of {\tt explosive$\_$source} optimized with sparse tiling will be referred to as a ``tiled version'', otherwise the term ``original version'' will be used. The structure of this section is as follows:
+
+\begin{enumerate}
+\item We start with an overview of the maximum speed-ups obtained through sparse tiling. Some preliminary observations are made.
+\item We delineate the structure of the search space exploration for sparse tiling. 
+\item We motivate, in detail, through plots and the {\it loop chain analyzer} tool, the performance of the various fusion schemes and optimizations attempted.
+\item We provide further evidence from profiler reports.
+\item We comment on the performance bottlenecks introduced by sparse tiling.
+\end{enumerate}
 
 \subsubsection{Summary of the Attained Speed-ups}
 The times that we report below derive from runs at maximum degree of parallelism (i.e., 1 MPI process per physical core). In other types of runs, for instance sequential runs, the tiled versions tend to provide no benefits or be outperformed. This is a consequence of two factors: (i) the memory access latency is only marginally affected if a larger proportion of bandwidth is available; (ii) the memory access pattern is more irregular in the tiled versions, which severely impairs hardware prefetching. 
@@ -1214,14 +1223,14 @@ Before diving into explanations, these tables already lead to some preliminary o
 %The search for the best tiled version is described in the next section. 
 
 \subsubsection{Structure of the Search Space Exploration}
-The best tiled version for a specific problem instance was determined empirically, trying all possible combinations of a set of parameters. The space of parameters is summarized below.
+The best tiled version for a specific problem instance was determined empirically, trying all possible combinations of a set of parameters. The space of parameters was described in Section~\ref{sec:tiling:seigen:opts} and is summarized below.
 
 \begin{description}
 \item[Fusion scheme] Five fusion schemes ({\tt fs$X$, $X \in \lbrace 1, 2, 3, 4, 5\rbrace$}) were studied, as summarized in Table~\ref{table:seigen-fusion-schemes}.
 \item[Seed tile size] For each {\tt fs} and $q$, three or four tile sizes were tested. Four tile sizes were used with $q \in \lbrace 1, 2\rbrace$. The tile sizes were chosen to maximize the likelihood of fitting in L2 or L3 cache. A less extensive experimentation with ``more adverse'' tile sizes showed that: (i) a very small value causes dramatic slow-downs (up to 8$\times$ slower than the original versions); (ii) larger values cause proportionately greater slow-downs.
 \item[Indirection maps] Both local and global maps were tested.
 \item[Partitioning] Two partitioning strategies were tested: {\tt chunk} and {\tt metis}.
-\item[Extended boundary region] All experiments were repeated with and without the extended boundary region optimization discussed earlier.
+\item[Extended boundary region] All experiments were repeated with and without the extended boundary region optimization discussed in Section~\ref{sec:tiling:seigen:opts}.
 %Two fusion schemes out of six may benefit from an extended boundary region to minimize redundant computation.
 \end{description}
 
@@ -1279,21 +1288,28 @@ Given the large number of problem instances, the search space exploration is org
 \end{figure}
 
 
-PyOP2 was enhanced with a \textit{loop chain analyzer} (LCA) capable of estimating the best- and worst-case tile memory footprint, as well as the percentage of data reuse ideally achievable\footnote{It is part of our future plans to move this machinery at the level of SLOPE, where the effects of tile expansion can be taken into account to provide better estimates.}. We use this tool, as well as Intel VTune, to motivate the performance achieved.
+PyOP2 was enhanced with a \textit{loop chain analyzer} (LCA) capable of estimating the best- and worst-case tile memory footprint, as well as the percentage of data reuse ideally achievable\footnote{It is part of our future plans to move this machinery into SLOPE, where the effects of tile expansion can be taken into account to provide better estimates.}. We use this tool, as well as Intel VTune, to motivate the performance achieved.
 
-Figure~\ref{fig:st-erebus-expl} and~\ref{fig:st-cx1-expl} illustrate the search space exploration on Erebus and CX1-Ivy, respectively. For reference, the ACCT of the original version is also reported (in red, null tile size). The general trend of the search space exploration is as follows:
+Figure~\ref{fig:st-erebus-expl} and~\ref{fig:st-cx1-expl} illustrate the search space exploration on Erebus and CX1-Ivy, respectively. For reference, the ACCT of the original version is also reported (in red, null tile size). The general trend of the search space exploration is as follows.
 \begin{itemize}
-\item {\tt fs}, unsurprisingly, is the parameter having largest impact on the ACCT. By influencing the fraction of data reuse convertible into data locality, the amount of redundant computation and the data volume exchanged, fusion schemes play a fundamental role in sparse tiling. This makes automation much more than a desired feature: without any change to the source code, many fusion and tiling strategies could be be studied and tuned. Automation is one of our major contributions, and this performance exploration justifies the implementation effort. 
-\item There is a non-trivial relationship between $ACCT$, $q$ and {\tt fs}. The aggressive fusion schemes are more effective with high $q$ -- that is, with larger memory footprints -- while they tend to be less efficient, or even deleterious, when $q$ is low. The extreme case is {\tt fs5}, which fuses two long sequences of loops (twelve and thirteen loops each). In Figure~\ref{fig:st-erebus-expl} (Erebus), {\tt fs5} is never a winning choice, although the difference between {\tt fs3}/{\tt fs4} and {\tt fs5} decreases as $q$ grows. In Figure~\ref{fig:st-cx1-expl-h08} (CX1-Ivy), instead, this phenomenon is even more pronounced. While with $q=2$ {\tt fs4} was almost 1.10$\times$ faster than the best {\tt fs5}, with $q=3$ the difference was only 1.04$\times$, and with $q=4$ {\tt fs5} ended outperforming {\tt fs4} by roughly 1.02$\times$. If this trend were confirmed by higher order methods, then the gain from sparse tiling would become increasingly larger.
-\item There is a range of "good tile sizes" -- smaller or bigger sizes make the runtime explode (e.g. for small; q=4 on Erebus emblematic for big tile sizes) ... TODO
-\item  TODO
+\item {\tt fs}, unsurprisingly, is the parameter having largest impact on the ACCT. By influencing the fraction of data reuse convertible into data locality, the amount of redundant computation and the data volume exchanged, fusion schemes play a fundamental role in sparse tiling. This makes automation much more than a desired feature: without any changes to the source code, multiple sparse tiling strategies could be be studied and tuned. Automation is one of our major contributions, and this performance exploration justifies the implementation effort. 
+\item There is a non-trivial relationship between $ACCT$, $q$ and {\tt fs}. The aggressive fusion schemes are more effective with high $q$ -- that is, with larger memory footprints -- while they tend to be less efficient, or even deleterious, when $q$ is low. The extreme case is {\tt fs5}, which fuses two long sequences of loops (twelve and thirteen loops each). In Figure~\ref{fig:st-erebus-expl} (Erebus), {\tt fs5} is never a winning choice, although the difference between {\tt fs3}/{\tt fs4} and {\tt fs5} decreases as $q$ grows. In Figure~\ref{fig:st-cx1-expl-h08} (CX1-Ivy), instead, this phenomenon is even more pronounced. While with $q=2$ {\tt fs4} was almost 1.10$\times$ faster than the best {\tt fs5}, with $q=3$ the difference was only 1.04$\times$, and with $q=4$ {\tt fs5} ended outperforming {\tt fs4} by roughly 1.02$\times$. If this trend were confirmed by higher order methods, then the gain from sparse tiling could become increasingly larger.
+\item A non-aggressive scheme fuses only a few small subsets of loops. As discussed in later sections, these fusion schemes, despite affording larger tile sizes than the more aggressive ones (due to the smaller memory footprint), suffer from limited cross-loop data reuse. For {\tt fs1}, LCA determines that the percentage of reusable data in the three fused loop chains decreases from 25$\%$ ($q=1$) to 13$\%$ ($q=4$). The drop is exacerbated by the fact that no reuse can be exploited for the maps. Not only are these ideal values, but also a significant number of loops are left outside of loop chains. The combination of these factors motivate the lack of substantial speed-ups. With {\tt fs2}, a larger proportion of loops are fused and the amount of shared data increases. The peak ideal reuse in a loop chain reaches 54$\%$, which translates into better ACCTs. A similar growth in data reuse can be appreciated in more aggressive fusion schemes, with a peak of 61$\%$ in one of the {\tt fs5}'s loop chains.  Nevertheless, the performance of {\tt fs5} is usually worse than {\tt fs4}. As we shall clarify in later sections, this is mainly due to the excessive memory footprint, which in turn leads to very small tiles. Speculatively, we tried running a sixth fusion scheme: a single loop chain including all of the 25 loops in a time iteration. In spite of an ideal data reuse of about 70$\%$, the ACCT was always significantly higher than all other schemes.
+\item Figure~\ref{fig:st-erebus-expl} and~\ref{fig:st-cx1-expl} show the ACCT for a ``good selection'' of tile size candidates. Our approach was as follows. We took a very small set of problem instances  and we tried a large range of seed tile sizes. Very small tile sizes caused dramatic slow-downs, mostly because of ineffective hardware prefetching and TLB misses. Tile sizes larger than a fraction of L3 cache also led to increasingly higher ACCTs. If we consider $q=4$ in Figure~\ref{fig:st-erebus-expl}, we observe that the ACCT of {\tt fs2}, {\tt fs3}, and {\tt fs4} grows when the initial number of iterations in a tile is as big as 70. Here, LCA shows that the tile memory footprint is, in many loop chains, higher than 3MB, with a peak of 6MB in {\tt fs3}. This exceeds the proportion of L3 cache that a process owns (on average), which explains the performance drop. 
 \end{itemize}
 
-Then say something about other optimisations .... TODO
-fs6 always bad TODO
+As explained, the tile size and the fusion scheme are the most important parameters of the search space exploration. Fortunately, general conclusions about the impact of the other optimizations can be drawn.
+
+\begin{description}
+\item[Indirection maps] Using local maps provides marginal gains with {\tt fs1} and {\tt fs2}; that is, only when there is none or very little reuse for the indirection maps. In all other cases, the original indirection maps, provided through the loop chain abstraction, lead to larger gains, despite the need for an extra level of indirection. 
+\item[Partitioning] The {\tt chunk} partitioning, applied on top of the RCM-based mesh numbering, \textit{always} outperforms the {\tt metis} partitioning. The main reasons, as properly documented in Section~\ref{sec:tiling:seigen:plf}, are the increase in TLB misses and a less effective hardware prefetching, caused by a more irregular tile expansion.
+\item[Extended boundary region] Minimization of redundant computation through expansion of non-exec tiles, implemented by allocating an extra layer of data elements along the boundary region (see $T_{ne}$ in Figure~\ref{fig:st-mpi-init} and Section~\ref{sec:tiling:seigen:opts}), {\it almost always} improves the ACCT. Further, when it does not, the performance difference tends to be negligible.
+\end{description}
+
+Summarizing, a very promising heuristic for a cost model might be: (i) never use local maps; (ii) always use {\tt chunk} partitioning, ideally on top of a Hilbert curve (see also Section~\ref{sec:tiling:seigen:plf}); (iii) always minimize redundant computation by means of a non-exec boundary region.
 
 
-\subsubsection{Testing the Hypothesis}
+\subsubsection{Testing the Hypothesis via Profilers}
 Our hypothesis was that speed-ups could be achieved as sparse tiling turns data reuse into data locality, thus diminishing the memory pressure and improving the memory latency. The combination of three different analyses provides compelling evidence that this was correct.
 
 \begin{itemize}
@@ -1303,6 +1319,7 @@ Our hypothesis was that speed-ups could be achieved as sparse tiling turns data 
 \end{itemize}
 
 \subsubsection{Performance Limiting Factors}
+\label{sec:tiling:seigen:plf}
 In this section, we discuss the computational and architectural factors that impair sparse tiling. The following considerations derive from a meticulous study of the data movement in Seigen, the information provided by the loop chain analyzer previously introduced, and extensive profiling through VTune. 
 
 There are two types of performance limiting factors: (i) inherent in the application and its loop chains and (ii) due to flaws or deficiencies in the sparse tiling implementation. We start with point (i).
