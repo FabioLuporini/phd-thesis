@@ -1,7 +1,7 @@
 \chapter{Background}
 \label{ch:background}
 
-The foundations of the thesis are established in this chapter. A top-down approach is followed. The first topic treated is the mathematical theory of the finite element method. How this theory is translated into software is subsequently discussed; in particular, a revolutionary approach based upon automated code generation is explored. The core libraries that make this approach possible are surveyed. The state-of-the-art in performance optimization is then reviewed, with emphasis on the fundamental class of loop reordering transformations. An overview of the successful domain-specific abstractions that have inspired some of the core contributions of this thesis concludes the chapter. Some of the relevant related work is introduced, although extended literature review is provided in the later chapters.
+The foundations of the thesis are established in this chapter. A top-down approach is followed. The first topic treated is the mathematical theory of the finite element method. How this theory is translated into software is subsequently discussed; in particular, a revolutionary approach based upon automated code generation is explored. The core libraries that make this approach possible are surveyed. The state of the art in performance optimization is then reviewed, with emphasis on the fundamental class of loop reordering transformations. An overview of the successful domain-specific abstractions that have inspired some of the core contributions of this thesis concludes the chapter. Some of the relevant related work is introduced, although extended literature review is provided in the later chapters.
 
 
 \section{The Finite Element Method}
@@ -335,7 +335,7 @@ $\rbrace$
 \label{code:burgers}
 \end{algorithm}
 
-The evaluation of integrals becomes more computationally expensive if the complexity of the variational form grows, in terms of number of coefficients and differential or algebraic operators involved. It is not pathological a scenario in which the computation of the local element tensor requires more than hundreds or even thousands of floating point operations. An excerpt from one such example is shown in Listing~\ref{code:burgers}: here, in the main assembly expression, $14$ unique arrays are accessed (with the same array referenced multiple times within the expression) along with several other constants. The loop trip counts are also larger due to the different choice of finite elements. 
+The evaluation of integrals becomes more computationally expensive if the complexity of the variational form grows, in terms of number of coefficients and differential or algebraic operators involved. A scenario in which the computation of the local element tensor requires more than hundreds or even thousands of floating point operations is not pathological. An excerpt from one such example is shown in Listing~\ref{code:burgers}: here, in the main assembly expression, $14$ distinct arrays are accessed (with the same array referenced multiple times within the expression) along with several other constants. The loop trip counts are also larger due to the different choice of finite elements. 
 
 %As we shall see, automated code generation for finite element operators has had two main objectives:
 %
@@ -349,7 +349,7 @@ The evaluation of integrals becomes more computationally expensive if the comple
 
 \subsection{Linear Solvers}
 \label{sec:bkg:linearsolvers}
-The last step of an FEM is the solution of the linear system (\ref{sec:bkg:eq:lin-sys}) arising from the variational form of the input problem. This and the assembly of $A$ and $b$ are the most expensive phases of an FEM. There is a whole science behind the solution of linear systems. Among the most effective solvers are the family of {\em Krylov-type iteration methods}, such {\em conjugate gradient} for symmetric positive-definite matrices and {\em generalized minimal residual} (GMRES), which does not require $A$ in explicit form. {\em Multi-grid} methods are also widely used, whereas {\em direct methods} computing an LU factorization using {\em Gaussian elimination} have limited applicability. 
+The last step of an FEM is the solution of the linear system (\ref{sec:bkg:eq:lin-sys}) arising from the variational form of the input problem. This and the assembly of $A$ and $b$ are the most expensive phases of an FEM. There is a whole science behind the solution of linear systems. Among the most effective solvers are the family of {\em Krylov-type iteration methods}, such as {\em conjugate gradient} for symmetric positive-definite matrices and {\em generalized minimal residual} (GMRES), which do not require $A$ in explicit form. {\em Multi-grid} methods are also widely used, whereas {\em direct methods} computing an LU factorization using {\em Gaussian elimination} have more limited applicability -- despite being the only option in various circumstances. 
 
 The solution of linear systems is not a topic of this thesis; the interested reader is invited to refer to~\cite{linear-system-saad}. It is however important to keep in mind that this phase usually has a significant impact on the execution time of an FEM: the performance optimization of the assembly phase has marginal impact if the method is solver-dominated. 
 
@@ -400,10 +400,10 @@ The transformed UFL (e.g., after automatic differentiation has been applied) is 
 TSFC has two main features:
 \begin{itemize}
 \item It is a \textit{structure-preserving compiler} in that it keeps intact the structure of algebraic operations (e.g., index sums, inner products), rather than committing to a specific implementation. This lets the lower-level compiler to explore the space of all possible transformations.
-\item As opposed to FFC, it supports the compilation of complicated forms making extensive use of tensor algebra. TSFC can efficiently identify repeated sub-expressions and assign them to temporary variables, thus drastically reducing the code generation time.
+\item In contrast to FFC, it supports the compilation of complicated forms making extensive use of tensor algebra. TSFC can efficiently identify repeated sub-expressions and assign them to temporary variables, thus drastically reducing the code generation time.
 \end{itemize}
 
-A neat separation of concerns characterizes Firedrake:
+Summarizing, in Firedrake the translation of the problem specification is characterized by a neat separation of concerns:
 \begin{itemize}
 \item UFL is the mathematical language that allows expressing finite element problems.
 \item TSFC progressively abstracts away the finite element specification by producing a general AST. Some nodes in the ASTs are decorated to keep track of domain properties (e.g., linearity of an expression in test and trial functions), exploitable in later optimization stages.
@@ -422,7 +422,7 @@ PyOP2 supports the parallel application of kernels over unstructured meshes, a k
 
 The PyOP2 abstraction implements another separation of concerns. The kernels, which encode the numerics of an FEM, are produced at higher layers through the Firedrake's language and form compiler, while the parallel application of kernels over the mesh is entirely handled by PyOP2. 
 
-The PyOP2 layer, and its relationship with the OP2 library~\cite{op2-main}, are documented in mode detail in Section~\ref{sec:bkg:op2}.
+The PyOP2 layer, and its relationship with the OP2 library~\cite{op2-main}, are documented in more detail in Section~\ref{sec:bkg:op2}.
 
 %the parallel execution needs handling A local assembly operator is an example of the latter case, since the kernel is applied to a cell and the values of the degrees of freedom associated 
 
