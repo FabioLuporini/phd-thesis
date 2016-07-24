@@ -6,7 +6,7 @@ Sharing elimination and pre-evaluation, presented in Chapter~\ref{ch:optimality}
 
 \section{Overview}
 
-We recall from Section~\ref{sec:bkg:fenics-and-firedrake} that Firedrake users employ the Unified Form Language to express problems in a mathematical syntax. At run-time, the high-level specification is translated by a form compiler, the Two-Stage Form Compiler (TSFC)~\citep{TSFC}, into one or more abstract syntax trees (ASTs) representing assembly kernels. ASTs are then passed to COFFEE for optimization. The output of COFFEE, C code, is eventually provided to PyOP2~\citep{pyop2isc}, where just-in-time compilation and execution over the computational mesh take place. This structure of this tool-chain is outlined in Figure~\ref{fig:coffee-pipeline}, along with an overview of the compilation pipeline in COFFEE. 
+We recall from Section~\ref{sec:bkg:fenics-and-firedrake} that Firedrake users employ the Unified Form Language to express problems in a mathematical syntax. At run-time, the high-level specification is translated by a form compiler, the Two-Stage Form Compiler (TSFC)~\citep{TSFC}, into one or more abstract syntax trees (ASTs) representing assembly kernels\footnote{TSFC has recently replaced FFC, the FEniCS Form Compiler, which has been used for performance evaluation in the previous chapters.}. ASTs are then passed to COFFEE for optimization. The output of COFFEE, C code, is eventually provided to PyOP2~\citep{pyop2isc}, where just-in-time compilation and execution over the computational mesh take place. This structure of this tool-chain is outlined in Figure~\ref{fig:coffee-pipeline}, along with an overview of the compilation pipeline in COFFEE. 
 
 \begin{figure}
 \centering
@@ -17,7 +17,7 @@ We recall from Section~\ref{sec:bkg:fenics-and-firedrake} that Firedrake users e
 
 \section{The Compilation Pipeline}
 \label{sec:coffee:pipeline}
-Similarly to general-purpose compilers, COFFEE provides multiple optimization levels: \texttt{O0}, \texttt{O1}, \texttt{O2} and \texttt{O3}. Apart from \texttt{O0}, which essentially leaves the ASTs unchanged (useful for debugging), all optimization levels apply ordered sequences of transformations. In essence, the higher the optimization level, the more aggressive (and potentially slower) is the AST processing. In the following, when describing aspects of the optimization process common to \texttt{O1}, \texttt{O2} and \texttt{O3}, we will use the generic notation \texttt{Ox} (\texttt{x} $\in \lbrace 1, 2, 3\rbrace$).
+In common with general-purpose compilers, COFFEE provides multiple optimization levels: \texttt{O0}, \texttt{O1}, \texttt{O2} and \texttt{O3}. Apart from \texttt{O0}, which essentially leaves the ASTs unchanged (useful for debugging), all optimization levels apply ordered sequences of transformations. In essence, the higher the optimization level, the more aggressive (and potentially slower) is the AST processing. In the following, when describing aspects of the optimization process common to \texttt{O1}, \texttt{O2} and \texttt{O3}, we will use the generic notation \texttt{Ox} (\texttt{x} $\in \lbrace 1, 2, 3\rbrace$).
 
 The optimization level \texttt{Ox} can logically be split into three stages:
 \begin{description}
@@ -85,7 +85,7 @@ The enriched FFC AST is intercepted prior to code generation and forwarded to a 
 \end{itemize}
 
 \paragraph{TSFC and COFFEE}
-TSFC was conceived to produce an input suitable for COFFEE. This is accomplished through an AST-to-AST converter, which translates the GEM representation (the internal language used by TSFC) of an assembly kernel into a COFFEE AST. The implementation was carried out by Myklos Homolya, the lead designer of TSFC.
+TSFC was conceived to produce an input suitable for COFFEE. This is accomplished through an AST-to-AST converter, which translates the GEM representation (the internal language used by TSFC) of an assembly kernel into a COFFEE AST. The implementation was carried out by Myklós Homolya, the lead designer of TSFC.
 
 
 \section{Rewrite Operators}
@@ -101,10 +101,10 @@ The most important rewrite operators in COFFEE are:
 \end{description}
 All these operators are used by both sharing elimination and pre-evaluation (apart from symbolic evaluation, only employed by pre-evaluation).
 
-The rewrite operators accept a number of options to let users steering the transformation process. With code motion, for example, one can specify what kind of sub-expressions should be hoisted (by indicating the invariant loops) or the maximum amount of memory that is spendable in temporaries. Factorization can be either ``explicit'' -- in which case, a list of symbols to be collected or a loop dimension along which searching for factorizable symbols are provided -- or ``heuristic'' -- with groups of recurring identical symbols being collected.
+The rewrite operators accept a number of options to enable users to steer the transformation process. With code motion, for example, one can specify what kind of sub-expressions should be hoisted (by indicating the invariant loops) or the maximum amount of memory that is spendable in temporaries. Factorization can be either ``explicit'' -- in which case, a list of symbols to be collected or a loop dimension along which searching for factorizable symbols are provided -- or ``heuristic'' -- with groups of recurring identical symbols being collected.
 
 \section{Features of the Implementation}
-This section focuses on the ``toolkit'' available in COFFEE for implementing and extending rewrite operators.
+This section focuses on the toolkit available in COFFEE for implementing and extending rewrite operators.
 
 \subsection{Tree Visitor Pattern}
 The need for a generic infrastructure for traversing ASTs has grown rapidly, together with the complexity of the compiler. In the early stages of COFFEE, any time a new transformation (e.g., a rewrite operator) or inspector (e.g., for dependence analysis) was required, one or more full AST traversals had to be implemented. The lack of a common interface for tree traversals also made the code less homogeneous and, as such, more difficult to understand. This led to the introduction of a tree visitor design pattern\footnote{The tree visitor infrastructure was mainly developed by Lawrence Mitchell, and was inspired by that adopted in UFL, the language used to specify forms in Firedrake.}, whose aim is to decouple the algorithms from the data structure on which they are applied. 
@@ -121,7 +121,7 @@ Code motion consists of hoisting a sub-expression out of one or more loops. We a
 
 When applying the operator, several pieces of information must be known:
 \begin{itemize}
-\item What sub-expression should be hoisted; for instance, should they be constant or invariant in at most one of the linear loops.
+\item Which sub-expressions should be hoisted; for instance, should they be constant or invariant in at most one of the linear loops.
 \item Where sub-expressions should be hoisted; that is, how far in the loop nest (which affects the size of the temporaries).
 \item How much memory are we allowed to use in total for the temporaries.
 \item A list of previously hoisted sub-expressions, for applying common sub-expressions elimination.
@@ -154,7 +154,7 @@ Data dependency analysis is necessary to ensure the legality of transformations.
 \item To implement the {\em strategy selection analysis} in Section~\ref{sec:opt:driving-se}.
 \end{itemize}
 
-COFFEE uses a dependency graph for tracking data dependencies. The dependency graph has as many vertices as symbols in the code; a direct edge from \texttt{A} to \texttt{B} indicates that symbol \texttt{B} depends on (i.e., is going to read) symbol \texttt{A}. Since COFFEE relies on \textit{static single assignment} -- a property that ensures that variables are assigned exactly once -- such a minimalistic data structure suffices for data dependence analysis.
+COFFEE uses a dependency graph to track data dependencies. The dependency graph has as many vertices as symbols in the code; a direct edge from \texttt{A} to \texttt{B} indicates that symbol \texttt{B} depends on (i.e., is going to read) symbol \texttt{A}. Since COFFEE relies on \textit{static single assignment} -- a property that ensures that variables are assigned exactly once -- such a minimalistic data structure suffices for data dependence analysis.
 
 \subsection{Minimizing Temporaries}
 Both the code motion operator and loop fusion (Section~\ref{sec:coffee-loopfusion}) impact the number of temporaries in an assembly kernel. Once the AST has been transformed, a special routine attempts to remove the unnecessary temporaries. In addition to reliving the register pressure (this actually depends on how smart is the underlying general-purpose compiler), this has the effect of making the code more readable.
