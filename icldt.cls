@@ -64,10 +64,12 @@
   \if@openright\cleardoublepage\else\clearpage\fi\@mainmatterfalse
 }
 
+\newcommand{\HRule}{\rule{\linewidth}{0.5mm}}
 \newcommand*{\@supervisor}{}
 \newcommand*{\@university}{}
 \newcommand*{\@college}{Imperial College London}
 \newcommand*{\@department}{}
+\newcommand*{\@group}{}
 \newcommand*{\@field}{}
 \newcommand*{\@degree}{}
 \newcommand*{\@diploma}{}
@@ -91,8 +93,8 @@
  \let\@declaration\empty}
 \DeclareOption{declaration=on}{%
  \renewcommand{\@declaration}{%
- I herewith certify that all material in this dissertation which
- is not my own work has been properly acknowledged.}}
+ I herewith certify that the material in this thesis that is not 
+ my own work has been properly acknowledged and referenced.}}
 \DeclareOption{doublespacing}{\AtBeginDocument{\doublespacing}}
 \DeclareOption{onehalfspacing}{\AtBeginDocument{\onehalfspacing}}
 \DeclareOption{titlepagenumber=off}{%
@@ -106,10 +108,12 @@
 \newcommand*{\supervisor}[1]{\gdef\@supervisor{#1}}
 \newcommand*{\college}[1]{\gdef\@college{#1}}
 \newcommand*{\department}[1]{\gdef\@department{#1}}
+\newcommand*{\group}[1]{\gdef\@group{#1}}
 \newcommand*{\field}[1]{\gdef\@field{#1}}
 \newcommand*{\declaration}[1]{\gdef\@declaration{#1}}
 \newlength{\logo@width}
 \newcommand*{\logo}[2][0pt]{\gdef\@logo{#2}\setlength{\logo@width}{#1}}
+\let\@logo\empty
 \LoadClass{scrreprt}
 \RequirePackage{setspace}
 \RequirePackage[left=4.2cm,right=4.2cm,top=2.97cm,bottom=5.94cm]%
@@ -125,22 +129,29 @@
   \ifx\@university\@empty \else \@university\par\fi
   \@college
   \ifx\@department\@empty \else \par Department of \@department\fi
+  \ifx\@group\@empty \else \par \@group\fi
  \end{minipage}
  \null\vfill
  \begin{center}
-  {\titlefont\huge \@title\par}
+  \HRule
+  \vskip 1em
+  {\huge \textsc{\@title}\par}
+  \vskip 1em
+  \HRule
   \vskip 3em
   {\Large \lineskip 0.75em
   \begin{tabular}[t]{c}
-   \@author
+    \textsc{\LARGE{\@author}}
   \end{tabular}\par}
   \vskip 1.5em
   {\Large \@date \par}
-  \vskip 0.5em
+  \vskip 1.5em
+  \ifx\@logo\@empty{\vfill}\else{
   \vskip \z@ \@plus3fill
     \ifdim\logo@width>0\p@\relax
     \includegraphics[width=\logo@width]{\@logo}\par\else\includegraphics{\@logo}\par\fi%
     \vskip 1.5em%
+  }\fi
   \ifx\@supervisor\@empty \else
   {\begin{tabular}[t]{c} Supervised by: \@supervisor \end{tabular}}
   \fi
@@ -161,6 +172,12 @@
  \@declaration
  \par\vspace{3cm}
  \hfill\@author
+ \vfill
+ The copyright of this thesis rests with the author and is made available under a Creative Commons
+ Attribution Non-Commercial No Derivatives licence. Researchers are free to copy, distribute or
+ transmit the thesis on the condition that they attribute it, that they do not use it for commercial
+ purposes and that they do not alter, transform or build upon it. For any reuse or redistribution,
+ researchers must make clear to others the licence terms of this work.
  \cleardoublepage
  }\fi
 \end{titlepage}
