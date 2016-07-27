@@ -352,7 +352,6 @@ It is worth noting how $T_2^R$ ``consumed'' the frontier elements of all other t
 
 \subsection*{Inspection for Distributed-Memory Parallelism}
 
-
 In the case of distributed-memory parallelism, the mesh is partitioned and distributed to a set of processes. As shown in Listing~\ref{code:tiling-struct}, neighboring processes may exchange (MPI) messages before executing a loop $L_j$. A message includes all ``dirty'' dataset values required by $L_j$ modified by any $L_k$, with $L_k \prec L_j$. In the running example, $L_0$ writes to vertices, so a subset of values associated with border vertices must be communicated prior to the execution of $L_1$. To apply sparse tiling, the idea is to push all communications at the beginning of the loop chain: as we shall see, this increases the amount of data to be communicated, but also reduces  the number of synchronizations (only 1 synchronization between each pair of neighboring processes per loop chain execution).
 
 From Section~\ref{sec:tiling:lc-unstruct} it is known that, in a loop chain, a set is logically split into three regions, \textit{core}, \textit{boundary}, and \textit{non-exec}. The boundary tiles, which originate from the seed partitioning of the boundary region, will include all iterations that cannot be executed until the communications have terminated. The procedure described for shared-memory parallelism -- now performed individually by each process on a partition of the input mesh -- is modified as follows:
@@ -428,7 +427,7 @@ As seen in the example in Section~\ref{sec:tiling:examples}, our inspector algor
 \subsection{The Generalized Sparse Tiling Inspector}
 \label{sec:tiling:inspector}
 
-The pseudo-code for the generalized sparse tiling inspector is showed in Algorithm~\ref{algo:st-inspector}. Given a loop chain and an average tile size, the algorithm produces a schedule suitable for mixed distributed/shared-memory parallelism. In the following, we elaborate on the main steps of the algorithm. The notation used throughout the section is summarized in Table~\ref{table:st-summary-notation}.
+The pseudo-code for the generalized sparse tiling inspector is shown in Algorithm~\ref{algo:st-inspector}. Given a loop chain and a ``seed'' tile size, the algorithm produces a schedule suitable for mixed distributed/shared-memory parallelism. In the following, we elaborate on the main steps of the algorithm. The notation used throughout the section is summarized in Table~\ref{table:st-summary-notation}.
 
 \begin{table}[h]
 \centering
@@ -449,7 +448,7 @@ $\mathbb{T}[i]$ & Accessing the $i$-th tile \\
 $\phi_S$ & A projection $\phi_S : S \rightarrow \mathbb{T}$ \\
 $\Phi$ & The set of all available projections \\
 $\sigma_j$ & A tiling function $\sigma_j : S_j \rightarrow \mathbb{T}$ for $L_j$ \\
-$ts$ & Average tile size \\
+$ts$ & seed tile size \\
 \hline
 \end{tabulary}
 \caption{Summary of the notation used throughout the section.}
@@ -709,7 +708,7 @@ The sparse tiling executor is illustrated in Algorithm~\ref{algo:st-executor}. I
 
 As explained in Sections~\ref{sec:tiling:examples} and~\ref{sec:tiling:inspector}, a sufficiently deep halo region enables correct computation of the boundary tiles. Further, tiles are executed atomically, meaning that all iterations in a tile are computed without ever synchronizing with other processes. The depth of the boundary region, which affects the amount of off-process data to be redundantly computed, increases with the number $n$ of loops to be fused. In the example in Figure~\ref{fig:st-mpi-init}, there are $n=3$ loops, and three ``strips'' of extra vertices are necessary for correctly computing the fused loops without tile-to-tile synchronizations.
 
-The {\em depth} of the loop chain establishes the extent of the boundary region. This parameter imposes a limit to the number of fusible loops, so if $n > \text{{\em depth}}$, then it may be needed to split the input into shorter loop chains.
+We recall from Section~\ref{sec:tiling:lc-unstruct} that the {\em depth} of the loop chain indicates the extent of the boundary region. This parameter imposes a limit to the number of fusible loops. If $\mathbb{L}$ includes more loops than the available boundary region -- that is, if $n > \text{{\em depth}}$ --  then $\mathbb{L}$ will have to be split into shorter loop chains, to be fused individually. As we shall see (Section~\ref{sec:tiling:impl-firedrake}), in our inspector/executor implementation the {\em depth} is controlled by the Firedrake's DMPlex module.
 
 %For ease of explanation, this aspect has been neglected in the inspector algorithms described in the previous section. 
 
@@ -753,8 +752,8 @@ The implementation of automated generalized sparse tiling is distributed over th
 
 There are several reasons that motivate this structuring.
 \begin{description}
-\item[Simplicity of analysis] The abstractions used in Firedrake and PyOP2 drastically simplify the analysis of input programs. For example, from the parallel loop construct in PyOP2 (Section~\ref{sec:bkg:op2}) we can derive most of the information we need to construct a loop chain.
-\item[Flexibility] It is very intuitive to use sparse tiling in a Firedrake program. Once the regions of code to be sparse tiled are identified, the inspector/executor schemes are automatically derived at the level of the run-time support. In the case of a pure PyOP2 program, the generation of inspector/executor schemes is only partly automated: the separation of a set into the core, boundary and non-exec regions for distributed-memory parallelism is here user's responsibility. An inspector-executor scheme can also be written from scratch, for instance in a plain C program. In this case, the loop chain must be provided explicitly through direct calls to the SLOPE library. 
+\item[Simplicity of analysis] The abstractions used in Firedrake and PyOP2 drastically simplify the analysis of input programs. For example, from the parallel loop construct in PyOP2 (Section~\ref{sec:bkg:op2}) we can derive the information that we need to construct a loop chain.
+\item[Flexibility] Inspector/executor schemes can be expressed at three different layers of abstraction: in Firedrake programs, in PyOP2 programs, or directly in C. It is extremely intuitive and simple to use sparse tiling in a Firedrake program. Once the regions of code to be sparse tiled are identified, the inspector/executor schemes are automatically derived in the PyOP2 implementation. In the case of a pure PyOP2 program, the generation of inspector/executor schemes is instead only partly automated, since the separation of a set into the core, boundary and non-exec regions for distributed-memory parallelism is user's responsibility. An inspector-executor scheme can also be written from scratch in a plain C program. In this case, the loop chain must be provided explicitly through direct calls to the SLOPE library. 
 \item[Realistic simulations] We aim to use generalized sparse tiling in real-world programs. The choice was then to use a framework, Firedrake, with a user base that could provide meaningful examples. The implementation effort is higher, but so is the potential scientific impact.
 \end{description}
 
@@ -763,7 +762,7 @@ The interplay amongst Firedrake, PyOP2 and SLOPE is outlined in Figure~\ref{fig:
 \begin{figure}[htpb]
 \centering
 \includegraphics[scale=0.6]{sparsetiling/figures/firedrake-pyop2-slope.pdf}
-\caption{Sparse tiling in the Firedrake-PyOP2-SLOPE framework. There are three ways of sparse tiling a loop chain: decorating a Firedrake program (1A), decorating a sequence of loops in a PyOP2 program (1B), writing both the loop chain and the inspector/executor codes explicitly in C through calls to SLOPE (1C). Both (1A) and (1B) use the {\em loop$\_$chain} interface (details in Section~\ref{sec:tiling:lcinterface}). The kernels generated within a {\em loop$\_$chain} are pre-processed in PyOP2 (2) and forwarded to SLOPE through its python interface (3). SLOPE has now access to the loop chain, so it can generate an inspector/executor scheme and return it to PyOP2 (4). The inspector is compiled and executed. The result, a schedule (i.e., the output of Algorithm~\ref{algo:st-inspector}), is cached and used as input to the executor. Each time the same {\em loop$\_$chain} is encountered in a Firedrake/PyOP2 program, the corresponding schedule is reused.}
+\caption{Sparse tiling in the Firedrake-PyOP2-SLOPE framework. There are three ways of sparse tiling a loop chain: decorating a Firedrake program (1A), decorating a sequence of loops in a PyOP2 program (1B), writing both the loop chain and the inspector/executor codes explicitly in C through calls to SLOPE (1C). Both (1A) and (1B) use the {\em loop$\_$chain} interface (details in Section~\ref{sec:tiling:lcinterface}). The kernels generated within a {\em loop$\_$chain} are pre-processed in PyOP2 (2) and forwarded to SLOPE through its python interface (3). SLOPE now has access to the loop chain, so it can generate an inspector/executor scheme and return it to PyOP2 (4). The inspector is compiled and executed. The result, a schedule (i.e., the output of Algorithm~\ref{algo:st-inspector}), is cached and used as input to the executor. Each time the same {\em loop$\_$chain} is encountered in a Firedrake/PyOP2 program, the corresponding schedule is reused.}
 \label{fig:st-implementation}
 \end{figure}
 
@@ -801,7 +800,7 @@ To apply sparse tiling to a sequence of loops, PyOP2 provides the {\em loop$\_$c
 \label{code:loop-chain-interface}
 \end{algorithm}
 
-PyOP2 exploits lazy evaluation of parallel loops to generate an inspector/executor scheme. The parallel loops encountered during the program execution -- or, analogously, those generated through Firedrake -- are pushed into a queue, instead of being executed immediately. The sequence of parallel loops in the queue is called {\em trace}. If a dataset $f$ needs be read, for example because a user wants to inspect its values or a global linear algebra operation needs be performed, the trace is traversed -- from the most recent parallel loop to the oldest one -- and a new sub-trace produced. The sub-trace includes all parallel loops that must be executed to evaluate $f$ correctly. The sub-trace can then be executed or further pre-processed.
+PyOP2 exploits lazy evaluation of parallel loops to generate an inspector/executor scheme. The parallel loops encountered during the program execution -- or, analogously, those generated through Firedrake -- are pushed into a queue, instead of being executed immediately. The sequence of parallel loops in the queue is called the {\em trace}. If a dataset $f$ needs to be read, for example because a user wants to inspect its values or a global linear algebra operation needs be performed, the trace is traversed -- from the most recent parallel loop to the oldest one -- and a new sub-trace produced. The sub-trace includes all parallel loops that must be executed to evaluate $f$ correctly. The sub-trace can then be executed or further pre-processed.
 
 All loops in a trace that were created within a {\em loop$\_$chain} scope are sparse tiling candidates. In detail, the interaction between PyOP2 and SLOPE is as follows:
 \begin{enumerate}
@@ -828,7 +827,7 @@ The experimentation of generalized sparse tiling consisted of two phases:
 
 \begin{enumerate}
 \item Initially, the technique was tried in two benchmarks: a sparse Jacobi kernel and a proxy unstructured mesh application, originally developed as a demo for the OP2 framework. The objectives of this phase were (i) to explore the impact of generalized sparse tiling on performance, (ii) to characterize the circumstances where the approach is profitable, (iii) to identify the potential limitations of the technique in real applications, (iv) to prototype a compiler. 
-\item Then, a real application developed in Firedrake, Seigen (an elastic wave equation solver for seismological problems), was used for systematic performance evaluation. This is presented in Section~\ref{sec:tiling:seigen}.
+\item Then, a real application developed in Firedrake, Seigen (an elastic wave equation solver for seismological problems), was used for systematic performance evaluation. This is presented in Section~\ref{sec:tiling:seigen}. Thanks to its long sequence of loops, Seigen provided a whole suite of sparse tiling benchmark configurations.
 \end{enumerate}
 
 In this section, we focus on phase 1. Both benchmarks are written in C. Sparse tiling was introduced manually using a rudimentary version of SLOPE. A previous version of the inspector algorithms presented in this chapter, described in~\cite{st-paper}, was used. As detailed next, one of the major drawbacks of this older inspector was its cost, which grew very rapidly with the number of loops in the chain and the number of distinct datasets accessed. Finally, only shared-memory parallelism via OpenMP was supported. 
@@ -841,7 +840,7 @@ In all experiments presented in this section, the optimal tile size (i.e. the on
 \centering
 \begin{tabulary}{1.0\columnwidth}{c | c | c}
 \hline
-Matrix name & Execution time reduction & Speed-up  \\
+Matrix name & Execution time reduction $\%$ & Speed-up  \\
 \hlineB{4}
 {\em ldoor} & 40.34 & 12.11 \\
 {\em pwtk} & 38.42 & 11.98 \\
@@ -874,7 +873,7 @@ The values in Table~\ref{table:st-jacobi} do not include the inspection time nec
 \centering
 \begin{tabulary}{1.0\columnwidth}{c | c | c | c}
 \hline
-Architecture & Implementation & Execution time & Speed-up \\
+Architecture & Implementation & Execution time (s) & Speed-up \\
 \hlineB{4}
 \multirow{3}{*}{Westmere} & {\em omp} & 36.87 & 6.43\\
 ~ & {\em mpi} & 31.0 & 7.66 \\
@@ -889,7 +888,7 @@ Architecture & Implementation & Execution time & Speed-up \\
 \label{table:st-airfoil}
 \end{table}
 
-The second benchmark was Airfoil, a representative unstructured mesh application~\citep{AIRFOIL}. Three implementations of Airfoil, {\em omp}, {\em mpi} and {\em tiled}, were compared on two shared-memory machines, an Intel Westmere (dual-socket 6-core Intel Xeon X5650 2.66 GHz, 12MB of shared L3 cache per socket) and an Intel Sandy Bridge (dual-socket 8-core Intel Xeon E5-2680 2.00Ghz, 20MB of shared L3 cache per socket). The code was compiled using the Intel \texttt{icc 2013} compiler with optimizations enabled (\texttt{-O3}, \texttt{-xSSE4.2/-xAVX}).
+The second benchmark was Airfoil, a proxy application designed to represent a class of computations based on the finite volume method~\citep{AIRFOIL}. Three implementations of Airfoil, {\em omp}, {\em mpi} and {\em tiled}, were compared on two shared-memory machines, an Intel Westmere (dual-socket 6-core Intel Xeon X5650 2.66 GHz, 12MB of shared L3 cache per socket) and an Intel Sandy Bridge (dual-socket 8-core Intel Xeon E5-2680 2.00Ghz, 20MB of shared L3 cache per socket). The code was compiled using the Intel \texttt{icc 2013} compiler with optimizations enabled (\texttt{-O3}, \texttt{-xSSE4.2} on the Westmere and \texttt{-xAVX} on the Sandy Bridge).
 
 The Airfoil code consists of a main time loop with 2000 iterations. This loop contains a sequence of four parallel loops that carry out the computation. In this sequence, the first two loops, called $adt$-$calc$ and $res$-$calc$, constitute the bulk of the computation. $Adt$-$calc$ iterates over cells, reads from adjacent vertices and write to a local dataset, whereas $res$-$calc$ iterates over edges and exploits indirect mappings to vertices and cells for incrementing indirect datasets associated to cells. These loops share datasets associated with cells and vertices. Datasets are composed of doubles.
 %-precision floating-point values.
@@ -917,7 +916,7 @@ The Airfoil experiments highlighted that shared-memory parallelism over multi-so
 
 \section{Performance Evaluation - Seigen: an Elastic Wave Equation Solver for Seismological Problems}
 \label{sec:tiling:seigen}
-In this section, we apply sparse tiling to a real-world computation built on top of Firedrake, Seigen. The performance analysis is vast and can actually be considered a methodological contribution of the thesis.
+In this section, sparse tiling is applied to a computation built on top of Firedrake, Seigen. The performance analysis presented in the following sections is an actual methodological contribution of the thesis. The objectives of this experimentation were to quantify and to motivate in detail the impact of the optimization in a complex, realistic simulation. For this, we executed a large set of experiments on multiple architectures, made use of profilers and analytical tools, and studied the correlation with key simulation parameters, such as the polynomial order and the mesh.
 
 \subsection{Computation}
 \label{sec:tiling:seigen:comp}
@@ -932,14 +931,14 @@ The Seigen framework has been implemented using Firedrake by Christian Jacobs\fo
 In a time loop iteration, eight linear systems need be solved, four from {\tt velocity} and four from {\tt stress}. Each solve consists of three macro-steps (see also Section~\ref{sec:bkg:assembly}): assembling a global matrix $A$; assembling a global vector $b$; computing $x$ in the system $Ax = b$. There are two global ``mass'' matrices, one for {\tt velocity} and one for {\tt stress}. Both matrices are
 \begin{itemize}
 \item Time invariant, so they are assembled before entering the time loop.
-\item Block-diagonal, as a consequence of the employed spatial discretization; a block belongs to an element in the mesh. The inverse of a block-diagonal matrix is again block-diagonal and is determined by computing the inverse of each block. The solution of the linear system $Ax = b$, expressible as $x = b A^{-1}$, can therefore be evaluated by looping over the mesh and computing a ``small'' matrix-vector product in each element, where the matrix is a block in $A^{-1}$.
+\item Block-diagonal, as a consequence of the spatial discretization employed; a block belongs to an element in the mesh. The inverse of a block-diagonal matrix is again block-diagonal and is determined by computing the inverse of each block. The solution of the linear system $Ax = b$, expressible as $x = b A^{-1}$, can therefore be evaluated by looping over the mesh and computing a ``small'' matrix-vector product in each element, where the matrix is a block in $A^{-1}$.
 \end{itemize}
-Assembling the global vectors reduces to executing a set of loops over mesh entities, particularly over cells, interior facets, and exterior facets. Overall, 25 loops are executed in a time loop iteration. Thanks to the hierarchy of ``software caches'' employed by Firedrake, the translation from mathematical syntax into loops is only performed once. 
+Assembling the global vectors reduces to executing a set of loops over mesh entities, particularly over cells, interior facets, and exterior facets. Overall, twenty-five loops are executed in a time loop iteration. Thanks to the hierarchy of ``software caches'' employed by Firedrake, the translation from mathematical syntax into loops is only performed once. 
 
 %Seigen is implemented on top of Firedrake, so most loops are not directly visible in the source code. In particular, all loops arising from the assembly of global vectors (17 in total) are derived automatically from the symbolic specification of {\tt velocity} and {\tt stress}. 
 
 \subsubsection{Application of Sparse Tiling}
-Introducing sparse tiling into Seigen was relatively straightforward. Three steps were required: (i) embedding the time stepping loop in a {\em loop$\_$chain} context (see Section~\ref{sec:tiling:lcinterface}), (ii) propagating the relevant user input for performance tuning, (iii) creating a set of {\em fusion schemes}. A fusion scheme establishes which sub-sequences of loops within a {\em loop$\_$chain} will be fused and the respective seed tile sizes. If no fusion schemes were specified, all of the 25 loops would be fused using a default tile size. As we shall see, operating with a set of small loop chains and heterogeneous tile sizes is much more effective than fusing long sequences of loops. Hence, specifying multiple fusion schemes is likely to have a direct payoff in performance. As an example, one such scheme treats the loops arising in {\tt velocity} and {\tt stress} as two different loop chains. 
+Introducing sparse tiling into Seigen was relatively straightforward. Three steps were required: (i) embedding the time stepping loop in a {\em loop$\_$chain} context (see Section~\ref{sec:tiling:lcinterface}), (ii) propagating the relevant user input for performance tuning, (iii) creating a set of {\em fusion schemes}. A fusion scheme establishes which sub-sequences of loops within a {\em loop$\_$chain} will be fused and the respective seed tile sizes. If no fusion schemes were specified, all of the twenty-five loops would be fused using a default tile size. As we shall see, operating with a set of small loop chains and heterogeneous tile sizes is much more effective than fusing long sequences of loops. Hence, specifying multiple fusion schemes is likely to have a direct payoff in performance. As an example, one such scheme treats the loops arising in {\tt velocity} and {\tt stress} as two different loop chains. 
 
 \subsubsection{Validation}
 Seigen has several mechanisms to validate the correctness of the seismological model and the test cases. The numerical results of all code versions (with and without tiling) were checked and compared. Paraview was also used to verify the simulation output.
@@ -953,16 +952,16 @@ There are two parameters that we can vary in {\tt explosive$\_$source}: the poly
 \end{description}
 
 \subsubsection{Computational Analysis of the Loops}
-We here discuss computational aspects of the 25 fusible loops. The following considerations derive from an analytical study of the data movement in the loop chain, extensive profiling through the Intel VTune Amplifier tool~\citep{vtune}, and roofline models (available in~\cite{Seigen-paper}).
+We here discuss computational aspects of the twenty-five fusible loops. The following considerations derive from an analytical study of the data movement in the loop chain, extensive profiling through the Intel VTune Amplifier tool~\citep{vtune}, and roofline models (available in~\cite{Seigen-paper}).
 
 \begin{description}
 \item[Seigen should benefit from sparse tiling] Not only does data reuse arise within single loops (e.g., by accessing vertex coordinates from adjacent cells), but also across consecutive loops, through indirect data dependencies. This makes Seigen a natural fit for sparse tiling. 
 
-\item[Data reuse across solvers] 8 ``solver'' loops perform matrix-vector multiplications in each mesh element. It is well established that this kind of linear algebra operations are memory-bound. 4 of these loops arise from {\tt velocity}, the others from {\tt stress}. There is significant data reuse amongst the 4 {\tt velocity} loops and amongst the 4 {\tt stress} loops, since the same blocks in the global inverse matrices are accessed. We hypothesize performance gains if these loops were fused through sparse tiling.
+\item[Data reuse across solvers] Eight ``solver'' loops perform matrix-vector multiplications in each mesh element. It is well established that linear algebra operations of this kind are memory-bound. Four of these loops arise from {\tt velocity}, the others from {\tt stress}. There is significant data reuse amongst the four {\tt velocity} loops and amongst the four {\tt stress} loops, since the same blocks in the global inverse matrices are accessed. We hypothesize performance gains if these loops were fused through sparse tiling.
 
-\item[Exterior facet loops have negligible cost] 3 loops implement the boundary conditions of the variational problems by iterating over the exterior mesh facets. The impact of these loops on the completion time is negligible, since their iteration space is order of magnitude smaller than that of cells and facets loops.
+\item[Exterior facet loops have negligible cost] Three loops implement the boundary conditions of the variational problems by iterating over the exterior mesh facets. The impact of these loops on the completion time is negligible, since their iteration space is order of magnitude smaller than that of cells and facets loops.
 
-\item[Data reuse across cells and facets loops] 6 loops iterate over the interior mesh facets to compute so called facet integrals. Facet integrals ensure the propagation of information between adjacent cells in discontinuous-Galerkin methods. The operational intensity of these loops is much lower than that of cells loops, and memory-boundedness is expected. Consecutive facet and cell integral loops share fields, which creates cross-loop data reuse opportunities. Again, sparse tiling might play a key role in transforming this data reuse into data locality.
+\item[Data reuse across cells and facets loops] Six loops iterate over the interior mesh facets to compute so called facet integrals. Facet integrals ensure the propagation of information between adjacent cells in discontinuous-Galerkin methods. The operational intensity of these loops is much lower than that of cell loops, and memory-boundedness is expected. Consecutive facet and cell integral loops share fields, which creates cross-loop data reuse opportunities. Again, sparse tiling might play a key role in transforming this data reuse into data locality.
 
 \item[Optimizing the operational intensity] All computational kernels generated in Seigen are optimized through COFFEE (Chapters~\ref{ch:optimality},~\ref{ch:lowlevelopt},~\ref{ch:coffee}). In essence: (i) the operation count is minimized by restructuring expressions and loop nests; (ii) auto-vectorization opportunities are created by using array padding and by enforcing data alignment.
 \end{description}
@@ -1252,7 +1251,7 @@ Given the large number of problem instances, the results of the search space exp
 
 \begin{figure}[htpb]
 \captionsetup{font=scriptsize}
-\caption{Search space exploration on Erebus with $n=4$ MPI processes. Two meshes ($h \in \lbrace 1.0, 1.2\rbrace$) and four polynomial orders ($q \in \lbrace 1, 2, 3 ,4\rbrace$) are shown. Each plot shows the average compute and communication time (ACCT, y-axis) of five fusion schemes and the original version. The seed tile size of a loop chain in an {\tt fs}, in terms of seed loop iterations, is the product of the ``tile size factor'' (x-axis) and a pre-established ``multiplier'' (an integer in the range $[1, 4]$; full list at~\cite{seigen-code}). With tiling, global maps, {\tt chunk} partitioning, and the extended boundary region optimization are used.}
+\caption{Search space exploration on Erebus with $n=4$ MPI processes. Two meshes ($h \in \lbrace 1.0, 1.2\rbrace$) and four polynomial orders ($q \in \lbrace 1, 2, 3 ,4\rbrace$) are shown. Each plot shows the average compute and communication time (ACCT, y-axis) of five fusion schemes and the original version. The seed tile size of a loop chain in an {\tt fs}, in terms of seed loop iterations, is the product of the ``tile size factor'' (x-axis) and a pre-established multiplier (an integer in the range $[1, 4]$; full list at~\cite{seigen-code}). With tiling, global maps, {\tt chunk} partitioning, and the extended boundary region optimization are used.}
 
 \par\bigskip
 \par\medskip
@@ -1278,7 +1277,7 @@ Given the large number of problem instances, the results of the search space exp
 
 \begin{figure}[htpb]
 \captionsetup{font=scriptsize}
-\caption{Search space exploration on CX1-Ivy with $n=20$ MPI processes. Two meshes ($h \in \lbrace 0.6, 0.8\rbrace$) and four polynomial orders ($q \in \lbrace 1, 2, 3 ,4\rbrace$) are shown. Each plot shows the average compute and communication time (ACCT, y-axis) of five fusion schemes and the original version. The seed tile size of a loop chain in an {\tt fs}, in terms of seed loop iterations, is the product of the ``tile size factor'' (x-axis) and a pre-established ``multiplier'' (an integer in the range $[1, 4]$; full list at~\cite{seigen-code}). With tiling, global maps, {\tt chunk} partitioning, and the extended boundary region optimization are used.}
+\caption{Search space exploration on CX1-Ivy with $n=20$ MPI processes. Two meshes ($h \in \lbrace 0.6, 0.8\rbrace$) and four polynomial orders ($q \in \lbrace 1, 2, 3 ,4\rbrace$) are shown. Each plot shows the average compute and communication time (ACCT, y-axis) of five fusion schemes and the original version. The seed tile size of a loop chain in an {\tt fs}, in terms of seed loop iterations, is the product of the ``tile size factor'' (x-axis) and a pre-established multiplier (an integer in the range $[1, 4]$; full list at~\cite{seigen-code}). With tiling, global maps, {\tt chunk} partitioning, and the extended boundary region optimization are used.}
 
 \par\bigskip
 \par\medskip
