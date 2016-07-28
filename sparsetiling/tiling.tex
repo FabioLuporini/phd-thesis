@@ -981,15 +981,15 @@ Five fusion schemes were devised, based on the following criteria: (i) amount of
 \centering
 \makebox[\textwidth][c]
 {
-\begin{tabulary}{1.0\columnwidth}{M{0.9cm} | M{2.2cm} | M{8.3cm} | M{0.9cm} N}
+\begin{tabulary}{1.0\columnwidth}{M{0.9cm} | M{2.2cm} | M{7.8cm} | M{1.0cm} N}
 \hline
 Fusion scheme & Number of sub loop chains & Criterion & {\em S-depth}  \\
 \hlineB{4}
-{\tt fs1} & 3 & Fuse {\tt velocity} cells and facets loops & 2 & \\[5pt] \hline
-{\tt fs2} & 8 & {\tt fs1} and fuse {\tt stress} cells and facets loops & 2 & \\[5pt] \hline
-{\tt fs3} & 6 & {\tt fs2} and fuse some solver loops & 2 & \\[5pt] \hline
-{\tt fs4} & 3 & More aggressive than {\tt fs2} & 3 & \\[5pt] \hline
-{\tt fs5} & 2 & Maximize locality in the {\tt velocity} and {\tt stress} loop chains & 4 & \\[5pt] \hline
+{\tt fs1} & 3 & Fuse only a few cells and facets loops & 2 & \\[5pt] \hline
+{\tt fs2} & 8 & Several short loop chains & 2 & \\[5pt] \hline
+{\tt fs3} & 6 & {\tt fs2} and include all solver loops & 2 & \\[5pt] \hline
+{\tt fs4} & 3 & More aggressive than {\tt fs3} & 3 & \\[5pt] \hline
+{\tt fs5} & 2 & Two loop chains: one for {\tt velocity} and one for {\tt stress} & 4 & \\[5pt] \hline
 \end{tabulary}
 }
 \caption{Summary of the fusion schemes adopted in Seigen. The {\em S-depth} column represents the number of off-process cell layers.}
