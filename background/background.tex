@@ -12,24 +12,26 @@ Computational methods based upon finite elements are used to approximate the sol
 
 \subsection{Weak Formulation}
 \label{sec:bkg:var-problems}
-In a {\em boundary value problem}, the solution of a (partial) differential equation subjected to a set of {\em boundary conditions} is sought. The boundary conditions specify the behaviour of the unknown at the domain boundary. We consider the {\em variational} or {\em weak} formulation of a linear boundary value problem\footnote{Non-linear problems require refinements that are out of the scope of this review.}
+In a {\em boundary value problem}, the solution of a (partial) differential equation subject to a set of {\em boundary conditions} is sought. The boundary conditions specify the behaviour of the unknown at the domain boundary. 
+
+We introduce two spaces of functions, $U$ and $V$, called respectively trial space and test space. Informally, we can think of $U$ and $V$ as ``nice'' spaces, in which functions have desirable properties. We consider the {\em variational} or {\em weak} formulation of a linear boundary value problem\footnote{Non-linear problems require refinements that are out of the scope of this review.}
 
 \begin{equation}
 \label{sec:bkg:eq:strong}
 \text{Find}\ u \in U\ \text{such that}\ \ \ \ a(u, v) = L(v)\ \ \ \ \forall v \in V
 \end{equation}
 
-where $u$ is the sought solution, $a$ a bilinear form and $L$ a linear form. The term ``variational'' stems from the fact that the function $v$ can vary arbitrarily. The reader unfamiliar with the theory of Hilbert spaces may find this formulation unusual. Informally, we can think of $V$ as a ``very nice'' space, in which functions have desirable properties. The underlying idea of the variational formulation consists of ``transferring'' certain requirements on the unknown (e.g., differentiability) to $v$. 
+where $u$ is the sought problem solution. In this formulation, $a$ is a bilinear form (a map $U \times V \rightarrow \mathbb{R}$, linear in each argument separately) and $L$ is a linear form (a linear map $V \rightarrow \mathbb{R}$). The term ``variational'' stems from the fact that the test function $v$ can vary arbitrarily. The reader unfamiliar with the theory of Hilbert spaces may find this formulation unusual. The underlying idea of the variational formulation consists of ``transferring'' certain requirements on the unknown (e.g., differentiability) to $v$. 
 %A deep understanding of meaning and implications of a weak formulation goes, however, far beyond the objectives of this section.
 
-The sets $U$ and $V$ and called, respectively, trial and test spaces. In the finite element method, the variational problem is discretized by using {\it discrete} trial and test spaces, namely $U_h \subset U$ and $V_h \subset V$. This leads to restating~(\ref{sec:bkg:eq:strong}) as
+In the finite element method, the variational problem is discretized by using {\it discrete} trial and test spaces, namely $U_h \subset U$ and $V_h \subset V$. This leads to restating~(\ref{sec:bkg:eq:strong}) as
 
 \begin{equation}
 \label{sec:bkg:eq:disc-var}
 \text{Find}\ u_h \in U_h \subset U\ \text{such that}\ \ \ \ a(u_h, v_h) = L(v_h)\ \ \ \ \forall v_h \in V_h \subset V
 \end{equation}
 
-Let $\lbrace \psi_j \rbrace_{j=1}^N$ be the set of basis functions spanning $U_h$ and let $\lbrace \phi_i \rbrace_{i=1}^{N}$ be the set of basis functions spanning $V_h$. The unknown solution $u$ can be approximated as a linear combination of the basis functions $\lbrace \psi_j \rbrace_{j=1}^N$,
+Let $\lbrace \psi_j \rbrace_{j=1}^N$ be a set of basis functions spanning $U_h$ and let $\lbrace \phi_i \rbrace_{i=1}^{N}$ be a set of basis functions spanning $V_h$. The unknown solution $u$ can be approximated as a linear combination of the basis functions $\lbrace \psi_j \rbrace_{j=1}^N$,
 
 \begin{equation}
 u_h = \sum_{j=1}^N \hat{u}_j \psi_j.
@@ -70,7 +72,7 @@ The underlying assumption of this formulation is that the finite dimensional sub
 In the finite element method, the domain $\Omega$ of the PDE is partitioned into a finite set of disjoint cells $\lbrace K \rbrace$; that is, $\bigcup K = \Omega$ and $\bigcap K = \emptyset$. This forms a {\em mesh}. 
 
 \paragraph{Finite elements}
-As originally formalized in~\cite{ciarlet-fem}, a finite element is a triple ${<}K,\mathcal{P}_K,\mathcal{L}_K{>}$, where:
+As originally formalized in~\cite{ciarlet-fem}, a finite element is a triple $\langle K,\mathcal{P}_K,\mathcal{L}_K \rangle$, where:
 \begin{itemize}
 \item $K$ is a cell in the mesh with non-empty interior and piecewise smooth boundary;
 \item $\mathcal{P}_K$ is a finite dimensional ``local'' function space of dimension $n_K$;
