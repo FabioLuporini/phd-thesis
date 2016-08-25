@@ -405,6 +405,7 @@ UFL will be used to generate kernels for experimentation; a deep understanding o
 % strict or deep ?
 
 \subsubsection{Form Compilers}
+\label{sec:bkg:form-compilers}
 The transformed UFL (e.g., after automatic differentiation has been applied) is passed to a form compiler, where a representation of the assembly operators is constructed. The {\em FEniCS Form Compiler}, or FFC, was originally used by Firedrake for this task. FFC, which supports the quadrature and tensor contraction modes illustrated in Section~\ref{sec:bkg:math-to-code}, was later modified to emit abstract syntax trees (ASTs) instead of C code. More recently, FFC has been supplanted by the {\em Two-Stage Form Compiler}, or TSFC. Just like FFC, TSFC emits abstract syntax trees (ASTs). The optimizations described in Chapters~\ref{ch:optimality} and~\ref{ch:lowlevelopt} are implemented by manipulating these ASTs in a lower-level compiler, COFFEE, whose structure will be outlined in Chapter~\ref{ch:coffee}.
 
 TSFC has two main features:
