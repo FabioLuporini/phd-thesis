@@ -22,7 +22,7 @@ In common with general-purpose compilers, COFFEE provides multiple optimization 
 The optimization level \texttt{Ox} can logically be split into three stages:
 \begin{description}
 \item[Expression rewriting] Any transformations changing the structure of an expression. These are sharing elimination and pre-evaluation; or, more in general, any rewrite operators on top of which such higher level transformations are expressed (e.g., generalized code motion, factorization; full list provided in Section~\ref{sec:coffee:rewrite-ops}). 
-\item[Sparsity Optimization] The iteration spaces are restructured to skip useless operations, such as those involving blocks of zeros in basis function tables. In particular, loops may be fissioned, their bounds changed, and offsets introduced for accessing non-zero array values. More details in Section~\ref{sec:zeros}.
+\item[Sparsity Optimization] The iteration spaces are restructured to skip useless operations, such as those involving blocks of zeros in basis function tables. In particular, loops may be fissioned, their bounds changed, and offsets introduced for accessing non-zero array values. More details are presented in Section~\ref{sec:zeros}.
 \item[Code Specialization] A combination of the low level transformations presented in Chapter~\ref{ch:coffee} is applied.
 \end{description}
 These three stages are totally ordered. Indeed, it would be useless to apply any of the low level transformations until all loops and temporaries have been created.
@@ -30,7 +30,7 @@ These three stages are totally ordered. Indeed, it would be useless to apply any
 The optimization process \texttt{Ox} represents the core phase in COFFEE. Overall, the compilation pipeline consists of three phases:
 
 \begin{description}
-\item[Analysis] During the analysis phase, an AST is visited and information are collected. In particular, candidates for expression rewriting are searched. These are represented as special nodes in the AST, which we refer to as ``expression nodes''. In plain C, we could think of an expression node as a statement preceded by a directive such as \texttt{$\#$pragma coffee}. The purpose of the directive would be to trigger COFFEE's \texttt{Ox}, similarly to the way loops are parallelized through OpenMP. If no expression nodes are found, we jump directly to the last phase (i.e., code generation).
+\item[Analysis] During the analysis phase, an AST is visited and information are collected. In particular, candidates for expression rewriting are searched for. These are represented as special nodes in the AST, which we refer to as ``expression nodes''. In plain C, we could think of an expression node as a statement preceded by a directive such as \texttt{$\#$pragma coffee}. The purpose of the directive would be to trigger COFFEE's \texttt{Ox}, similarly to the way loops are parallelized through OpenMP. If no expression nodes are found, we jump directly to the last phase (i.e., code generation).
 
 \item[Optimization ({\tt Ox} or user-provided)] In addition to \texttt{Ox}, users can craft their own optimization pipelines by composing the individual transformations available in COFFEE. The compiler checks that the provided transformation sequence is legal. If the specified sequence of transformations is legal, the AST is processed. Specifically, for {\tt Ox}:
 \begin{description}
@@ -72,7 +72,7 @@ Rather than using a parser, COFFEE exposes the whole hierarchy of nodes for expl
 COFFEE has been integrated with two form compilers: the FEniCS Form Compiler (FFC) and the Two-Stage Form Compiler (TSFC). These form compilers represent assembly kernels using their own internal language. The objective is to turn such a representation into an AST suitable for COFFEE. 
 
 \paragraph{FFC and COFFEE}
-FFC was developed in the context of the FEniCS framework. We had to modify the FFC's intermediate representation for constructing COFFEE ASTs, rather than C code. We made the following changes.
+FFC was developed in the context of the FEniCS framework. We had to modify the FFC's intermediate representation for constructing COFFEE ASTs, rather than C code. We made the following changes:
 \begin{itemize}
 \item The mathematical expression evaluating the element tensor is represented in FFC as a tree data structure, or FFC AST. A limitation of an FFC AST was that its nodes -- symbols or arithmetic operations -- were not bound to loops. For instance, the FFC AST node corresponding to the symbol \texttt{A[i][j]} could not separate the variable name \texttt{A} from the loop indices \texttt{i} and \texttt{j}. We have enriched FFC AST symbols with additional fields to capture this kind of information.
 \item Basis functions in an FFC AST are added a new field storing the dimensionality of the function space. This information is later used to enrich \texttt{ArrayInit} objects with a sparsity pattern. This enables sparsity optimization without requiring COFFEE to ``sniff'' array values.
@@ -90,7 +90,7 @@ TSFC was conceived to produce an input suitable for COFFEE. This is accomplished
 
 \section{Rewrite Operators}
 \label{sec:coffee:rewrite-ops}
-COFFEE implements sharing elimination and pre-evaluation by composing ``building-block'' operators, or ``rewrite operators''. This has several advantages. Firstly, extendibility: novel transformations -- for instance, sum-factorization in spectral methods -- could be expressed using the existing operators, or with small effort building on what is already available. Secondly, generality: COFFEE can be seen as a lightweight, low level computer algebra system, not necessarily tied to finite element integration. Thirdly, robustness: the same operators are exploited, and therefore stressed, by different optimization pipelines. The rewrite operators, whose implementation is based on manipulation of the kernel's AST, essentially compose the COFFEE language. 
+COFFEE implements sharing elimination and pre-evaluation by composing ``building-block'' operators, or ``rewrite operators''. This has several advantages. Firstly, extensibility: novel transformations -- for instance, sum-factorization in spectral methods -- could be expressed using the existing operators, or with small effort building on what is already available. Secondly, generality: COFFEE can be seen as a lightweight, low level computer algebra system, not necessarily tied to finite element integration. Thirdly, robustness: the same operators are exploited, and therefore stressed, by different optimization pipelines. The rewrite operators, whose implementation is based on manipulation of the kernel's AST, essentially compose the COFFEE language. 
 
 The most important rewrite operators in COFFEE are:
 \begin{description}
@@ -157,7 +157,7 @@ Data dependency analysis is necessary to ensure the legality of transformations.
 COFFEE uses a dependency graph to track data dependencies. The dependency graph has as many vertices as symbols in the code; a direct edge from \texttt{A} to \texttt{B} indicates that symbol \texttt{B} depends on (i.e., is going to read) symbol \texttt{A}. Since COFFEE relies on \textit{static single assignment} -- a property that ensures that variables are assigned exactly once -- such a minimalistic data structure suffices for data dependence analysis.
 
 \subsection{Minimizing Temporaries}
-Both the code motion operator and loop fusion (Section~\ref{sec:coffee-loopfusion}) impact the number of temporaries in an assembly kernel. Once the AST has been transformed, a special routine attempts to remove the unnecessary temporaries. In addition to reliving the register pressure (this actually depends on how smart is the underlying general-purpose compiler), this has the effect of making the code more readable.
+Both the code motion operator and loop fusion (Section~\ref{sec:coffee-loopfusion}) impact the number of temporaries in an assembly kernel. Once the AST has been transformed, a special routine attempts to remove the unnecessary temporaries. In addition to relieving the register pressure (this actually depends on how smart the underlying general-purpose compiler is), this has the effect of making the code more readable.
 
 The main rule for removing a temporary \texttt{t} storing an expression \texttt{e} is that if \texttt{t} is accessed only in a single statement \texttt{s}, then \texttt{e} is inlined into \texttt{s} and \texttt{t} is removed. Secondly, if some of the transformations in the optimization pipeline reduced \texttt{e} to a symbol, then any appearance of \texttt{t} is also replaced by \texttt{e}.
 
