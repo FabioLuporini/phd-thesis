@@ -5,7 +5,7 @@
 \chapter{Minimizing Operations in Finite Element Integration Loops}
 \label{ch:optimality}
 
-In this chapter, we present an algorithm for the optimization of a class of finite element local assembly kernels. This algorithm, which exploits fundamental mathematical properties of finite element operators, is proven to achieve a locally optimal operation count. In specified circumstances the optimum achieved is global. Extensive experimentation shows significant performance improvements over state-of-the-art finite element code generation systems in almost all cases. This validates the effectiveness of the algorithm presented here, and illustrates its limitations. The algorithm is implemented in COFFEE and currently in use in the Firedrake framework. This chapter is an extended version of~\citep{Luporini-minimalflops}.
+In this chapter, we present an algorithm for the optimization of a class of finite element local assembly kernels. This algorithm, which exploits fundamental mathematical properties of finite element operators, is proven to achieve a locally optimal operation count. In specified circumstances the optimum achieved is global. Extensive experimentation shows significant performance improvements over state-of-the-art finite element code generation systems in almost all cases. This validates the effectiveness of the algorithm presented here, and illustrates its limitations. The algorithm is implemented in COFFEE and is currently in use in the Firedrake framework. This chapter is an extended version of~\citep{Luporini-minimalflops}.
 
 \section{Motivation and Related Work}
 
@@ -37,7 +37,7 @@ In Section~\ref{sec:lnopt} we introduce a set of definitions mapping mathematica
 
 \section{Loop Nests, Expressions and Optimality}
 \label{sec:lnopt}
-In this section, we characterize global and local optimality for finite element integration. In order to make the chapter self-contained, we start with reviewing basic compiler terminology.
+In this section, we characterize global and local optimality for finite element integration. In order to make the chapter self-contained, we start by reviewing basic compiler terminology.
 
 \begin{Def}[Perfect and imperfect loop nests]
 A perfect loop nest is a loop whose body either 1) comprises only a sequence of non-loop statements or 2) is itself a perfect loop nest. If this condition does not hold, a loop nest is said to be imperfect. 
@@ -142,7 +142,7 @@ Achieving optimality in polynomial time is not generally feasible, since the $\s
 
 \section{Transformation Space: Sharing Elimination}
 \label{sec:sharing-elimination}
-We start with introducing the fundamental notion of sharing.
+We start by introducing the fundamental notion of sharing.
 
 \begin{Def}[Sharing]
 A statement within a loop nest $\Lambda$ presents sharing if at least one of the following conditions hold:
@@ -584,7 +584,7 @@ Following the methodology adopted in~\cite{quadrature-olegaard}, we vary the fol
 \end{itemize}
 While constants of our study are
 \begin{itemize}
-\item the space of test, trial, and coefficient functions: Lagrange
+\item the element family: Lagrange
 \item the mesh: tetrahedral with a total of 4374 elements
 \item exact numerical quadrature (we employ the same scheme used in~\cite{quadrature-olegaard}, based on the Gauss-Legendre-Jacobi rule)
 \end{itemize}
@@ -653,7 +653,7 @@ In the experiments on the hyperelastic model, shown in Figure~\ref{fig:hyperelas
 
 \section{Conclusions}
 \label{sec:conclusions}
-We have developed a theory for the optimization of finite element integration loop nests. The chapter details the domain properties which are exploited by our approach (e.g., linearity) and how these translate to transformations at the level of loop nests. All of the algorithms shown in this chapter have been implemented in COFFEE, a compiler publicly available fully integrated with the Firedrake framework. The correctness of the transformation algorithm was discussed. The performance results achieved suggest the effectiveness of our methodology. 
+We have developed a theory for the optimization of finite element integration loop nests. The chapter details the domain properties which are exploited by our approach (e.g., linearity) and how these translate to transformations at the level of loop nests. All of the algorithms shown in this chapter have been implemented in COFFEE, a publicly available compiler fully integrated with the Firedrake framework. The correctness of the transformation algorithm was discussed. The performance results achieved suggest the effectiveness of our methodology.
 
 \section{Limitations and Future Work}
 \label{sec:completeness}
