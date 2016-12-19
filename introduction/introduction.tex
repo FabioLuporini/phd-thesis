@@ -9,7 +9,7 @@
 
 %Maximizing the performance of numerical methods based upon unstructured meshes is a challenging task that can be relieved by raising the level of abstraction: if applications are expressed with domain-specific languages, powerful optimizations can be automated through compilers without the need for complex source code analysis. 
 
-Maximizing the performance of numerical methods for partial differential equations is a challenging task that can be relieved by raising the level of abstraction, through which automated optimization becomes possible. 
+Maximizing the performance of numerical methods for partial differential equations is a challenging task that can be facilitated by raising the level of abstraction, through which automated optimization becomes possible.
 
 \section{Overview}
 In many fields such as computational fluid dynamics, computational electromagnetics and structural mechanics, phenomena are modelled by partial differential equations. Numerical techniques, such as the finite volume method and the finite element method, are widely employed to approximate their solutions. Unstructured meshes are often used to discretize the computational domain, since they allow an accurate representation of complex geometries. The solution is sought by applying suitable numerical operations, or kernels, to the entities of a mesh, such as edges, vertices, or cells. On typical clusters of multi-core processors, usually, a kernel is executed sequentially by a process, while parallelism is achieved by assigning mesh partitions to different nodes or processes. This execution model is adopted by many real-world applications and frameworks.
