@@ -35,7 +35,7 @@ The optimization process \texttt{Ox} represents the core phase in COFFEE. Overal
 \item[Optimization ({\tt Ox} or user-provided)] In addition to \texttt{Ox}, users can craft their own optimization pipelines by composing the individual transformations available in COFFEE. The compiler checks that the provided transformation sequence is legal. If the specified sequence of transformations is legal, the AST is processed. Specifically, for {\tt Ox}:
 \begin{description}
 \item[\texttt{O1}] Expression rewriting reduces to generalized code motion, while only padding and data alignment as well as loop fusion are applied amongst the low level optimizations.
-\item[\texttt{O2}] With respect to \texttt{O1}, there is only one yet fundamental change: expression rewriting now performs the whole sharing elimination procedure (i.e., Algorithm~\ref{algo:sharing-elimination}).
+\item[\texttt{O2}] With respect to \texttt{O1}, there is only one, yet fundamental, change: expression rewriting now performs the whole sharing elimination procedure (i.e., Algorithm~\ref{algo:sharing-elimination}).
 \item[\texttt{O3}] Algorithm~\ref{algo:gamma}, which coordinates sharing elimination and pre-evaluation, is executed. This is followed by sparsity optimization, loop fusion and padding and data alignment.
 \end{description}
 
@@ -72,7 +72,7 @@ Rather than using a parser, COFFEE exposes the whole hierarchy of nodes for expl
 COFFEE has been integrated with two form compilers: the FEniCS Form Compiler (FFC) and the Two-Stage Form Compiler (TSFC). These form compilers represent assembly kernels using their own internal language. The objective is to turn such a representation into an AST suitable for COFFEE. 
 
 \paragraph{FFC and COFFEE}
-FFC was developed in the context of the FEniCS framework. We had to modify the FFC's intermediate representation for constructing COFFEE ASTs, rather than C code. We made the following changes:
+FFC was developed in the context of the FEniCS framework. In the early stages of this thesis, the FFC's intermediate representation was modified to construct COFFEE ASTs, rather than C code. The following contributions were made:
 \begin{itemize}
 \item The mathematical expression evaluating the element tensor is represented in FFC as a tree data structure, or FFC AST. A limitation of an FFC AST was that its nodes -- symbols or arithmetic operations -- were not bound to loops. For instance, the FFC AST node corresponding to the symbol \texttt{A[i][j]} could not separate the variable name \texttt{A} from the loop indices \texttt{i} and \texttt{j}. We have enriched FFC AST symbols with additional fields to capture this kind of information.
 \item Basis functions in an FFC AST are added a new field storing the dimensionality of the function space. This information is later used to enrich \texttt{ArrayInit} objects with a sparsity pattern. This enables sparsity optimization without requiring COFFEE to ``sniff'' array values.
