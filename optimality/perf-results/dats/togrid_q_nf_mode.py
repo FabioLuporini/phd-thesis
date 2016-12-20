@@ -92,30 +92,31 @@ for ax, ((nf, q), vals) in zip(grid, sorted(_timings.items())):
 
     # Tricks to display proper ylabels and axis titles
     if name == 'helmholtz':
-        y0 = 18.0
-        y1 = 11.0
-        ax.set_ylabel(r'$\mathrm{nf} = %d$' % _nf, fontsize=fontsize, color='black')
-        if _nf == 0:
-            # floats, not ints
-            ax.set_ylim([0.0, 8.01])
-            ax.set_yticks([0, 1, 2, 3, 4, 5, 6, 7, 8, 8.5])
+        y0 = 42.6
+        y1 = 26.73
+        ax.set_ylabel(r'$\mathrm{nf} = %d$' % _nf, fontsize=fontsize, color='black', labelpad=9.0)
+        ax.set_ylim([0.0, 8.3])
+        ax.set_yticks([0, 2, 4, 6, 8])
     elif name == 'elasticity':
-        y0 = 62.0
+        y0 = 64.2
         y1 = 39.0
-        if _nf in [0, 1, 2]:
-            ax.set_ylabel(r'$\mathrm{nf} = %d$' % _nf, fontsize=fontsize, color='black', labelpad=11.0)
-        else:
-            ax.set_ylabel(r'$\mathrm{nf} = %d$' % _nf, fontsize=fontsize, color='black')
+        ax.set_ylim([0.0, 12.5])
+        ax.set_yticks([0, 2, 4, 6, 8, 10, 12])
+        ax.set_ylabel(r'$\mathrm{nf} = %d$' % _nf, fontsize=fontsize, color='black', labelpad=3.8)
     elif name == 'mass':
-        y0 = 9.28
-        y1 = 5.73
-        ax.set_ylabel(r'$\mathrm{nf} = %d$' % _nf, fontsize=fontsize, color='black')
+        y0 = 20.48
+        y1 = 12.73
+        ax.set_ylabel(r'$\mathrm{nf} = %d$' % _nf, fontsize=fontsize, color='black', labelpad=9.0)
+        ax.set_ylim([0.0, 4.0])
+        ax.set_yticks([0, 1, 2, 3, 4])
     elif name == 'hyperelasticity':
-        y0 = 46.0
+        y0 = 48.0
         y1 = 30.0
-        ax.set_ylabel(r'$\mathrm{nf} = %d$' % _nf, fontsize=fontsize, color='black')
+        ax.set_ylim([0.0, 21.0])
+        ax.set_yticks([0, 5, 10, 15, 20])
+        ax.set_ylabel(r'$\mathrm{nf} = %d$' % _nf, fontsize=fontsize, color='black', labelpad=3.8)
 
 # Finally, we're ready to plot !
 plt.text(-9.6, y0, r'Polynomial degree $q$')
-plt.text(-21.9, y1, r'Speedup relative to baseline', rotation='vertical')
+plt.text(-22.15, y1, r'Speedup relative to baseline', rotation='vertical')
 plt.savefig('%s.pdf' % name)
