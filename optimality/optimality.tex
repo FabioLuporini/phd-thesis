@@ -631,7 +631,7 @@ As in the case of Mass matrix, when $q=1$ the matrix insertion phase is dominant
 \begin{description}
 \item[$\mathrm{nf}=0$] pre-evaluation makes \texttt{cfO2} notably faster than \texttt{cfO1}, especially for high values of $q$; \texttt{auto} correctly selects \texttt{tens}, which is comparable to \texttt{cfO2}. 
 \item[$\mathrm{nf}=1$] \texttt{auto} picks \texttt{tens}; the choice is however sub-optimal when $q=3$ and $q=4$. This can indirectly be inferred from the large gap between \texttt{cfO2} and \texttt{tens/auto}: \texttt{cfO2} applies sharing elimination, but it correctly avoids pre-evaluation because of the excessive expansion cost.
-\item[$\mathrm{nf}=2$ and $\mathrm{nf}=3$] \texttt{auto} reverts to \texttt{quad}, which would theoretically be the right choice (the flop count is much lower than in \texttt{tens}); however, the generated code suffers from the presence of indirection arrays, which break autovectorization and ``traditional'' code motion.
+\item[$\mathrm{nf}=2, 3$] \texttt{auto} reverts to \texttt{quad}, which would theoretically be the right choice (the flop count is much lower than in \texttt{tens}); however, the generated code suffers from the presence of indirection arrays, which break autovectorization and ``traditional'' code motion.
 \end{description}
 
 The slow-downs (or marginal improvements) seen in a small number of cases exhibited by \texttt{ufls} can be attributed to the presence of sharing in the generated code.
