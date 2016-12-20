@@ -217,7 +217,7 @@ where $B$ is the set of all basis functions or temporary variables accessed in t
 %registers.
 
 \begin{figure}[h]
-\centerline{\includegraphics[scale=0.6]{lowlevelopt/pictures/vect-by-vect-inline.pdf}}
+\centerline{\includegraphics[scale=0.9]{lowlevelopt/pictures/vect-by-vect-inline.pdf}}
 \caption{The outer-product vectorization relies on permuting values directly within vector registers.}
 \label{fig:vect-by-vect}
 \end{figure}
@@ -225,7 +225,7 @@ where $B$ is the set of all basis functions or temporary variables accessed in t
 The storage layout of {\tt PA}, however, is incorrect after the application of this outer-product-based vectorization. It can be efficiently restored with a sequence of vector shuffles following the pattern highlighted in Figure~\ref{fig:restore-layout}, executed once outside of the \texttt{ijk} loop nest. The pseudo-code for the transformed weighted Laplace assembly kernel is shown in Listing~\ref{code:weighted-laplace-opvect}.
 
 \begin{figure}[h]
-\centerline{\includegraphics[scale=0.6]{lowlevelopt/pictures/vect-restore-inline.pdf}}
+\centerline{\includegraphics[scale=0.9]{lowlevelopt/pictures/vect-restore-inline.pdf}}
 \caption{Restoring the storage layout is the last step of the outer-product vectorization. The figure shows how 4$\times$4 elements in the top-left block of the element matrix {\tt A} can be moved to their correct positions. Each rotation, represented by a group of three same-colored arrows, is implemented by a single shuffle intrinsic.}
 \label{fig:restore-layout}
 \end{figure}

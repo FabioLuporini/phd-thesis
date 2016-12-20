@@ -204,7 +204,7 @@ $A_{ij}^K$ is numerically evaluated by means of a quadrature scheme. A quadratur
 
 \begin{equation}
 \begin{split}
-A^K & = \int_K w \nabla \phi_i^K \cdot \nabla \phi_j^K \\
+A_{ij}^K & = \int_K w \nabla \phi_i^K \cdot \nabla \phi_j^K \\
 & \approx w \sum_{k=1}^{N_q} W_k \nabla \phi_i^K(\boldsymbol{x}^k) \cdot \nabla \phi_j^K (\boldsymbol{x}^k) | \operatorname{det} \mathcal{G}_K'(\boldsymbol{x}^k) |,
 \end{split}
 \end{equation} 
@@ -228,15 +228,29 @@ A_{ij}^K = \sum_{k=1}^{N_q} \sum_{\alpha_3=1}^n \phi_{\alpha_3}(\boldsymbol{X}^k
 \subsubsection{Assembly with Tensor Contraction}
 %\label{sec:tc}
 Consider the case in which $\mathcal{G}_K : \hat{K} \rightarrow K$ is an affine mapping. Exploiting linearity, associativity and distributivity of the involved mathematical operators, we can rewrite (\ref{eq:quadrature}) as
+
 \begin{equation}
 \label{eq:tensor}
-A_{ij}^K = \sum_{\alpha_1=1}^d \sum_{\alpha_2=1}^d \sum_{\alpha_3=1}^n \operatorname{det} \mathcal{G}_K' w_{\alpha_3} \sum_{\beta=1}^d \frac{X_{\alpha_1}}{\partial x_{\beta}} \frac{\partial X_{\alpha_2}}{\partial x_{\beta}} \int_{K_0} \phi_{\alpha_3} \frac{\partial \phi_{i_1}}{\partial X_{\alpha_1}} \frac{\partial \phi_{i_2}}{\partial X_{\alpha_2}} dX.
+A_{ij}^K = \sum_{\alpha_1=1}^d \sum_{\alpha_2=1}^d \sum_{\alpha_3=1}^n \operatorname{det} \mathcal{G}_K' w_{\alpha_3} \sum_{\beta=1}^d \frac{\partial X_{\alpha_1}}{\partial x_{\beta}} \frac{\partial X_{\alpha_2}}{\partial x_{\beta}} \int_{K_0} \phi_{\alpha_3} \frac{\partial \phi_{i}}{\partial X_{\alpha_1}} \frac{\partial \phi_{j}}{\partial X_{\alpha_2}} dX.
 \end{equation}
+
 A generalization of this transformation has been proposed in~\cite{FFC-TC}. By only involving reference element terms, the integral in the equation can be pre-evaluated and stored in temporary variables. The evaluation of the local tensor can then be abstracted as
+
 \begin{equation}
-A_{ij}^K = \sum_{\alpha} A_{i_1 i_2 \alpha}^0 G_{K}^\alpha
+A_{ij}^K = \sum_{\alpha} A_{i j \alpha}^0 G_{K}^\alpha
 \end{equation}
-in which the pre-evaluated ``reference tensor'' $A_{i_1 i_2 \alpha}$ and the cell-dependent ``geometry tensor'' $G_{K}^\alpha$ are exposed. 
+
+in which the pre-evaluated ``reference tensor'' $A_{i j \alpha}$ and the cell-dependent ``geometry tensor'' $G_{K}^\alpha$
+
+\begin{equation}
+A_{i j \alpha}^0 = \int_{K_0} \phi_{\alpha_3} \frac{\partial \phi_{i}}{\partial X_{\alpha_1}} \frac{\partial \phi_{j}}{\partial X_{\alpha_2}} dX,
+\end{equation}
+
+\begin{equation}
+G_{K}^\alpha = \operatorname{det} \mathcal{G}_K' w_{\alpha_3} \sum_{\beta=1}^d \frac{\partial X_{\alpha_1}}{\partial x_{\beta}} \frac{\partial X_{\alpha_2}}{\partial x_{\beta}}
+\end{equation}
+
+are exposed.
 
 
 \subsubsection{Qualitative Comparison of Quadrature and Tensor Contraction}
@@ -547,8 +561,8 @@ PyOP2 distinguishes itself from OP2 in a number of ways.
 A stencil defines how to access a set of values associated with a mesh element (e.g., vertex, cell) and its neighboring elements. In the literature, the word ``stencil'' is often used to refer to the special case in which the access rule is an affine function. This is the case of computational methods based on structured meshes, such as the finite difference method. However, since this thesis focuses on unstructured meshes, we generalize this notion. We characterize a stencil as follows:
 
 \begin{description}
-\item[Stencils for structured meshes] Given an element $\boldsymbol{i}$ in the mesh, a stencil is a vector-valued function $f(\boldsymbol{i}) = [f_1(\boldsymbol{i}), f_2(\boldsymbol{i}), ..., f_n(\boldsymbol{i})]$ which retrieves the $n$ elements that need be updated when accessing $\boldsymbol{i}$. A function $f_j$ is affine and usually takes the form $f_j(\boldsymbol{i}) = \boldsymbol{i}*h + o$, with $h, o \in \mathbb{N}$.
-\item[Stencils for unstructured meshes] Given an element $\boldsymbol{i}$ in the mesh and an affine access function $g$, a stencil is a vector-valued operator $f(\boldsymbol{i}, g) = [f_1(\boldsymbol{i}, g), f_2(\boldsymbol{i}, g), ..., f_n(\boldsymbol{i}, g)]$ which retrieves the $n$ elements that need be updated when accessing $\boldsymbol{i}$. A function $f_j$ is non-affine and usually takes the form $f_j(\boldsymbol{i}, g) = g(\boldsymbol{i})*h + o$, with $h, o \in \mathbb{N}$.
+\item[Stencils for structured meshes] Given an element $\boldsymbol{i}$ in the mesh, a stencil is a vector-valued function $f(\boldsymbol{i}) = [f_1(\boldsymbol{i}), f_2(\boldsymbol{i}), ..., f_n(\boldsymbol{i})]$ which retrieves the $n$ elements that need to be updated when accessing $\boldsymbol{i}$. A function $f_j$ is affine and usually takes the form $f_j(\boldsymbol{i}) = \boldsymbol{i}*h + o$, with $h, o \in \mathbb{N}$.
+\item[Stencils for unstructured meshes] Given an element $\boldsymbol{i}$ in the mesh and an affine access function $g$, a stencil is a vector-valued operator $f(\boldsymbol{i}, g) = [f_1(\boldsymbol{i}, g), f_2(\boldsymbol{i}, g), ..., f_n(\boldsymbol{i}, g)]$ which retrieves the $n$ elements that need to be updated when accessing $\boldsymbol{i}$. A function $f_j$ is non-affine and usually takes the form $f_j(\boldsymbol{i}, g) = g(\boldsymbol{i})*h + o$, with $h, o \in \mathbb{N}$.
 \end{description}
 
 \subsubsection{Stencil Languages for Unstructured Meshes}
