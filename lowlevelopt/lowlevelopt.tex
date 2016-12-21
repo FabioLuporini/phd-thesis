@@ -248,7 +248,7 @@ The benchmarks, including the UFL description, are available at~\citep{ufl-code-
 \begin{equation}
 \int_\Omega \nabla u\cdot\nabla v  + uv\ \mathrm{d}x
 \end{equation}
-\caption{The Helmholtz bilinear form. The trial function $u$ and the test function $v$ belong to the space of Lagrange basis functions of given order.}
+\caption{The Helmholtz bilinear form. The trial function $u$ and the test function $v$ belong to the space of continuous piecewise-defined polynomials of given degree (spanned by the usual Lagrange basis functions).}
 \label{eq:lowlevel-helmholtz}
 \end{figure}
 
@@ -256,7 +256,7 @@ The benchmarks, including the UFL description, are available at~\citep{ufl-code-
 \begin{equation}
 \int_\Omega \nabla u\cdot\nabla v\ \mathrm{d}x
 \end{equation}
-\caption{The Diffusion bilinear form. The trial function $u$ and the test function $v$ belong to the space of Lagrange basis functions of given order.}
+\caption{The Diffusion bilinear form. The trial function $u$ and the test function $v$ belong to the space of continuous piecewise-defined polynomials of given degree (spanned by the usual Lagrange basis functions).}
 \label{eq:lowlevel-diffusion}
 \end{figure}
 
@@ -264,7 +264,7 @@ The benchmarks, including the UFL description, are available at~\citep{ufl-code-
 \begin{equation}
 \int_\Omega\frac{u^{n+1}-u^n}{dt}\cdot v + ((u^{n+1}\cdot\nabla) u^{n+1})\cdot v + \nu\nabla u^{n+1}\cdot\nabla v \ \mathrm d x
 \end{equation}
-\caption{The Burgers operator. The solution $u$ and the test function $v$ belong to the space of vector-valued Lagrange basis functions of given order. $\nu$ is a constant scalar viscosity. A backward Euler time discretization is used.}
+\caption{The Burgers operator. The solution $u$ and the test function $v$ belong to the space of vector-valued continuous piecewise-defined polynomials of given degree (spanned by the usual Lagrange basis functions). $\nu$ is a constant scalar viscosity. A backward Euler time discretization is used.}
 \label{eq:lowlevel-burgers}
 \end{figure}
 
