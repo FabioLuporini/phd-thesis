@@ -915,13 +915,13 @@ The Airfoil experiments highlighted that shared-memory parallelism over multi-so
 
 \section{Performance Evaluation - Seigen: an Elastic Wave Equation Solver for Seismological Problems}
 \label{sec:tiling:seigen}
-In this section, sparse tiling is applied to a computation built on top of Firedrake, Seigen. The performance analysis presented in the following sections is an actual methodological contribution of the thesis. The objectives of this experimentation were to quantify and to motivate in detail the impact of the optimization in a complex, realistic simulation. For this, we executed a large set of experiments on multiple architectures, made use of profilers and analytical tools, and studied the correlation with key simulation parameters, such as the polynomial order and the mesh.
+In this section, sparse tiling is applied to a computation built on top of Firedrake, Seigen. The performance analysis presented in the following sections is an actual methodological contribution of the thesis. The objectives of this experimentation were to quantify and to motivate in detail the impact of the optimization in a complex, realistic application. For this, we executed a large set of experiments on multiple architectures, made use of profilers and analytical tools, and studied the correlation with key simulation parameters, such as the polynomial order and the mesh.
 
 \subsection{Computation}
 \label{sec:tiling:seigen:comp}
 
 \subsubsection{The Seismic Model}
-Seigen is a novel seismological modelling framework capable of solving the elastic wave equation on unstructured meshes. Exploiting the well-known velocity-stress formulation~\citep{Seigen-3}, the seismic model is expressible as two first-order linear PDEs, which we refer to as {\tt velocity} and {\tt stress}. These governing equations are discretized in space through the discontinuous-Galerkin finite element method. The evolution over time is obtained by using a fourth-order explicit leapfrog scheme based on a truncated Taylor series expansion of the velocity and stress fields. The particular choice of spatial and temporal discretizations has been shown to be non-dissipative~\citep{Seigen-1}. More details can be found in~\cite{Seigen-paper}. Seigen is part of OPESCI, an ecosystem of software for elastic wave modeling~\citep{opesci-project}.
+Seigen is a new seismological modelling framework capable of solving the elastic wave equation on unstructured meshes. Exploiting the well-known velocity-stress formulation~\citep{Seigen-3}, the seismic model is expressible as two first-order linear PDEs, which we refer to as {\tt velocity} and {\tt stress}. These governing equations are discretized in space through the discontinuous-Galerkin finite element method. The evolution over time is obtained by using a fourth-order explicit leapfrog scheme based on a truncated Taylor series expansion of the velocity and stress fields. The particular choice of spatial and temporal discretizations has been shown to be non-dissipative~\citep{Seigen-1}. More details can be found in~\cite{Seigen-paper}. Seigen is part of OPESCI, an ecosystem of software for elastic wave modeling~\citep{opesci-project}.
 
 \subsubsection{Choice of the Test Case}
 The Seigen framework has been implemented using Firedrake by Christian Jacobs\footnote{Formerly Imperial College London, now University of Southampton}, along with a set of test cases. In this experimentation, we use the {\tt explosive$\_$source} test case. The test cases may differ in various aspects, such as the initial conditions of the system and the propagation of waves. However, they are all based upon the same seismological model; from a computational viewpoint, this means that, in a time step, the same sequence of loops is executed. Consequently, the performance analysis of {\tt explosive$\_$source} in Section~\ref{sec:tiling:seigen-results} is generalizable to the other test cases. In fact, some of the conclusions will be generalizable to even completely different codes. 
@@ -940,7 +940,38 @@ Assembling the global vectors reduces to executing a set of loops over mesh enti
 Introducing sparse tiling into Seigen was relatively straightforward. Three steps were required: (i) embedding the time stepping loop in a {\em loop$\_$chain} context (see Section~\ref{sec:tiling:lcinterface}), (ii) propagating the relevant user input for performance tuning, (iii) creating a set of {\em fusion schemes}. A fusion scheme establishes which sub-sequences of loops within a {\em loop$\_$chain} will be fused and the respective seed tile sizes. If no fusion schemes were specified, all of the twenty-five loops would be fused using a default tile size. As we shall see, operating with a set of small loop chains and heterogeneous tile sizes is much more effective than fusing long sequences of loops. Hence, specifying multiple fusion schemes is likely to have a direct payoff in performance. As an example, one such scheme treats the loops arising in {\tt velocity} and {\tt stress} as two different loop chains. 
 
 \subsubsection{Validation}
-Seigen has several mechanisms to validate the correctness of the seismological model and the test cases. The numerical results of all code versions (with and without tiling) were checked and compared. Paraview was also used to verify the simulation output.
+
+\begin{figure}[t]
+\centering
+\begin{subfigure}[b]{0.48\textwidth}
+\includegraphics[width=\textwidth]{sparsetiling/figures/expl-source01.png}
+\caption{Right after the explosion.}
+\end{subfigure}%
+~
+\begin{subfigure}[b]{0.48\textwidth}
+\centering
+\includegraphics[width=\textwidth]{sparsetiling/figures/expl-source02.png}
+\caption{Wave propagation (1).}
+\end{subfigure}%
+~\\
+\begin{subfigure}[b]{0.48\textwidth}
+\centering
+\includegraphics[width=\textwidth]{sparsetiling/figures/expl-source03.png}
+\caption{Wave propagation (2).}
+\end{subfigure}%
+~
+\begin{subfigure}[b]{0.48\textwidth}
+\centering
+\includegraphics[width=\textwidth]{sparsetiling/figures/expl-source04.png}
+\caption{Final snapshot.}
+\end{subfigure}%
+
+\caption{Four phases of the {\tt explosive$\_$source} test case in Seigen, following an explosion at a point source.}
+\label{fig:seigen-output}
+\end{figure}
+
+Seigen has several mechanisms to validate the correctness of the seismological model and the test cases. The numerical results of all code versions (with and without tiling) were checked and compared. Paraview was also used to verify the simulation output. A snapshot of the simulation output is displayed in Figure~\ref{fig:seigen-output}.
+
 
 \subsubsection{Parametrization of the Computation}
 There are two parameters that we can vary in {\tt explosive$\_$source}: the polynomial order of the method and the input mesh. 
