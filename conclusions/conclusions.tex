@@ -39,7 +39,7 @@ All optimizations presented in Chapter~\ref{ch:lowlevelopt} can improve the perf
 We recapitulate the open questions that arose from the three main chapters of the thesis and provide insights into possible research directions.
 
 \paragraph{Extensive performance evaluation of sparse tiling}
-The theory and the tools behind generalized sparse tiling are now mature. The next big step is extensive experimentation with computations arising in multiple domains; for instance, in addition to numerical methods on unstructured meshes (not necessarily finite element), molecular dynamics and graph processing. The potential of spare tiling has not been fully discovered yet.
+The theory and the tools behind generalized sparse tiling are now mature. The next big step will consist of extensive experimentation with computations arising in multiple domains; for instance, in addition to numerical methods on unstructured meshes (not necessarily finite element), molecular dynamics and graph processing. The potential of sparse tiling has not yet been fully explored.
 
 \paragraph{Sparse tiling in general-purpose or research compilers}
 It is unclear whether sparse tiling could be automated in general-purpose or research (polyhedral-based) compilers. Although simple inspector/executor schemes are widespread (e.g., many compilers introduce alternative code paths for handling statically unknown loop bounds), the path towards supporting more advanced transformations is long and intricate. In fact, it is also unclear whether sparse tiling should be even considered a general-purpose transformation.
