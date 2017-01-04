@@ -563,7 +563,7 @@ We analyze the execution time of four real-world bilinear forms of increasing co
 
 We evaluate the speed-ups achieved by a wide variety of transformation systems over the ``original'' code produced by the FEniCS Form Compiler (i.e., no optimizations applied). We analyze the following transformation systems:
 \begin{description}
-\item[quad] Optimized quadrature mode. Work presented in~\cite{quadrature-olegaard}, implemented in  in the FEniCS Form Compiler. 
+\item[quad] Optimized quadrature mode. Work presented in~\cite{quadrature-olegaard}, implemented in the FEniCS Form Compiler.
 \item[tens] Tensor contraction mode. Work presented in~\cite{FFC-TC}, implemented in the FEniCS Form Compiler.
 \item[auto] Automatic choice between \texttt{tens} and \texttt{quad} driven by heuristic (detailed in~\cite{Fenics} and summarized in Section~\ref{sec:bkg:math-to-code}). Implemented in the FEniCS Form Compiler.
 \item[ufls] UFLACS, a novel back-end for the FEniCS Form Compiler whose primary goals are improved code generation and execution times.
