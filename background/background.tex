@@ -562,7 +562,7 @@ A stencil defines how to access a set of values associated with a mesh element (
 
 \begin{description}
 \item[Stencils for structured meshes] Given an element $\boldsymbol{i}$ in the mesh, a stencil is a vector-valued function $f(\boldsymbol{i}) = [f_1(\boldsymbol{i}), f_2(\boldsymbol{i}), ..., f_n(\boldsymbol{i})]$ which retrieves the $n$ elements that need to be accessed when updating $\boldsymbol{i}$. A function $f_j$ is affine and usually takes the form $f_j(\boldsymbol{i}) = \boldsymbol{i}*h + o$, with $h, o \in \mathbb{N}$.
-\item[Stencils for unstructured meshes] Given an element $\boldsymbol{i}$ in the mesh and an affine access function $g$, a stencil is a vector-valued operator $f(\boldsymbol{i}, g) = [f_1(\boldsymbol{i}, g), f_2(\boldsymbol{i}, g), ..., f_n(\boldsymbol{i}, g)]$ which retrieves the $n$ elements that need to be accessed when updating $\boldsymbol{i}$. A function $f_j$ is non-affine and usually takes the form $f_j(\boldsymbol{i}, g) = g(\boldsymbol{i})*h + o$, with $h, o \in \mathbb{N}$.
+\item[Stencils for unstructured meshes] Given an element $\boldsymbol{i}$ in the mesh and an access function $g$, a stencil is a vector-valued operator $f(\boldsymbol{i}, g) = [f_1(\boldsymbol{i}, g), f_2(\boldsymbol{i}, g), ..., f_n(\boldsymbol{i}, g)]$ which retrieves the $n$ elements that need to be accessed when updating $\boldsymbol{i}$. There usually is no closed form for a function $f_j$.
 \end{description}
 
 \subsubsection{Stencil Languages for Unstructured Meshes}
