@@ -11,7 +11,7 @@ We recall from Section~\ref{sec:bkg:fenics-and-firedrake} that Firedrake users e
 \begin{figure}
 \centering
 \includegraphics[scale=0.50]{coffee/pictures/coffee-pipeline.pdf}
-\caption{The COFFEE's compilation pipeline and its interaction with Firedrake.}
+\caption{The COFFEE pipeline and its interaction with Firedrake.}
 \label{fig:coffee-pipeline}
 \end{figure}
 
@@ -35,7 +35,7 @@ The optimization process \texttt{Ox} represents the core phase in COFFEE. Overal
 \item[Optimization ({\tt Ox} or user-provided)] In addition to \texttt{Ox}, users can craft their own optimization pipelines by composing the individual transformations available in COFFEE. The compiler checks that the provided transformation sequence is legal. If the specified sequence of transformations is legal, the AST is processed. Specifically, for {\tt Ox}:
 \begin{description}
 \item[\texttt{O1}] Expression rewriting reduces to generalized code motion, while only padding and data alignment as well as loop fusion are applied amongst the low level optimizations.
-\item[\texttt{O2}] With respect to \texttt{O1}, there is only one yet fundamental change: expression rewriting now performs the whole sharing elimination procedure (i.e., Algorithm~\ref{algo:sharing-elimination}).
+\item[\texttt{O2}] With respect to \texttt{O1}, there is only one, yet fundamental, change: expression rewriting now performs the whole sharing elimination procedure (i.e., Algorithm~\ref{algo:sharing-elimination}).
 \item[\texttt{O3}] Algorithm~\ref{algo:gamma}, which coordinates sharing elimination and pre-evaluation, is executed. This is followed by sparsity optimization, loop fusion and padding and data alignment.
 \end{description}
 
@@ -72,7 +72,7 @@ Rather than using a parser, COFFEE exposes the whole hierarchy of nodes for expl
 COFFEE has been integrated with two form compilers: the FEniCS Form Compiler (FFC) and the Two-Stage Form Compiler (TSFC). These form compilers represent assembly kernels using their own internal language. The objective is to turn such a representation into an AST suitable for COFFEE. 
 
 \paragraph{FFC and COFFEE}
-FFC was developed in the context of the FEniCS framework. We had to modify the FFC's intermediate representation for constructing COFFEE ASTs, rather than C code. We made the following changes:
+FFC was developed in the context of the FEniCS framework. In the early stages of this thesis, the FFC's intermediate representation was modified to construct COFFEE ASTs, rather than C code. The following contributions were made:
 \begin{itemize}
 \item The mathematical expression evaluating the element tensor is represented in FFC as a tree data structure, or FFC AST. A limitation of an FFC AST was that its nodes -- symbols or arithmetic operations -- were not bound to loops. For instance, the FFC AST node corresponding to the symbol \texttt{A[i][j]} could not separate the variable name \texttt{A} from the loop indices \texttt{i} and \texttt{j}. We have enriched FFC AST symbols with additional fields to capture this kind of information.
 \item Basis functions in an FFC AST are added a new field storing the dimensionality of the function space. This information is later used to enrich \texttt{ArrayInit} objects with a sparsity pattern. This enables sparsity optimization without requiring COFFEE to ``sniff'' array values.
@@ -163,3 +163,16 @@ The main rule for removing a temporary \texttt{t} storing an expression \texttt{
 
 \section{On the Compilation Time}
 Firedrake and its various software components are implemented in Python, whereas the generated code is pure C. COFFEE has been written in Python for a natural integration with Firedrake. The process of transforming an AST usually takes fractions of seconds. For more complex forms, on a Sandy Bridge architecture, the AST processing takes not more than approximately 2 seconds. For extremely challenging forms, like those arising in the Holzapfel-Ogden hyperelasticity model, the code generation is carried out in 16 seconds; this is the only case, out of dozens, in which the processing time was higher than 3 seconds. We believe, however, that there is still ample space for optimizing the AST processing in COFFEE.
+
+\section{Overview of Applications Exploiting COFFEE}
+By default, Firedrake optimizes all local assembly kernels by using COFFEE at optimization level \texttt{O2}. This means that all applications written on top of Firedrake seamlessly exploit the technology described in this thesis. A non-comprehensive list of such applications is given below.
+
+\begin{description}
+\item[Thetis] A framework for coastal and estuarine modelling~\citep{thetis-webpage}. Thetis has applications in the simulation of 3D baroclinic river dynamics. It exploits 3D layered meshes (so-called ``extruded meshes'') and a large variety of finite element schemes. The lead developer, Tuomas K{\"a}rn{\"a} (Oregon Health and Science University) has observed that several simulations execute up to 30$\%$ faster when COFFEE is enabled (as it is by default).
+\item[Gusto] A dynamical core package based upon compatible finite element methods~\citep{gusto-webpage}, developed at Imperial College London by Coling Cotter, Jemma Shimpton, Hiroe Yamazaki, Andrew McRae and David Ham. The dynamical core is the part of an atmosphere model that actually solves the flow equations. Gusto is one of the key applications built on top of Firedrake.
+\item[Stability of jets and vortices] Francis Poulin (University of Waterloo) is using Firedrake to study the stability characteristics of oceanic jets and vortices (e.g., the Gulf Stream and Meddies). The focus is on understanding the structures produced and how the energy cascades across the different length scales.
+\item[Water waves and structures] At University of Leeds, Firedrake is employed in a number of projects. Anna Kalogirou and Onno Bokhove are studying the generation of nonlinear rogue water waves and how these affect ships. Floriane Gidel and Onno Bokhove use Firedrake to solve the Benney-Luke equations to simulate freak waves (created, for example, when solitary waves encounter oblique walls)~\citep{gidel-bokhove}. Tomasz Salwa, Onno Bokhove, Mark Kelmanson have developed a fluid-structure interaction model centered on water waves interacting with offshore wind turbines~\citep{salwa-bokhove-kelmanson}.
+\item[r-adaptivity on the sphere] Andrew McRae, Chris Budd (University of Bath), Colin Cotter, Jemma Shimpton (Imperial College London) are working with Firedrake on moving-mesh methods for atmospheric problems on the Earth. By solving a Monge-Ampère-type equation on the sphere, the fundamental operation of adapting a mesh to a scalar monitor-function is carried out without impacting the mesh connectivity~\citep{r-adaptivity}.
+\end{description}
+
+Most of these applications have played a key role in the development of COFFEE, either by providing interesting test cases or by simply exposing flaws in the transformation algorithms.

@@ -217,7 +217,7 @@ where $B$ is the set of all basis functions or temporary variables accessed in t
 %registers.
 
 \begin{figure}[h]
-\centerline{\includegraphics[scale=0.6]{lowlevelopt/pictures/vect-by-vect-inline.pdf}}
+\centerline{\includegraphics[scale=0.9]{lowlevelopt/pictures/vect-by-vect-inline.pdf}}
 \caption{The outer-product vectorization relies on permuting values directly within vector registers.}
 \label{fig:vect-by-vect}
 \end{figure}
@@ -225,7 +225,7 @@ where $B$ is the set of all basis functions or temporary variables accessed in t
 The storage layout of {\tt PA}, however, is incorrect after the application of this outer-product-based vectorization. It can be efficiently restored with a sequence of vector shuffles following the pattern highlighted in Figure~\ref{fig:restore-layout}, executed once outside of the \texttt{ijk} loop nest. The pseudo-code for the transformed weighted Laplace assembly kernel is shown in Listing~\ref{code:weighted-laplace-opvect}.
 
 \begin{figure}[h]
-\centerline{\includegraphics[scale=0.6]{lowlevelopt/pictures/vect-restore-inline.pdf}}
+\centerline{\includegraphics[scale=0.9]{lowlevelopt/pictures/vect-restore-inline.pdf}}
 \caption{Restoring the storage layout is the last step of the outer-product vectorization. The figure shows how 4$\times$4 elements in the top-left block of the element matrix {\tt A} can be moved to their correct positions. Each rotation, represented by a group of three same-colored arrows, is implemented by a single shuffle intrinsic.}
 \label{fig:restore-layout}
 \end{figure}
@@ -240,9 +240,33 @@ The objective is to evaluate the impact of the code transformations presented in
 \subsection{Setup}
 We use three bilinear forms, which we refer to as (i) {\tt Helmholtz}, (ii) {\tt Diffusion}, and (iii) {\tt Burgers} (the names derive from the PDEs from which the bilinear forms were extracted). The three chosen forms lead to \emph{real-life kernels} and comprise the core differential operators in some of the most frequently encountered finite element problems in scientific computing. This is of crucial importance because distinct problems, possibly arising in completely different fields, may employ (subsets of) the same differential operators of our benchmarks, which implies similarities and redundant patterns in the generated code. Consequently, the proposed code transformations have a domain of applicability that goes far beyond that of the three analyzed equations.
 
-The {\tt Helmholtz} and {\tt Diffusion} kernels are archetypal second order elliptic operators. They are complete and unsimplified examples of the operators used to model diffusion and viscosity in fluids, and for imposing pressure in compressible fluids. As such, they are both extensively used in climate and ocean modeling. Very similar operators, for which the same optimisations are expected to be equally effective, apply to elasticity problems, which are at the base of computational structural mechanics. The {\tt Burgers} kernel is a typical example of a first order hyperbolic conservation law, which occurs in real applications whenever a quantity is transported by a fluid (the momentum itself, in our case). We chose this particular kernel since it applies to a vector-valued quantity, while the elliptic operators apply to scalar quantities; this impacts the generated code, as explained next. The operators we have selected are characteristic of both the second and first order operators that dominate fluids and solids simulations.
+The {\tt Helmholtz} and {\tt Diffusion} kernels are archetypal second order elliptic operators. They are complete and unsimplified examples of the operators used to model diffusion and viscosity in fluids, and for imposing pressure in incompressible fluids. As such, they are both extensively used in climate and ocean modeling. Very similar operators, for which the same optimizations are expected to be equally effective, apply to elasticity problems, which are at the base of computational structural mechanics. The {\tt Burgers} kernel is a typical example of a first order hyperbolic conservation law, which occurs in real applications whenever a quantity is transported by a fluid (the momentum itself, in our case). While the two elliptic operators apply to scalar quantities, the chosen {\tt Burgers} kernel applies to a vector-valued quantity; this impacts the generated code, as explained next. The operators we have selected are characteristic of both the second and first order operators that dominate fluids and solids simulations. 
 
-The benchmarks were written in UFL (code available at~\citep{ufl-code-lowlevelopt}) and executed over real unstructured meshes through Firedrake. The transformations are applied through COFFEE, which is used by Firedrake. The {\tt Diffusion} code has already been shown in Listing~\ref{code:weighted-laplace}. The {\tt Helmholtz} equation uses the same differential operators as {\tt Diffusion}. In the {\tt Helmholtz} kernel code, the main differences with respect to {\tt Helmholtz} are the presence of additional arrays (the basis functions for the ``mass term'') and constants for computing the element matrix. {\tt Burgers} is a non-linear problem employing differential operators different from those of {\tt Helmholtz} and relying on vector-valued quantities, which has a major impact on the generated assembly code (see Listing~\ref{code:burgers}), where a larger number of basis function arrays ($X1$, $X2$, ...) and constants ($F0$, $F1$, ..., $K0$, $K1$,...) are generated.
+The benchmarks, including the UFL description, are available at~\citep{ufl-code-lowlevelopt}; for convenience, the studied bilinear operators are also summarized in Figures~\ref{eq:lowlevel-helmholtz},~\ref{eq:lowlevel-diffusion}, and~\ref{eq:lowlevel-burgers}. The benchmarks were executed over real unstructured meshes through Firedrake. The transformations are applied through COFFEE, which is used by Firedrake. The {\tt Diffusion} code has already been shown in Listing~\ref{code:weighted-laplace}. The {\tt Helmholtz} equation uses the same differential operators as {\tt Diffusion}. In the {\tt Helmholtz} kernel code, the main differences with respect to {\tt Diffusion} are the presence of additional arrays (the basis functions for the ``mass term'') and constants for computing the element matrix. {\tt Burgers} is a non-linear problem employing differential operators different from those of {\tt Helmholtz} and relying on vector-valued quantities, which has a major impact on the generated assembly code (see Listing~\ref{code:burgers}), where a larger number of basis function arrays ($X1$, $X2$, ...) and constants ($F0$, $F1$, ..., $K0$, $K1$,...) are generated.
+
+\begin{figure}
+\begin{equation}
+\int_\Omega \nabla u\cdot\nabla v  + uv\ \mathrm{d}x
+\end{equation}
+\caption{The Helmholtz bilinear form. The trial function $u$ and the test function $v$ belong to the space of continuous piecewise-defined polynomials of given degree.}
+\label{eq:lowlevel-helmholtz}
+\end{figure}
+
+\begin{figure}
+\begin{equation}
+\int_\Omega \nabla u\cdot\nabla v\ \mathrm{d}x
+\end{equation}
+\caption{The Diffusion bilinear form. The trial function $u$ and the test function $v$ belong to the space of continuous piecewise-defined polynomials of given degree.}
+\label{eq:lowlevel-diffusion}
+\end{figure}
+
+\begin{figure}
+\begin{equation}
+\int_\Omega\frac{u^{n+1}-u^n}{dt}\cdot v + ((u^{n+1}\cdot\nabla) u^{n+1})\cdot v + \nu\nabla u^{n+1}\cdot\nabla v \ \mathrm d x
+\end{equation}
+\caption{The Burgers operator. The solution $u$ and the test function $v$ belong to the space of vector-valued continuous piecewise-defined polynomials of given degree. $\nu$ is a constant scalar viscosity. A backward Euler time discretization is used.}
+\label{eq:lowlevel-burgers}
+\end{figure}
 
 These problems were studied varying both the shape of mesh elements and the polynomial order $q$ of the function spaces, whereas the element family, Lagrange, is fixed. As might be expected, the larger the element shape and $q$, the larger the iteration space. Triangles, tetrahedra, and prisms were tested as element shape. For instance, in the case of {\tt Helmholtz} with $q=1$, the size of the \texttt{j} and \texttt{k} loops for the three element shapes is, respectively, $3$, $4$, and $6$. Moving to larger shapes has the effect of increasing the number of basis function arrays, since, intuitively, the behaviour of the equation has to be approximated also along a third axis. On the other hand, the polynomial order affects only the problem size (the three loops \texttt{i}, \texttt{j}, and \texttt{k}, and, as a consequence, the size of the $X$ and $Y$ arrays). A range of polynomial orders from $q=1$ to $q=4$ were tested; higher polynomial orders are excluded from the study because of current Firedrake limitations. In all these cases, the size of the element matrix rarely exceeds 30$\times$30, with a peak of 105$\times$105 in {\tt Burgers} with prisms and $q=4$.
 

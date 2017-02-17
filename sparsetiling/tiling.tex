@@ -159,7 +159,7 @@ Before diving into the description of the loop chain abstraction, it is worth ob
 %We have spent a considerable amount of time in designing and implementing a highly optimized inspector algorithm; this hopefully will make the overhead negligible even in the unfortunate case of frequent changes to the data dependence pattern. 
 \item To adopt sparse tiling in a code there are two options. One possibility is to provide a library and leave the application specialists with the burden of carrying out the implementation (re-implementation in case of legacy code). A more promising alternative consists of raising the level of abstraction: programs can be written in a domain-specific language; loop chain, inspector, and executor can then be automatically derived at the level of the intermediate representation. As we shall see in Section~\ref{sec:tiling:automation}, the tools developed in this chapter enable both approaches.
 \end{itemize}
-These points will further be elaborated in later sections.
+These points will be further elaborated in later sections.
 
 \subsection{Definition of a Loop Chain}
 In~\cite{ST-KriegerHIPS2013}, a loop chain is defined as follows:
@@ -830,7 +830,7 @@ The experimentation of generalized sparse tiling consisted of two phases:
 \item Then, a real application developed in Firedrake, Seigen (an elastic wave equation solver for seismological problems), was used for systematic performance evaluation. This is presented in Section~\ref{sec:tiling:seigen}. Thanks to its long sequence of loops, Seigen provided a whole suite of sparse tiling benchmark configurations.
 \end{enumerate}
 
-In this section, we focus on phase 1. Both benchmarks are written in C. Sparse tiling was introduced manually using a rudimentary version of SLOPE. A previous version of the inspector algorithms presented in this chapter, described in~\cite{st-paper}, was used. As detailed next, one of the major drawbacks of this older inspector was its cost, which grew very rapidly with the number of loops in the chain and the number of distinct datasets accessed. Finally, only shared-memory parallelism via OpenMP was supported. 
+In this section, we focus on phase 1. Both benchmarks are written in C. Sparse tiling was introduced manually using a preliminary version of SLOPE. A previous version of the inspector algorithms presented in this chapter, described in~\cite{st-paper}, was used. As detailed next, one of the major drawbacks of this older inspector was its cost, which grew very rapidly with the number of loops in the chain and the number of distinct datasets accessed. Finally, only shared-memory parallelism via OpenMP was supported.
 
 In all experiments presented in this section, the optimal tile size (i.e. the one leading to the best execution time) was determined empirically, for each combination of architecture and application. 
 
@@ -888,10 +888,9 @@ Architecture & Implementation & Execution time (s) & Speed-up \\
 \label{table:st-airfoil}
 \end{table}
 
-The second benchmark was Airfoil, a proxy application designed to represent a class of computations based on the finite volume method~\citep{AIRFOIL}. Three implementations of Airfoil, {\em omp}, {\em mpi} and {\em tiled}, were compared on two shared-memory machines, an Intel Westmere (dual-socket 6-core Intel Xeon X5650 2.66 GHz, 12MB of shared L3 cache per socket) and an Intel Sandy Bridge (dual-socket 8-core Intel Xeon E5-2680 2.00Ghz, 20MB of shared L3 cache per socket). The code was compiled using the Intel \texttt{icc 2013} compiler with optimizations enabled (\texttt{-O3}, \texttt{-xSSE4.2} on the Westmere and \texttt{-xAVX} on the Sandy Bridge).
+The second benchmark was Airfoil~\citep{AIRFOIL}, a proxy finite volume application designed in the context of the OP2 project to represent the 3D viscous flow calculations typical of the Hydra CFD code~\citep{hydra-op2} at Rolls-Royce plc. It is a nonlinear 2D inviscid airfoil code using an unstructured mesh, which solves the 2D Euler equations employing a scalar numerical dissipation. Airfoil has a predictor/corrector time-marching loop consisting of 2000 iterations, and iterates towards the steady state solution by using a control volume approach in each iteration~\citep{airfoil-code}. At each time iteration, four parallel loops are executed. The first two loops, called {\tt adt-calc} and {\tt res-calc}, constitute the bulk of the computation. The {\tt adt-calc} loop iterates over cells, reads from adjacent vertices and writes to a local dataset, whereas {\tt res-calc} iterates over edges and exploits indirect mappings to vertices and cells for incrementing indirect datasets associated to cells. These loops share datasets associated with cells and vertices. The {\tt res-calc} loop computes the flux over the interior edges. The third and fourth loops, called {\tt bres-calc} and {\tt update}, are less computationally expensive. The former computes the flux over the boundary edges, while the latter -- a direct loop over cells -- updates the current solution. Double-precision floating-point arithmetic is used.
 
-The Airfoil code consists of a main time loop with 2000 iterations. This loop contains a sequence of four parallel loops that carry out the computation. In this sequence, the first two loops, called $adt$-$calc$ and $res$-$calc$, constitute the bulk of the computation. $Adt$-$calc$ iterates over cells, reads from adjacent vertices and write to a local dataset, whereas $res$-$calc$ iterates over edges and exploits indirect mappings to vertices and cells for incrementing indirect datasets associated to cells. These loops share datasets associated with cells and vertices. Datasets are composed of doubles.
-%-precision floating-point values.
+Three implementations of Airfoil, {\em omp}, {\em mpi} and {\em tiled}, were compared on two shared-memory machines, an Intel Westmere (dual-socket 6-core Intel Xeon X5650 2.66 GHz, 12MB of shared L3 cache per socket) and an Intel Sandy Bridge (dual-socket 8-core Intel Xeon E5-2680 2.00Ghz, 20MB of shared L3 cache per socket). The code was compiled using the Intel \texttt{icc 2013} compiler with optimizations enabled (\texttt{-O3}, \texttt{-xSSE4.2} on the Westmere and \texttt{-xAVX} on the Sandy Bridge).
 
 The {\em omp} and {\em mpi} versions of Airfoil were implemented in OP2. The effectiveness of these parallelization schemes has been demonstrated in~\cite{op2-main}. The {\em tiled} implementation uses an early version of the SLOPE library (the differences with the inspector algorithms shown in Section~\ref{sec:tiling:inspector} are discussed later) and is based on shared-memory parallelism via OpenMP. We manually unrolled the time loop by a factor of two to be able to tile over 6 loops in total. 
 
@@ -916,13 +915,13 @@ The Airfoil experiments highlighted that shared-memory parallelism over multi-so
 
 \section{Performance Evaluation - Seigen: an Elastic Wave Equation Solver for Seismological Problems}
 \label{sec:tiling:seigen}
-In this section, sparse tiling is applied to a computation built on top of Firedrake, Seigen. The performance analysis presented in the following sections is an actual methodological contribution of the thesis. The objectives of this experimentation were to quantify and to motivate in detail the impact of the optimization in a complex, realistic simulation. For this, we executed a large set of experiments on multiple architectures, made use of profilers and analytical tools, and studied the correlation with key simulation parameters, such as the polynomial order and the mesh.
+In this section, sparse tiling is applied to a computation built on top of Firedrake, Seigen. The performance analysis presented in the following sections is an actual methodological contribution of the thesis. The objectives of this experimentation were to quantify and to motivate in detail the impact of the optimization in a complex, realistic application. For this, we executed a large set of experiments on multiple architectures, made use of profilers and analytical tools, and studied the correlation with key simulation parameters, such as the polynomial order and the mesh.
 
 \subsection{Computation}
 \label{sec:tiling:seigen:comp}
 
 \subsubsection{The Seismic Model}
-Seigen is a novel seismological modelling framework capable of solving the elastic wave equation on unstructured meshes. Exploiting the well-known velocity-stress formulation~\citep{Seigen-3}, the seismic model is expressible as two first-order linear PDEs, which we refer to as {\tt velocity} and {\tt stress}. These governing equations are discretized in space through the discontinuous-Galerkin finite element method. The evolution over time is obtained by using a fourth-order explicit leapfrog scheme based on a truncated Taylor series expansion of the velocity and stress fields. The particular choice of spatial and temporal discretizations has been proven to be non-dissipative~\citep{Seigen-1}. More details can be found in~\cite{Seigen-paper}. Seigen is part of OPESCI, an ecosystem of software for elastic wave modeling~\citep{opesci-project}. 
+Seigen is a new seismological modelling framework capable of solving the elastic wave equation on unstructured meshes. Exploiting the well-known velocity-stress formulation~\citep{Seigen-3}, the seismic model is expressible as two first-order linear PDEs, which we refer to as {\tt velocity} and {\tt stress}. These governing equations are discretized in space through the discontinuous-Galerkin finite element method. The evolution over time is obtained by using a fourth-order explicit leapfrog scheme based on a truncated Taylor series expansion of the velocity and stress fields. The particular choice of spatial and temporal discretizations has been shown to be non-dissipative~\citep{Seigen-1}. More details can be found in~\cite{Seigen-paper}. Seigen is part of OPESCI, an ecosystem of software for elastic wave modeling~\citep{opesci-project}.
 
 \subsubsection{Choice of the Test Case}
 The Seigen framework has been implemented using Firedrake by Christian Jacobs\footnote{Formerly Imperial College London, now University of Southampton}, along with a set of test cases. In this experimentation, we use the {\tt explosive$\_$source} test case. The test cases may differ in various aspects, such as the initial conditions of the system and the propagation of waves. However, they are all based upon the same seismological model; from a computational viewpoint, this means that, in a time step, the same sequence of loops is executed. Consequently, the performance analysis of {\tt explosive$\_$source} in Section~\ref{sec:tiling:seigen-results} is generalizable to the other test cases. In fact, some of the conclusions will be generalizable to even completely different codes. 
@@ -941,14 +940,45 @@ Assembling the global vectors reduces to executing a set of loops over mesh enti
 Introducing sparse tiling into Seigen was relatively straightforward. Three steps were required: (i) embedding the time stepping loop in a {\em loop$\_$chain} context (see Section~\ref{sec:tiling:lcinterface}), (ii) propagating the relevant user input for performance tuning, (iii) creating a set of {\em fusion schemes}. A fusion scheme establishes which sub-sequences of loops within a {\em loop$\_$chain} will be fused and the respective seed tile sizes. If no fusion schemes were specified, all of the twenty-five loops would be fused using a default tile size. As we shall see, operating with a set of small loop chains and heterogeneous tile sizes is much more effective than fusing long sequences of loops. Hence, specifying multiple fusion schemes is likely to have a direct payoff in performance. As an example, one such scheme treats the loops arising in {\tt velocity} and {\tt stress} as two different loop chains. 
 
 \subsubsection{Validation}
-Seigen has several mechanisms to validate the correctness of the seismological model and the test cases. The numerical results of all code versions (with and without tiling) were checked and compared. Paraview was also used to verify the simulation output.
+
+\begin{figure}[t]
+\centering
+\begin{subfigure}[b]{0.48\textwidth}
+\includegraphics[width=\textwidth]{sparsetiling/figures/expl-source01.png}
+\caption{Right after the explosion.}
+\end{subfigure}%
+~
+\begin{subfigure}[b]{0.48\textwidth}
+\centering
+\includegraphics[width=\textwidth]{sparsetiling/figures/expl-source02.png}
+\caption{Wave propagation (1).}
+\end{subfigure}%
+~\\
+\begin{subfigure}[b]{0.48\textwidth}
+\centering
+\includegraphics[width=\textwidth]{sparsetiling/figures/expl-source03.png}
+\caption{Wave propagation (2).}
+\end{subfigure}%
+~
+\begin{subfigure}[b]{0.48\textwidth}
+\centering
+\includegraphics[width=\textwidth]{sparsetiling/figures/expl-source04.png}
+\caption{Final snapshot.}
+\end{subfigure}%
+
+\caption{Four phases of the {\tt explosive$\_$source} test case in Seigen, following an explosion at a point source.}
+\label{fig:seigen-output}
+\end{figure}
+
+Seigen has several mechanisms to validate the correctness of the seismological model and the test cases. The numerical results of all code versions (with and without tiling) were checked and compared. Paraview was also used to verify the simulation output. A snapshot of the simulation output is displayed in Figure~\ref{fig:seigen-output}.
+
 
 \subsubsection{Parametrization of the Computation}
 There are two parameters that we can vary in {\tt explosive$\_$source}: the polynomial order of the method and the input mesh. 
 
 \begin{description}
 \item[Polynomial order $q$] We will test the spectrum $q \in \lbrace 1, 2, 3, 4 \rbrace$. To test higher polynomial orders, changes to both the spatial and temporal discretizations would be necessary. For the spatial discretization, the most obvious choice would be tensor product function spaces. However, this functionality is still under development in Firedrake.
-\item[Mesh] We use as input a two-dimensional rectangular mesh of fixed size 300$\times$150. We will vary the mesh spacing $h$, which impacts the number of elements in the domain.
+\item[Mesh] We use as input a two-dimensional rectangular domain of fixed size 300$\times$150 tessellated with triangles. We will vary the mesh spacing $h$, which impacts the number of elements in the domain.
 \end{description}
 
 \subsubsection{Computational Analysis of the Loops}
@@ -1089,7 +1119,7 @@ To collect OT, ACT and ACCT, the following configuration was adopted.
 \item The cost of global matrix assembly -- an operation that takes place before entering the time loop -- {\it is not} included in OT. Firedrake needs to be extended to assemble block-diagonal matrices directly into vectors (an entry in the vector would represent a matrix block). Currently, this is instead obtained in two steps: first, by assembling into a CSR matrix; then, by explicitly copying the diagonal into a vector (a Python operation). The assembly per se never takes more than 3 seconds, so it is reasonable to exclude this temporary overhead from our timing.
 \item The inspection cost due to sparse tiling {\it is} included in OT.
 \item Extra costs were minimized: no check-pointing, only two I/O sessions (at the beginning and at the end of the computation), and minimal logging.
-\item The time loop has a fixed duration $T$, while the time step depends on the mesh spacing $h$. In essence, finer meshes require proportionately smaller time steps to ensure convergence. Furthermore, $T$ cannot be reduced arbitrarily, which makes the performance exploration longer. A (prolonged) transitory period $P$ is necessary so that the waves fully propagate across the domain. During $P$, the data movement is greatly reduced as most data values are unchanged. The effects of sparse tiling become evident only if $T$ is sufficiently longer than $P$, so complete simulations had to be executed.
+\item The time loop has a fixed duration $T$, while the time step depends on the mesh spacing $h$ to satisfy the Courant–Friedrichs–Lewy necessary condition (i.e., CFL limit) for the numerical convergence. In essence, finer meshes require proportionately smaller time steps to ensure convergence. Furthermore, $T$ cannot be reduced arbitrarily, which makes the performance exploration longer. A (prolonged) transitory period $P$ is necessary so that the waves fully propagate across the domain. During $P$, the data movement is greatly reduced as most data values are unchanged. The effects of sparse tiling become evident only if $T$ is sufficiently longer than $P$, so complete simulations had to be executed.
 \end{itemize}
 
 
@@ -1380,12 +1410,13 @@ It is not unreasonable to expect some of these limiting factors to arise in othe
 
 
 \section{Conclusions and Future Work}
-Sparse tiling, and more generally time tiling, aims to turn the data reuse in a sequence of loops into data locality. In this chapter, three main problems have been addressed: the generalization of sparse tiling to arbitrary sequences of irregular loops through the loop chain abstraction, automation via DSLs, and effective support for shared- and distributed-memory parallelism. The major strength of this work lies in the fact that all algorithmic and technological contributions derive from an in-depth study of real-world applications. The performance issues we found through Seigen would never have been exposed by a set of simplistic benchmarks, as often used in the literature. 
+Sparse tiling, and more generally time tiling, aims to turn the data reuse in a sequence of loops into data locality. In this chapter, three main problems have been addressed: the generalization of sparse tiling to arbitrary sequences of irregular loops through the loop chain abstraction, automation via DSLs, and effective support for shared- and distributed-memory parallelism. The major strength of this work lies in the fact that all algorithmic and technological contributions derive from an in-depth study of a realistic applications. The performance issues we found through Seigen would never have been exposed by a set of simplistic benchmarks, as often used in the literature.
 %Hopefully, the methodology presented in this chapter will be in this sense inspirational.
 
 The thorough performance analysis of Seigen has shed much light on sparse tiling. However, the experimentation can still be extended in two ways:
 \begin{description}
 \item[Multi-node experiments] The more aggressive fusion schemes, which make use of extended halo regions, may be affected or take advantage from network communication. Other issues or potentials inherent in sparse tiling could be exposed. Multi-node experiments have highest priority and are now in progress.
+\item[3D problems] Since many real-world simulations are based on 3D problems, it would be natural to extend the performance evaluation of Seigen in this direction. At the moment of writing, however, Seigen still does not include 3D test cases.
 \item[Other applications] Seigen was attractive for its long sequence of loops, which provides a complex, realistic scenario for testing sparse tiling. It would be particularly interesting to experiment with other explicit high-order discontinuous-Galerkin methods. Another class of appealing loop chains arises in matrix-free solvers.
 %, since compelling evidence that the performance gain grows with the memory footprint was provided
 \end{description}
